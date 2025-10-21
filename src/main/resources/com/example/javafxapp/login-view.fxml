@@ -1,0 +1,189 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+<?import javafx.scene.shape.*?>
+<?import javafx.scene.effect.*?>
+<?import javafx.scene.text.Text?>
+
+<StackPane xmlns="http://javafx.com/javafx/21.0.1" xmlns:fx="http://javafx.com/fxml/1"
+           fx:controller="com.example.javafxapp.LoginController">
+    <children>
+        <HBox fx:id="rootHBox" spacing="0">
+            <!-- LEFT PANEL (Branding) -->
+            <StackPane fx:id="leftPanel" HBox.hgrow="ALWAYS" prefWidth="600" styleClass="left-panel">
+                <children>
+                    <!-- Decorative circles -->
+                    <Pane>
+                        <children>
+                            <Circle radius="128" layoutX="680" layoutY="60" styleClass="blur-circle-white">
+                                <effect>
+                                    <GaussianBlur radius="45" />
+                                </effect>
+                            </Circle>
+                            <Circle radius="192" layoutX="120" layoutY="520" styleClass="blur-circle-green">
+                                <effect>
+                                    <GaussianBlur radius="45" />
+                                </effect>
+                            </Circle>
+                        </children>
+                    </Pane>
+
+                    <VBox spacing="28" maxWidth="720">
+                        <padding><Insets top="48" right="48" bottom="48" left="48"/></padding>
+                        <!-- Logo row -->
+                        <HBox spacing="16" alignment="CENTER_LEFT">
+                            <StackPane alignment="CENTER" styleClass="logo-box">
+                                <!-- TrendingUp icon via SVGPath -->
+                                <SVGPath styleClass="input-icon" fill="white"
+                                         content="M2 14 L2 10 L8 4 L12 8 L20 0 L22 2 L12 12 L8 8 L4 12 L4 14 Z"/>
+                            </StackPane>
+                            <VBox spacing="2">
+                                <Label textFill="white" style="-fx-font-size: 24px; -fx-font-weight: 800;" text="Sistema BI"/>
+                                <Label textFill="rgba(255,255,255,0.8)" style="-fx-font-size: 14px;" text="Business Intelligence"/>
+                            </VBox>
+                        </HBox>
+
+                        <!-- Main title -->
+                        <VBox spacing="8">
+                            <Text styleClass="brand-title" text="Transforma tus" />
+                            <Text styleClass="brand-title" text="datos en" />
+                            <Text styleClass="brand-title brand-title-accent" text="decisiones inteligentes" />
+                        </VBox>
+
+                        <!-- Subtitle -->
+                        <Label wrapText="true" maxWidth="400" styleClass="brand-subtitle"
+                               text="Plataforma completa de análisis de negocios diseñada para PyMEs que buscan crecer con inteligencia."/>
+
+                        <!-- Feature list -->
+                        <VBox spacing="16">
+                            <HBox spacing="12" alignment="CENTER_LEFT">
+                                <StackPane styleClass="feature-icon-box" alignment="CENTER">
+                                    <SVGPath fill="white" opacity="0.9"
+                                             content="M2 18 L2 16 L6 16 L6 18 Z M8 18 L8 10 L12 10 L12 18 Z M14 18 L14 6 L18 6 L18 18 Z"/>
+                                </StackPane>
+                                <VBox spacing="2">
+                                    <Label styleClass="brand-feature-title" text="Análisis Predictivo"/>
+                                    <Label styleClass="brand-feature-subtitle" text="Proyecciones basadas en IA"/>
+                                </VBox>
+                            </HBox>
+                            <HBox spacing="12" alignment="CENTER_LEFT">
+                                <StackPane styleClass="feature-icon-box" alignment="CENTER">
+                                    <SVGPath fill="white" opacity="0.9"
+                                             content="M2 18 L22 18 L22 16 L2 16 Z M4 14 L8 10 L12 12 L20 6 L22 8 L22 14 Z"/>
+                                </StackPane>
+                                <VBox spacing="2">
+                                    <Label styleClass="brand-feature-title" text="Reportes en Tiempo Real"/>
+                                    <Label styleClass="brand-feature-subtitle" text="Dashboard actualizado constantemente"/>
+                                </VBox>
+                            </HBox>
+                            <HBox spacing="12" alignment="CENTER_LEFT">
+                                <StackPane styleClass="feature-icon-box" alignment="CENTER">
+                                    <SVGPath fill="white" opacity="0.9"
+                                             content="M12 2 A10 10 0 1 0 22 12 L12 12 Z"/>
+                                </StackPane>
+                                <VBox spacing="2">
+                                    <Label styleClass="brand-feature-title" text="Evaluación de Rentabilidad"/>
+                                    <Label styleClass="brand-feature-subtitle" text="Analiza el desempeño financiero"/>
+                                </VBox>
+                            </HBox>
+                        </VBox>
+
+                        <Pane VBox.vgrow="ALWAYS"/>
+                        <Label styleClass="brand-footer" text="Más de 1,000 empresas confían en nosotros para tomar mejores decisiones"/>
+                    </VBox>
+                </children>
+            </StackPane>
+
+            <!-- RIGHT PANEL (Login Form) -->
+            <ScrollPane fitToWidth="true" fitToHeight="true" HBox.hgrow="ALWAYS" pannable="false" hbarPolicy="NEVER" vbarPolicy="AS_NEEDED">
+                <content>
+                    <VBox fx:id="rightPanel" spacing="28" styleClass="right-panel" alignment="TOP_CENTER">
+                        <padding><Insets top="48" right="32" bottom="48" left="32"/></padding>
+
+                        <!-- Mobile logo (visible only when leftPanel hidden) -->
+                        <StackPane fx:id="mobileLogo" styleClass="mobile-logo-box" visible="false" managed="false" alignment="CENTER">
+                            <SVGPath fill="white" content="M2 14 L2 10 L8 4 L12 8 L20 0 L22 2 L12 12 L8 8 L4 12 L4 14 Z"/>
+                        </StackPane>
+
+                        <!-- Header -->
+                        <VBox spacing="6" alignment="CENTER_LEFT" maxWidth="520">
+                            <Label styleClass="header-title" text="Bienvenido de nuevo"/>
+                            <Label styleClass="header-subtitle" text="Ingresa tus credenciales para acceder"/>
+                        </VBox>
+
+                        <!-- Form Card -->
+                        <StackPane maxWidth="520">
+                            <StackPane fx:id="formCard" styleClass="form-card">
+                                <VBox spacing="16">
+                                    <!-- Email -->
+                                    <VBox spacing="8">
+                                        <Label styleClass="form-label" text="Correo Electrónico"/>
+                                        <StackPane fx:id="emailWrapper" styleClass="input-wrapper" alignment="CENTER_LEFT">
+                                            <children>
+                                                <SVGPath fx:id="iconEmail" styleClass="input-icon" translateX="14" translateY="0" content="M2 4 H22 A2 2 0 0 1 24 6 V18 A2 2 0 0 1 22 20 H2 A2 2 0 0 1 0 18 V6 A2 2 0 0 1 2 4 Z M2 6 L12 12 L22 6"/>
+                                                <TextField fx:id="emailField" promptText="correo@ejemplo.com" prefHeight="56" />
+                                            </children>
+                                        </StackPane>
+                                        <HBox spacing="6" visible="false" managed="false" fx:id="emailErrorRow">
+                                            <Circle radius="3" fill="#A03C48" />
+                                            <Label fx:id="emailError" styleClass="error-label" text=""/>
+                                        </HBox>
+                                    </VBox>
+
+                                    <!-- Password -->
+                                    <VBox spacing="8">
+                                        <Label styleClass="form-label" text="Contraseña"/>
+                                        <StackPane fx:id="passwordWrapper" styleClass="input-wrapper" alignment="CENTER_LEFT">
+                                            <children>
+                                                <SVGPath fx:id="iconLock" styleClass="input-icon" translateX="14" content="M6 10 V8 A6 6 0 0 1 18 8 V10 H20 V22 H4 V10 Z M8 10 H16 V8 A4 4 0 0 0 8 8 Z"/>
+                                                <PasswordField fx:id="passwordField" promptText="••••••••" prefHeight="56" />
+                                                <!-- Eye button -->
+                                                <Button fx:id="togglePassBtn" style="-fx-background-color: transparent; -fx-text-fill: #6B7280;" text="" StackPane.alignment="CENTER_RIGHT" translateX="-8">
+                                                    <graphic>
+                                                        <SVGPath fx:id="iconEye" fill="#6B7280" content="M1 12 C3 7 8 4 12 4 C16 4 21 7 23 12 C21 17 16 20 12 20 C8 20 3 17 1 12 Z M12 8 A4 4 0 1 0 12 16 A4 4 0 1 0 12 8 Z"/>
+                                                    </graphic>
+                                                </Button>
+                                            </children>
+                                        </StackPane>
+                                        <HBox spacing="6" visible="false" managed="false" fx:id="passwordErrorRow">
+                                            <Circle radius="3" fill="#A03C48" />
+                                            <Label fx:id="passwordError" styleClass="error-label" text=""/>
+                                        </HBox>
+                                    </VBox>
+
+                                    <!-- Options Row -->
+                                    <HBox spacing="12" alignment="CENTER_LEFT">
+                                        <CheckBox fx:id="rememberCheck" text="Recordarme" />
+                                        <Pane HBox.hgrow="ALWAYS" />
+                                        <Hyperlink fx:id="forgotLink" text="¿Olvidaste tu contraseña?" styleClass="link" />
+                                    </HBox>
+
+                                    <!-- Login Button -->
+                                    <Button fx:id="loginButton" styleClass="primary-btn" prefHeight="56" maxWidth="Infinity">
+                                        <graphic>
+                                            <HBox spacing="10" alignment="CENTER">
+                                                <ProgressIndicator fx:id="spinner" visible="false" managed="false" prefWidth="16" prefHeight="16" styleClass="loading-indicator" progress="-1" />
+                                                <Label fx:id="btnText" text="Iniciar Sesión" />
+                                                <SVGPath fx:id="arrowIcon" fill="white" content="M4 12 H18 L14 8 L16 6 L24 14 L16 22 L14 20 L18 16 H4 Z"/>
+                                            </HBox>
+                                        </graphic>
+                                    </Button>
+
+                                    <!-- Footer under button -->
+                                    <HBox alignment="CENTER" spacing="6">
+                                        <Label text="¿No tienes una cuenta?" style="-fx-text-fill: #6B7280;" />
+                                        <Hyperlink text="Contacta con ventas" styleClass="link" />
+                                    </HBox>
+                                </VBox>
+                            </StackPane>
+                        </StackPane>
+
+                        <!-- Copyright -->
+                        <Label text="© 2025 Sistema BI. Todos los derechos reservados." style="-fx-text-fill: #6B7280; -fx-font-size: 12px;" />
+                    </VBox>
+                </content>
+            </ScrollPane>
+        </HBox>
+    </children>
+</StackPane>

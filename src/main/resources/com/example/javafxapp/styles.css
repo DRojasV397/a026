@@ -1,0 +1,142 @@
+/* Color palette */
+.root {
+    -primary: #3B8EA5;
+    -primary-dark: #2C6B7D;
+    -green-accent: #58BD8B;
+    -text-main: #2C3E50;
+    -text-secondary: #6B7280;
+    -error: #A03C48;
+    -bg: #F5F9FC;
+    -white: #FFFFFF;
+}
+
+/* Layout backgrounds */
+.left-panel {
+    -fx-background-color: linear-gradient(to bottom right, #3B8EA5, #2C6B7D);
+}
+.right-panel {
+    -fx-background-color: #F5F9FC;
+}
+
+/* Blurred decorative circles */
+.blur-circle-white {
+    -fx-fill: rgba(255,255,255,0.05);
+}
+.blur-circle-green {
+    -fx-fill: rgba(88,189,139,0.20);
+}
+
+/* Branding text */
+.brand-title {
+    -fx-font-size: 60px;
+    -fx-font-weight: 800;
+    -fx-text-fill: white;
+    -fx-line-spacing: 6px;
+}
+.brand-title-accent { -fx-text-fill: #58BD8B; }
+.brand-subtitle {
+    -fx-font-size: 18px;
+    -fx-text-fill: rgba(255,255,255,0.8);
+}
+.brand-feature-title {
+    -fx-font-size: 16px;
+    -fx-font-weight: 700;
+    -fx-text-fill: white;
+}
+.brand-feature-subtitle {
+    -fx-font-size: 13px;
+    -fx-text-fill: rgba(255,255,255,0.8);
+}
+.brand-footer {
+    -fx-font-size: 14px;
+    -fx-text-fill: rgba(255,255,255,0.6);
+}
+
+/* Logo container */
+.logo-box {
+    -fx-min-width: 48px; -fx-min-height: 48px;
+    -fx-max-width: 48px; -fx-max-height: 48px;
+    -fx-background-color: rgba(255,255,255,0.10);
+    -fx-background-radius: 12;
+    -fx-border-radius: 12;
+    -fx-border-color: rgba(255,255,255,0.20);
+}
+
+/* Feature icon container */
+.feature-icon-box {
+    -fx-min-width: 40px; -fx-min-height: 40px;
+    -fx-max-width: 40px; -fx-max-height: 40px;
+    -fx-background-color: rgba(255,255,255,0.10);
+    -fx-background-radius: 8;
+    -fx-border-radius: 8;
+    -fx-border-color: rgba(255,255,255,0.20);
+}
+
+/* Form */
+.header-title { -fx-font-size: 36px; -fx-text-fill: #2C3E50; -fx-font-weight: 800; }
+.header-subtitle { -fx-font-size: 14px; -fx-text-fill: #6B7280; }
+
+.form-card {
+    -fx-background-color: white;
+    -fx-background-radius: 16;
+    -fx-border-radius: 16;
+    -fx-border-color: #E5E7EB; /* gray 300 */
+    -fx-effect: dropshadow(three-pass-box, rgba(16,24,40,0.12), 24, 0.2, 0, 10);
+    -fx-padding: 32px;
+}
+
+.form-label { -fx-text-fill: #2C3E50; -fx-font-weight: 700; }
+
+/* Input fields base (standard JavaFX controls) */
+.text-field, .password-field {
+    -fx-background-radius: 12;
+    -fx-border-radius: 12;
+    -fx-padding: 12 12 12 42; /* space for left icon */
+}
+
+.input-wrapper { -fx-background-color: transparent; -fx-background-radius: 12; -fx-border-radius: 12; -fx-border-color: #E5E7EB; -fx-border-width: 2; }
+.input-wrapper:hover { -fx-border-color: #D1D5DB; }
+.input-wrapper:focused, .input-focused { -fx-border-color: #3B8EA5; }
+.input-error { -fx-border-color: #A03C48; -fx-background-color: rgba(160,60,72,0.05); }
+
+.input-icon { -fx-fill: #6B7280; }
+.input-icon-focused { -fx-fill: #3B8EA5; }
+
+.error-label { -fx-text-fill: #A03C48; -fx-font-size: 14px; }
+
+/* Checkbox color (standard JavaFX) */
+.check-box {
+    -fx-accent: #3B8EA5;
+}
+
+/* Links */
+.link { -fx-text-fill: #3B8EA5; -fx-underline: false; }
+.link:hover { -fx-text-fill: #2C6B7D; -fx-underline: true; }
+
+/* Button */
+.primary-btn {
+    -fx-background-color: linear-gradient(to right, #3B8EA5, #2C6B7D);
+    -fx-text-fill: white;
+    -fx-background-radius: 12;
+    -fx-padding: 12 16;
+    -fx-min-height: 56px;
+}
+.primary-btn:hover {
+    -fx-background-color: linear-gradient(to right, #2C6B7D, #3B8EA5);
+    -fx-effect: dropshadow(three-pass-box, rgba(16,24,40,0.2), 18, 0.2, 0, 6);
+}
+.primary-btn:disabled { -fx-opacity: 0.7; }
+
+/* Spinner override for white */
+.loading-indicator .indicator {
+    -fx-progress-color: white;
+}
+
+/* Mobile logo */
+.mobile-logo-box {
+    -fx-min-width: 64px; -fx-min-height: 64px;
+    -fx-max-width: 64px; -fx-max-height: 64px;
+    -fx-background-radius: 16;
+    -fx-background-color: linear-gradient(to bottom right, #3B8EA5, #2C6B7D);
+    -fx-effect: dropshadow(three-pass-box, rgba(16,24,40,0.15), 20, 0.2, 0, 10);
+}
