@@ -5,7 +5,7 @@ import javafx.fxml.FXMLLoader;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
 import javafx.stage.Stage;
-import org.kordamp.bootstrapfx.BootstrapFX;
+import atlantafx.base.theme.PrimerLight;
 
 /**
  * Main.java
@@ -22,9 +22,10 @@ public class Main extends Application {
         );
         Parent root = loader.load();
 
+        // Set Atlantafx theme globally
+        Application.setUserAgentStylesheet(new PrimerLight().getUserAgentStylesheet());
+
         Scene scene = new Scene(root, 1200, 800);
-        // BootstrapFX base theme
-        scene.getStylesheets().add(BootstrapFX.bootstrapFXStylesheet());
         // App-specific styles
         scene.getStylesheets().add(Main.class.getResource("/com/example/javafxapp/styles.css").toExternalForm());
 

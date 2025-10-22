@@ -1,0 +1,191 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?import javafx.scene.chart.*?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.image.*?>
+<?import javafx.scene.layout.*?>
+<?import javafx.geometry.*?>
+<?import javafx.scene.shape.*?>
+
+<BorderPane xmlns="http://javafx.com/javafx/17.0.2" xmlns:fx="http://javafx.com/fxml/1"
+            fx:controller="com.example.javafxapp.DashboardController" prefWidth="1200" prefHeight="800" stylesheets="@styles/dashboard.css" styleClass="dashboard-root">
+    <!-- Sidebar -->
+    <left>
+        <VBox fx:id="sidebar" spacing="12" prefWidth="200" styleClass="sidebar" BorderPane.alignment="CENTER_LEFT">
+            <padding><Insets top="16" right="12" bottom="16" left="12"/></padding>
+            <!-- App Logo/Name -->
+            <HBox alignment="CENTER_LEFT" spacing="10">
+                <StackPane styleClass="sidebar-logo">
+                    <Circle radius="14" fill="#3B82F6"/>
+                </StackPane>
+                <Label text="BI Analytics" styleClass="sidebar-title"/>
+                <Pane HBox.hgrow="ALWAYS"/>
+                <Button fx:id="collapseBtn" text="≪" onAction="#collapseSidebar" focusTraversable="false"
+                        styleClass="btn sidebar-collapse"/>
+                <Button fx:id="expandBtn" text="≫" onAction="#expandSidebar" focusTraversable="false"
+                        visible="false" managed="false" styleClass="btn sidebar-collapse"/>
+            </HBox>
+
+            <Separator opacity="0.15"/>
+
+            <!-- Menu -->
+            <VBox spacing="6">
+                <ToggleButton fx:id="menuDashboard" text="Dashboard" selected="true" onAction="#navDashboard" styleClass="sidebar-item">
+                    <graphic>
+                        <SVGPath content="M3 11 L12 3 L21 11 V21 H14 V14 H10 V21 H3 Z" styleClass="sidebar-icon"/>
+                    </graphic>
+                </ToggleButton>
+                <ToggleButton fx:id="menuPredictive" text="Predictive Analysis" onAction="#navPredictive" styleClass="sidebar-item">
+                    <graphic>
+                        <SVGPath content="M3 17 L9 11 L13 15 L21 7" styleClass="sidebar-icon"/>
+                    </graphic>
+                </ToggleButton>
+                <ToggleButton fx:id="menuProfitability" text="Profitability Evaluation" onAction="#navProfitability" styleClass="sidebar-item">
+                    <graphic>
+                        <SVGPath content="M4 20 H20 V18 H4 Z M6 16 H10 V6 H6 Z M12 16 H16 V10 H12 Z M18 16 H20 V8 H18 Z" styleClass="sidebar-icon"/>
+                    </graphic>
+                </ToggleButton>
+                <ToggleButton fx:id="menuSimulation" text="Scenario Simulation" onAction="#navSimulation" styleClass="sidebar-item">
+                    <graphic>
+                        <SVGPath content="M4 6 H20 V10 H4 Z M4 14 H14 V18 H4 Z" styleClass="sidebar-icon"/>
+                    </graphic>
+                </ToggleButton>
+                <ToggleButton fx:id="menuData" text="Data Management" onAction="#navData" styleClass="sidebar-item">
+                    <graphic>
+                        <SVGPath content="M4 6 H20 V10 H4 Z M4 12 H20 V16 H4 Z" styleClass="sidebar-icon"/>
+                    </graphic>
+                </ToggleButton>
+                <ToggleButton fx:id="menuAlerts" text="Alerts Management" onAction="#navAlerts" styleClass="sidebar-item">
+                    <graphic>
+                        <SVGPath content="M12 3 L22 20 H2 Z M12 9 V13 M12 17 V17" styleClass="sidebar-icon"/>
+                    </graphic>
+                </ToggleButton>
+                <ToggleButton fx:id="menuReports" text="Reports Generation" onAction="#navReports" styleClass="sidebar-item">
+                    <graphic>
+                        <SVGPath content="M6 4 H14 L20 10 V20 H6 Z M14 4 V10 H20" styleClass="sidebar-icon"/>
+                    </graphic>
+                </ToggleButton>
+            </VBox>
+
+            <Pane VBox.vgrow="ALWAYS"/>
+
+            <!-- User / Logout -->
+            <VBox spacing="6">
+                <HBox spacing="10" alignment="CENTER_LEFT">
+                    <Circle radius="14" fill="#0EA5E9"/>
+                    <VBox>
+                        <Label text="Juan Pérez" style="-fx-text-fill: #E2E8F0; -fx-font-weight: bold; -fx-font-size: 12px;"/>
+                        <Label text="Administrador" style="-fx-text-fill: #94A3B8; -fx-font-size: 11px;"/>
+                    </VBox>
+                </HBox>
+                <Button text="Logout" onAction="#handleLogout" styleClass="btn btn-danger sidebar-logout"/>
+            </VBox>
+        </VBox>
+    </left>
+
+    <!-- Header -->
+    <top>
+        <HBox spacing="16" styleClass="header-bar">
+            <VBox spacing="2">
+                <Label fx:id="titleLabel" text="Dashboard" styleClass="header-title"/>
+                <Label fx:id="subtitleLabel" text="Resumen general de tu negocio" styleClass="header-subtitle"/>
+            </VBox>
+            <Pane HBox.hgrow="ALWAYS"/>
+            <HBox spacing="6" alignment="CENTER">
+                <ToggleButton fx:id="periodWeek" text="Week" onAction="#onPeriodChange" styleClass="button-outlined"/>
+                <ToggleButton fx:id="periodMonth" text="Month" selected="true" onAction="#onPeriodChange" styleClass="button-primary"/>
+                <ToggleButton fx:id="periodYear" text="Year" onAction="#onPeriodChange" styleClass="button-outlined"/>
+            </HBox>
+            <HBox spacing="10" alignment="CENTER">
+                <Label text="Juan Pérez"/>
+                <Circle radius="14" fill="#1F2937"/>
+            </HBox>
+        </HBox>
+    </top>
+
+    <!-- Center content -->
+    <center>
+        <ScrollPane fitToWidth="true" style="-fx-background: #F5F9FC; -fx-background-color: #F5F9FC;">
+            <content>
+                <VBox spacing="24" styleClass="center-container">
+                    <!-- KPI Cards -->
+                    <GridPane hgap="12" vgap="12">
+                        <columnConstraints>
+                            <ColumnConstraints percentWidth="25"/>
+                            <ColumnConstraints percentWidth="25"/>
+                            <ColumnConstraints percentWidth="25"/>
+                            <ColumnConstraints percentWidth="25"/>
+                        </columnConstraints>
+                        <rowConstraints>
+                            <RowConstraints vgrow="NEVER"/>
+                        </rowConstraints>
+
+                        <!-- Card 1 -->
+                        <VBox GridPane.rowIndex="0" GridPane.columnIndex="0" styleClass="card surface">
+                            <Label text="ROI" styleClass="kpi-title"/>
+                            <Label fx:id="roiValue" text="24.5%" styleClass="kpi-value"/>
+                            <HBox spacing="6" alignment="CENTER_LEFT">
+                                <Label text="+3.2%" styleClass="badge badge-success"/>
+                                <Label text="vs mes anterior" styleClass="muted"/>
+                            </HBox>
+                        </VBox>
+                        <!-- Card 2 -->
+                        <VBox GridPane.columnIndex="1" styleClass="card surface">
+                            <Label text="Punto de Equilibrio" styleClass="kpi-title"/>
+                            <Label fx:id="breakevenValue" text="45,230" styleClass="kpi-value"/>
+                            <HBox spacing="6" alignment="CENTER_LEFT">
+                                <Label text="-5.1%" styleClass="badge badge-danger"/>
+                                <Label text="vs mes anterior" styleClass="muted"/>
+                            </HBox>
+                        </VBox>
+                        <!-- Card 3 -->
+                        <VBox GridPane.columnIndex="2" styleClass="card surface">
+                            <Label text="Utilidad Operativa" styleClass="kpi-title"/>
+                            <Label fx:id="operatingProfitValue" text="128,450" styleClass="kpi-value"/>
+                            <HBox spacing="6" alignment="CENTER_LEFT">
+                                <Label text="+12.3%" styleClass="badge badge-success"/>
+                                <Label text="vs mes anterior" styleClass="muted"/>
+                            </HBox>
+                        </VBox>
+                        <!-- Card 4 -->
+                        <VBox GridPane.columnIndex="3" styleClass="card surface">
+                            <Label text="Margen de Utilidad" styleClass="kpi-title"/>
+                            <Label fx:id="profitMarginValue" text="18.7%" styleClass="kpi-value"/>
+                            <HBox spacing="6" alignment="CENTER_LEFT">
+                                <Label text="+2.1%" styleClass="badge badge-success"/>
+                                <Label text="vs mes anterior" styleClass="muted"/>
+                            </HBox>
+                        </VBox>
+                    </GridPane>
+
+                    <!-- Charts and Top Products -->
+                    <HBox spacing="12">
+                        <VBox spacing="8" HBox.hgrow="ALWAYS" styleClass="surface">
+                            <Label text="Tendencia de Ventas" style="-fx-font-weight: bold; -fx-text-fill: #0F172A;"/>
+                            <LineChart fx:id="salesChart" legendVisible="true" animated="false"
+                                       createSymbols="false" HBox.hgrow="ALWAYS">
+                                <xAxis>
+                                    <CategoryAxis label="Mes"/>
+                                </xAxis>
+                                <yAxis>
+                                    <NumberAxis label="Ventas"/>
+                                </yAxis>
+                            </LineChart>
+                        </VBox>
+                        <VBox spacing="8" prefWidth="360" styleClass="surface">
+                            <Label text="Top Productos" style="-fx-font-weight: bold; -fx-text-fill: #0F172A;"/>
+                            <ListView fx:id="topProductsList" prefHeight="320"/>
+                        </VBox>
+                    </HBox>
+
+                    <!-- Recent Alerts -->
+                    <VBox spacing="8">
+                        <Label text="Alertas Recientes" styleClass="header-title"/>
+                        <VBox styleClass="alerts-card">
+                            <ListView fx:id="recentAlertsList" prefHeight="220" />
+                        </VBox>
+                    </VBox>
+                </VBox>
+            </content>
+        </ScrollPane>
+    </center>
+</BorderPane>

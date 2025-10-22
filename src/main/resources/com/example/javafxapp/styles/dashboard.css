@@ -1,0 +1,112 @@
+/* Dashboard custom styles (AtlantaFX Primer Light base) */
+.root {
+    /* Brand palette */
+    -color-bg: #F5F9FC;
+    -color-surface: #FFFFFF;
+    -color-border: #E2E8F0;
+    -color-text: #1E293B;
+    -color-muted: #64748B;
+    -color-primary: #3B82F6;
+    -color-positive: #10B981;
+    -color-negative: #EF4444;
+    -color-warning: #F59E0B;
+    -color-sidebar: #1E293B;
+    -color-sidebar-hover: #334155;
+    -color-active: #3B82F6;
+}
+
+/* Layout */
+.dashboard-root {
+    -fx-background-color: -color-bg;
+}
+
+/* Sidebar */
+.sidebar {
+    -fx-background-color: -color-sidebar;
+    -fx-padding: 16 12;
+}
+.sidebar .sidebar-title {
+    -fx-text-fill: #E2E8F0;
+    -fx-font-size: 16px;
+    -fx-font-weight: bold;
+}
+.sidebar .sidebar-item {
+    -fx-background-color: transparent;
+    -fx-text-fill: #FFFFFF;
+    -fx-background-radius: 8;
+    -fx-padding: 10 12;
+    -fx-alignment: CENTER_LEFT;
+    -fx-spacing: 12;
+    -fx-cursor: hand;
+}
+.sidebar .sidebar-item .sidebar-icon { -fx-fill: #CBD5E1; }
+.sidebar .sidebar-item:hover { -fx-background-color: -color-sidebar-hover; }
+.sidebar .sidebar-item:selected {
+    -fx-background-color: -color-active;
+    -fx-text-fill: white;
+}
+.sidebar .sidebar-item:selected .sidebar-icon { -fx-fill: white; }
+
+/* Collapsed state */
+.sidebar.sidebar-collapsed { -fx-padding: 16 8; }
+.sidebar.sidebar-collapsed .sidebar-title { -fx-opacity: 0; }
+.sidebar.sidebar-collapsed .sidebar-item { -fx-alignment: CENTER; -fx-padding: 10 6; }
+
+/* Header */
+.header-bar {
+    -fx-background-color: -color-surface;
+    -fx-padding: 0 24;
+    -fx-pref-height: 64px;
+    -fx-min-height: 64px;
+    -fx-max-height: 64px;
+    -fx-alignment: CENTER_LEFT;
+    -fx-border-color: -color-border;
+    -fx-border-width: 0 0 1 0;
+}
+.header-title { -fx-font-size: 20px; -fx-font-weight: 700; -fx-text-fill: -color-text; }
+.header-subtitle { -fx-font-size: 14px; -fx-text-fill: -color-muted; }
+
+/* Period selector buttons using AtlantaFX classes */
+.button-primary { }
+.button-outlined { }
+
+/* Cards and surfaces */
+.card { -fx-background-color: -color-surface; -fx-background-radius: 8; -fx-padding: 20; -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.08), 8, 0, 0, 2); -fx-border-color: transparent; }
+.card:hover { -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.12), 14, 0, 0, 4); }
+.surface { -fx-background-color: -color-surface; -fx-background-radius: 8; -fx-padding: 20; -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.08), 6, 0, 0, 1); }
+
+/* KPI typography */
+.kpi-title { -fx-font-size: 14px; -fx-text-fill: -color-muted; -fx-font-weight: 700; -fx-letter-spacing: 0.5px; }
+.kpi-value { -fx-font-size: 32px; -fx-text-fill: -color-text; -fx-font-weight: 800; }
+
+/* Badges */
+.badge { -fx-background-radius: 999; -fx-padding: 2 8; -fx-text-fill: white; -fx-font-size: 14px; -fx-font-weight: 700; }
+.badge-success { -fx-background-color: -color-positive; }
+.badge-danger { -fx-background-color: -color-negative; }
+
+/* Center content container */
+.center-container { -fx-background-color: -color-bg; -fx-padding: 32; -fx-spacing: 24; }
+
+/* Charts */
+.chart-plot-background { -fx-background-color: transparent; }
+.chart-vertical-grid-lines, .chart-horizontal-grid-lines { -fx-stroke: -color-border; -fx-opacity: 1; }
+.axis { -fx-tick-label-fill: -color-muted; }
+.axis .axis-label { -fx-text-fill: -color-muted; -fx-font-size: 12px; }
+.default-color0.chart-series-line { -fx-stroke: -color-primary; -fx-stroke-width: 2; }
+.default-color1.chart-series-line { -fx-stroke: -color-positive; -fx-stroke-width: 2; }
+
+/* Alerts list */
+.alerts-card { -fx-background-color: -color-surface; -fx-background-radius: 8; -fx-padding: 16; -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.08), 6, 0, 0, 1); }
+.alert-item { -fx-spacing: 12; -fx-padding: 8 0; }
+.alert-icon { -fx-min-width: 20; -fx-min-height: 20; -fx-max-width: 20; -fx-max-height: 20; -fx-background-radius: 999; }
+.alert-warning { -fx-background-color: #F59E0B; }
+.alert-error { -fx-background-color: #EF4444; }
+.alert-info { -fx-background-color: #3B82F6; }
+.alert-message { -fx-font-size: 14px; -fx-text-fill: -color-text; }
+.alert-time { -fx-font-size: 12px; -fx-text-fill: -color-muted; }
+
+/* Transitions helpers */
+.transition { -fx-transition: all 0.2s ease; }
+
+/* Navigation item custom class */
+.nav-item { }

@@ -244,7 +244,27 @@ public class LoginController {
 
     // Callback when login is successful
     public void onLogin(String email, String password) {
-        System.out.println("[Login] email=" + email + ", remember=" + (rememberCheck.isSelected()) );
-        // TODO: Integrate with actual authentication service.
+        // Print requested confirmation
+        System.out.println("Login successful - User: " + email + ", Password: " + password);
+        try {
+            javafx.fxml.FXMLLoader loader = new javafx.fxml.FXMLLoader(getClass().getResource("/com/example/javafxapp/DashboardView.fxml"));
+            javafx.scene.Parent root = loader.load();
+            javafx.scene.Scene scene = new javafx.scene.Scene(root);
+            // Apply app-specific styles and rely on global Atlantafx theme set in Main
+            scene.getStylesheets().add(Main.class.getResource("/com/example/javafxapp/styles.css").toExternalForm());
+            scene.getStylesheets().add(Main.class.getResource("/com/example/javafxapp/styles/dashboard.css").toExternalForm());
+            javafx.stage.Stage stage = new javafx.stage.Stage();
+            stage.setTitle("Business Intelligence Dashboard");
+            stage.setScene(scene);
+            stage.setMinWidth(1280);
+            stage.setMinHeight(720);
+            stage.setMaximized(true);
+            stage.show();
+            // Close login window
+            javafx.stage.Stage current = (javafx.stage.Stage) loginButton.getScene().getWindow();
+            current.close();
+        } catch (Exception ex) {
+            ex.printStackTrace();
+        }
     }
 }
