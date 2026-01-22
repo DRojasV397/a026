@@ -1,0 +1,92 @@
+Última actualización: Enero 2026
+
+Al utilizar este sistema, usted acepta estar vinculado por los siguientes términos y condiciones.
+
+1. ACEPTACIÓN DE TÉRMINOS
+El uso de Sistema BI TT implica la aceptación total de estos términos y condiciones. Si no está de acuerdo con alguna disposición, debe abstenerse de utilizar el sistema.
+
+2. DESCRIPCIÓN DEL SERVICIO
+Sistema BI TT es una aplicación de escritorio on-premise para análisis predictivo empresarial que permite gestionar y analizar datos de compras, ventas e inventarios de pequeñas y medianas empresas.
+
+3. LICENCIA Y ACCESO
+3.1. El acceso al sistema se otorga únicamente mediante contrato de compra firmado.
+3.2. La licencia es intransferible y de uso exclusivo para la organización contratante.
+3.3. El sistema es instalado en las instalaciones del cliente (on-premise).
+3.4. La empresa se reserva el derecho de verificar el cumplimiento de los términos de licencia.
+
+4. GESTIÓN DE USUARIOS
+4.1. La creación, modificación y eliminación de usuarios es responsabilidad exclusiva del administrador del sistema designado por el cliente.
+4.2. Cada usuario debe mantener la confidencialidad de sus credenciales de acceso.
+4.3. El cliente es responsable de todas las actividades realizadas bajo las cuentas de sus usuarios.
+4.4. Se recomienda implementar políticas internas de gestión de accesos y permisos.
+
+5. DATOS Y PRIVACIDAD
+5.1. Todos los datos almacenados (compras, ventas, usuarios) permanecen en los servidores del cliente.
+5.2. El cliente es el único responsable del resguardo, backup y seguridad de su información.
+5.3. Sistema BI TT no accede, almacena ni transmite datos del cliente a servidores externos.
+5.4. El cliente debe cumplir con las leyes de protección de datos aplicables en su jurisdicción.
+
+6. USO APROPIADO
+6.1. El sistema debe utilizarse únicamente para fines empresariales legítimos.
+6.2. Queda prohibido:
+    - Intentar acceder a áreas restringidas del sistema
+    - Modificar, descompilar o realizar ingeniería inversa del software
+    - Utilizar el sistema para actividades ilícitas
+    - Compartir credenciales de acceso entre usuarios
+    - Extraer datos de forma masiva con fines no autorizados
+
+7. CONFIDENCIALIDAD
+7.1. Toda información generada y procesada por el sistema es considerada confidencial.
+7.2. Los usuarios se comprometen a no divulgar información sensible de la empresa.
+7.3. El personal técnico de Sistema BI TT mantendrá confidencialidad sobre cualquier información a la que acceda durante soporte técnico.
+
+8. RESPONSABILIDADES
+8.1. El cliente es responsable de:
+    - La veracidad de los datos ingresados al sistema
+    - El mantenimiento de la infraestructura donde opera el software
+    - Las copias de seguridad de la información
+    - La capacitación de sus usuarios
+    - El cumplimiento de normativas aplicables
+
+8.2. Sistema BI TT es responsable de:
+    - Proveer soporte técnico según el contrato firmado
+    - Entregar actualizaciones de seguridad críticas
+    - Mantener la funcionalidad descrita en la documentación
+
+9. LIMITACIÓN DE RESPONSABILIDAD
+9.1. Sistema BI TT no se hace responsable por:
+    - Pérdida de datos causada por mal uso, fallos de hardware o desastres naturales
+    - Decisiones empresariales tomadas con base en análisis del sistema
+    - Daños indirectos, incidentales o consecuentes
+    - Interrupciones del servicio causadas por el cliente o terceros
+    - Incompatibilidad con software de terceros no especificado en requisitos
+
+9.2. Los análisis predictivos son herramientas de apoyo y no garantizan resultados específicos.
+
+10. SOPORTE Y ACTUALIZACIONES
+10.1. El soporte técnico se proporciona según los términos del contrato de compra.
+10.2. Las actualizaciones mayores pueden tener costo adicional.
+10.3. Las actualizaciones de seguridad se proporcionan sin costo durante la vigencia del contrato.
+
+11. PROPIEDAD INTELECTUAL
+11.1. Sistema BI TT y todos sus componentes son propiedad exclusiva del desarrollador.
+11.2. El cliente adquiere únicamente una licencia de uso, no la propiedad del software.
+11.3. Todos los derechos no expresamente otorgados están reservados.
+
+12. TERMINACIÓN
+12.1. El contrato puede terminarse por mutuo acuerdo o incumplimiento de términos.
+12.2. En caso de terminación, el cliente debe cesar el uso del sistema.
+12.3. El cliente conserva sus datos pero pierde acceso a actualizaciones y soporte.
+
+13. MODIFICACIONES
+13.1. Nos reservamos el derecho de modificar estos términos en cualquier momento.
+13.2. Los cambios serán notificados con 30 días de anticipación.
+13.3. El uso continuado después de las modificaciones implica aceptación.
+
+14. LEY APLICABLE
+Estos términos se rigen por las leyes aplicables en la jurisdicción del cliente.
+
+15. CONTACTO
+Para consultas sobre estos términos, contacte a soporte@sistemabitt.com
+
+Al hacer clic en "Acepto" o al utilizar el sistema, usted confirma que ha leído, comprendido y aceptado estos Términos y Condiciones.

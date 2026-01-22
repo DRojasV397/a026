@@ -1,0 +1,163 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.StackPane?>
+<?import javafx.scene.layout.VBox?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.TextField?>
+<?import javafx.scene.control.PasswordField?>
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.Hyperlink?>
+<?import javafx.geometry.Insets?>
+<HBox xmlns="http://javafx.com/javafx/21"
+      xmlns:fx="http://javafx.com/fxml/1"
+      fx:controller="com.app.ui.login.LoginController"
+      styleClass="login-root">
+
+    <!-- ================= IZQUIERDA (INFO) ================= -->
+    <VBox styleClass="login-right"
+          HBox.hgrow="ALWAYS"
+          spacing="30">
+
+        <!-- Header -->
+        <VBox spacing="8">
+            <HBox spacing="10" alignment="CENTER_LEFT">
+                <Label text="⬢" styleClass="app-icon"/>
+                <VBox>
+                    <Label text="Sistema BI TT" styleClass="app-name"/>
+                    <Label text="Business intelligence"
+                           styleClass="app-subtitle"/>
+                </VBox>
+            </HBox>
+        </VBox>
+
+        <!-- Hero -->
+        <VBox spacing="10">
+            <Label text="Transforma tus&#10;datos en"
+                   styleClass="hero-title-white"/>
+            <Label text="decisiones inteligentes"
+                   styleClass="hero-title-green"/>
+        </VBox>
+
+        <!-- Features -->
+        <VBox spacing="18">
+
+            <HBox spacing="12">
+                <Label text="📊" styleClass="feature-icon"/>
+                <VBox>
+                    <Label text="Análisis predictivo"
+                           styleClass="feature-title"/>
+                    <Label text="Anticipa tendencias y toma decisiones informadas."
+                           styleClass="feature-desc"/>
+                </VBox>
+            </HBox>
+
+            <HBox spacing="12">
+                <Label text="📈" styleClass="feature-icon"/>
+                <VBox>
+                    <Label text="Visualización clara"
+                           styleClass="feature-title"/>
+                    <Label text="Gráficos intuitivos para entender tu información."
+                           styleClass="feature-desc"/>
+                </VBox>
+            </HBox>
+
+            <HBox spacing="12">
+                <Label text="💸" styleClass="feature-icon"/>
+                <VBox>
+                    <Label text="Evaluación de rentabilidad"
+                           styleClass="feature-title"/>
+                    <Label text="Analiza el desempeño financiero."
+                           styleClass="feature-desc"/>
+                </VBox>
+            </HBox>
+
+        </VBox>
+
+        <!-- Footer -->
+        <Label text="Impulsando el uso de tus datos,&#10;confía en nosotros para tomar las mejores decisiones."
+               styleClass="right-footer"/>
+    </VBox>
+
+    <!-- ================= DERECHA (LOGIN) ================= -->
+    <StackPane styleClass="login-left"
+               HBox.hgrow="ALWAYS">
+
+        <VBox alignment="CENTER" spacing="20">
+
+            <!-- Titles -->
+                <VBox styleClass="login-card-title" alignment="BASELINE_LEFT" spacing="15">
+                    <VBox.margin>
+                        <Insets top="0" right="40.0" bottom="0" left="40.0" />
+                    </VBox.margin>
+                    <Label text="Bienvenido de nuevo"
+                           styleClass="login-h1"/>
+                    <Label text="Ingresa tus credenciales para acceder"
+                           styleClass="login-h4"/>
+                </VBox>
+
+            <!-- Card -->
+            <VBox styleClass="login-card" spacing="15">
+                <VBox.margin>
+                    <Insets top="0" right="35.0" bottom="0" left="35.0" />
+                </VBox.margin>
+
+                <Label text="Correo electrónico"
+                       styleClass="login-h4"/>
+                <HBox fx:id="userWrapper" styleClass="input-wrapper" alignment="CENTER_LEFT" spacing="10">
+
+                    <Label text="📧" styleClass="input-icon"/>
+                    <TextField fx:id="userField"
+                               promptText="Ej. correo@example.com" styleClass="input-field" HBox.hgrow="ALWAYS"/>
+                </HBox>
+
+                <Label text="Contraseña"
+                       styleClass="login-h4"/>
+                <HBox fx:id="passwordWrapper" styleClass="input-wrapper" alignment="CENTER_LEFT" spacing="10">
+
+                    <Label text="🔒" styleClass="input-icon"/>
+
+                    <PasswordField fx:id="passwordField" promptText="*************"
+                                   styleClass="input-field" HBox.hgrow="ALWAYS"/>
+
+                </HBox>
+
+                <!-- MENSAJE DE ERROR -->
+                <Label fx:id="errorLabel"
+                       styleClass="error-label"
+                       visible="false"
+                       managed="false"/>
+
+                <HBox alignment="CENTER_RIGHT">
+                    <Hyperlink text="¿Olvidaste tu contraseña?"
+                               styleClass="login-link"/>
+                </HBox>
+
+                <Button fx:id="loginButton"
+                        text="Iniciar sesión →"
+                        onAction="#onLogin"
+                        styleClass="button-login"
+                        maxWidth="Infinity"/>
+
+                <Label text="Términos y condiciones"
+                       styleClass="link-label"
+                       onMouseClicked="#onShowTerms"/>
+
+            </VBox>
+
+            <HBox alignment="CENTER" spacing="5">
+                <Label text="¿No tienes una cuenta?"
+                       styleClass="login-footer-text"/>
+                <Hyperlink text="Contacta con ventas"
+                           onAction="#onContactSales"
+                           styleClass="login-footer-link"/>
+            </HBox>
+
+            <!-- Footer -->
+            <Label text="© 2026 Todos los derechos reservados"
+                   styleClass="login-small"/>
+        </VBox>
+
+    </StackPane>
+
+</HBox>

@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import java.lang.*?>
+<?import java.util.*?>
+<?import javafx.scene.*?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+
+<?import javafx.scene.text.Text?>
+<VBox fx:id="root"
+      alignment="TOP_CENTER"
+      xmlns="http://javafx.com/javafx/21"
+      xmlns:fx="http://javafx.com/fxml"
+      fx:controller="com.app.ui.common.TermsController"
+      spacing="20"
+      styleClass="modal-root">
+
+    <!-- Título -->
+    <Label text="Términos y Condiciones"
+           styleClass="login-h1"/>
+
+    <Label text="Sistema BI TT - Sistema de análisis predictivo para PyMES"
+           styleClass="login-h4"/>
+
+    <!-- Contenedor del texto -->
+    <VBox styleClass="terms-container">
+        <ScrollPane fitToWidth="true"
+                    styleClass="terms-scroll">
+            <VBox styleClass="terms-content">
+                <Text fx:id="termsText"
+                      styleClass="terms-text"
+                      wrappingWidth="640"/>
+            </VBox>
+        </ScrollPane>
+    </VBox>
+
+    <!-- Botón -->
+    <Button text="Aceptar"
+            onAction="#onClose"
+            styleClass="button-login"/>
+
+</VBox>
