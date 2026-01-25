@@ -1,0 +1,262 @@
+<?import javafx.scene.layout.VBox?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.Hyperlink?>
+<?import javafx.scene.layout.StackPane?>
+<?import javafx.scene.layout.Region?>
+<?import javafx.scene.image.ImageView?>
+<?import javafx.scene.image.Image?>
+<VBox xmlns="http://javafx.com/javafx/21"
+      xmlns:fx="http://javafx.com/fxml/1"
+      fx:controller="com.app.ui.components.sidebar.SidebarController"
+      styleClass="sidebar"
+      spacing="10"
+      fx:id="sidebarRoot"
+      stylesheets="@/styles/sidebar.css">
+
+    <!-- HEADER -->
+    <HBox alignment="CENTER_LEFT"
+          styleClass="sidebar-header"
+          spacing="10">
+
+        <HBox spacing="10"
+              alignment="CENTER_LEFT"
+              styleClass="sidebar-header-content">
+
+            <ImageView fitWidth="24" fitHeight="24" preserveRatio="true">
+                <image>
+                    <Image url="@/images/app-icon.png"/>
+                </image>
+            </ImageView>
+
+            <Label text="SISTEMA BI TT"
+                   styleClass="sidebar-app-name, sidebar-text"/>
+        </HBox>
+
+    </HBox>
+
+
+    <!-- MENU -->
+    <VBox spacing="6" fx:id="menuBox">
+
+        <Button onAction="#goDashboard"
+                styleClass="sidebar-item"
+                graphicTextGap="10"
+                alignment="CENTER_LEFT"
+                maxWidth="Infinity">
+
+            <graphic>
+                <HBox spacing="10" alignment="CENTER_LEFT">
+                    <ImageView fitWidth="24" fitHeight="24" preserveRatio="true">
+                        <image>
+                            <Image url="@/images/sidebar/dashboard.png"/>
+                        </image>
+                    </ImageView>
+
+                    <Label text="Dashboard" styleClass="sidebar-text"/>
+                </HBox>
+            </graphic>
+
+        </Button>
+
+        <Button onAction="#goPredictive"
+                styleClass="sidebar-item"
+                graphicTextGap="10"
+                alignment="CENTER_LEFT"
+                maxWidth="Infinity">
+
+            <graphic>
+                <HBox spacing="10" alignment="CENTER_LEFT">
+                    <ImageView fitWidth="24" fitHeight="24" preserveRatio="true">
+                        <image>
+                            <Image url="@/images/sidebar/predictive.png"/>
+                        </image>
+                    </ImageView>
+
+                    <Label text="Análisis Predictivo" styleClass="sidebar-text"/>
+                </HBox>
+            </graphic>
+
+        </Button>
+
+        <Button onAction="#goProfit"
+                styleClass="sidebar-item"
+                graphicTextGap="10"
+                alignment="CENTER_LEFT"
+                maxWidth="Infinity">
+
+            <graphic>
+                <HBox spacing="10" alignment="CENTER_LEFT">
+                    <ImageView fitWidth="24" fitHeight="24" preserveRatio="true">
+                        <image>
+                            <Image url="@/images/sidebar/profit.png"/>
+                        </image>
+                    </ImageView>
+
+                    <Label text="Rentabilidad" styleClass="sidebar-text"/>
+                </HBox>
+            </graphic>
+
+        </Button>
+
+        <Button onAction="#goSimulation"
+                styleClass="sidebar-item"
+                graphicTextGap="10"
+                alignment="CENTER_LEFT"
+                maxWidth="Infinity">
+
+            <graphic>
+                <HBox spacing="10" alignment="CENTER_LEFT">
+                    <ImageView fitWidth="24" fitHeight="24" preserveRatio="true">
+                        <image>
+                            <Image url="@/images/sidebar/simulation.png"/>
+                        </image>
+                    </ImageView>
+
+                    <Label text="Simulación" styleClass="sidebar-text"/>
+                </HBox>
+            </graphic>
+
+        </Button>
+
+        <Button onAction="#goAlerts"
+                styleClass="sidebar-item"
+                graphicTextGap="10"
+                alignment="CENTER_LEFT"
+                maxWidth="Infinity">
+
+            <graphic>
+                <HBox spacing="10" alignment="CENTER_LEFT">
+                    <ImageView fitWidth="24" fitHeight="24" preserveRatio="true">
+                        <image>
+                            <Image url="@/images/sidebar/alerts.png"/>
+                        </image>
+                    </ImageView>
+
+                    <Label text="Alertas" styleClass="sidebar-text"/>
+                </HBox>
+            </graphic>
+
+        </Button>
+
+        <Button onAction="#goReports"
+                styleClass="sidebar-item"
+                graphicTextGap="10"
+                alignment="CENTER_LEFT"
+                maxWidth="Infinity">
+
+            <graphic>
+                <HBox spacing="10" alignment="CENTER_LEFT">
+                    <ImageView fitWidth="24" fitHeight="24" preserveRatio="true">
+                        <image>
+                            <Image url="@/images/sidebar/reports-icon.png"/>
+                        </image>
+                    </ImageView>
+
+                    <Label text="Reportes" styleClass="sidebar-text"/>
+                </HBox>
+            </graphic>
+
+        </Button>
+
+        <!-- ADMIN (visible según rol) -->
+        <Button fx:id="adminItem"
+                onAction="#goAdmin"
+                styleClass="sidebar-item"
+                graphicTextGap="10"
+                alignment="CENTER_LEFT"
+                maxWidth="Infinity">
+
+            <graphic>
+                <HBox spacing="10" alignment="CENTER_LEFT">
+                    <ImageView fitWidth="24" fitHeight="24" preserveRatio="true">
+                        <image>
+                            <Image url="@/images/sidebar/admin.png"/>
+                        </image>
+                    </ImageView>
+
+                    <Label text="Administración" styleClass="sidebar-text"/>
+                </HBox>
+            </graphic>
+
+        </Button>
+
+        <Button onAction="#goData"
+                styleClass="sidebar-item"
+                graphicTextGap="10"
+                alignment="CENTER_LEFT"
+                maxWidth="Infinity">
+
+            <graphic>
+                <HBox spacing="10" alignment="CENTER_LEFT">
+                    <ImageView fitWidth="24" fitHeight="24" preserveRatio="true">
+                        <image>
+                            <Image url="@/images/sidebar/database-icon.png"/>
+                        </image>
+                    </ImageView>
+
+                    <Label text="Gestión de datos" styleClass="sidebar-text"/>
+                </HBox>
+            </graphic>
+
+        </Button>
+
+
+    </VBox>
+
+    <!-- PUSH FOOTER DOWN -->
+    <Region VBox.vgrow="ALWAYS"/>
+
+    <!-- FOOTER -->
+    <VBox spacing="12"
+          styleClass="sidebar-footer-container">
+
+        <!-- Perfil -->
+        <HBox spacing="10"
+              alignment="CENTER_LEFT"
+              styleClass="sidebar-footer">
+
+            <!-- Avatar -->
+            <StackPane styleClass="sidebar-avatar">
+                <Label text="👤"/>
+            </StackPane>
+
+            <VBox spacing="2">
+                <Label fx:id="userNameLabel"
+                       text="Nombre Usuario"
+                       styleClass="sidebar-user-name, sidebar-text"/>
+
+                <Hyperlink text="Ver perfil"
+                           onAction="#goProfile"
+                           styleClass="sidebar-profile-link, sidebar-text"/>
+            </VBox>
+
+        </HBox>
+
+        <!-- Botón colapsar -->
+        <Button onAction="#toggleSidebar"
+                styleClass="sidebar-collapse-btn"
+                maxWidth="Infinity"
+                alignment="CENTER_LEFT">
+
+            <graphic>
+                <HBox spacing="8" alignment="CENTER_LEFT">
+                    <Label fx:id="collapseIcon" text="⟨⟨⟨" styleClass="sidebar-collapse-icon"/>
+                    <Label text="Colapsar menú"
+                           styleClass="sidebar-text"/>
+                </HBox>
+            </graphic>
+
+        </Button>
+
+
+
+    </VBox>
+
+    <VBox.margin>
+        <Insets bottom="20"/>
+    </VBox.margin>
+
+</VBox>

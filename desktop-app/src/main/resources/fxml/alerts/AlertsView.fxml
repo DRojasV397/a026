@@ -3,12 +3,12 @@
 <?import javafx.scene.layout.BorderPane?>
 <?import javafx.scene.control.Label?>
 <BorderPane xmlns:fx="http://javafx.com/fxml"
-            fx:controller="com.app.ui.home.HomeController"
+            fx:controller="com.app.ui.alerts.AlertsController"
             stylesheets="@/styles/dashboard.css"
             styleClass="dashboard-root">
 
     <center>
-        <Label text="Bienvenido al Home"/>
+        <Label text="Bienvenido al módulo de Alertas"/>
     </center>
 
 </BorderPane>

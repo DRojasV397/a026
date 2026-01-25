@@ -1,5 +1,6 @@
 package com.app.ui.login;
 
+import com.app.Main;
 import com.app.core.navigation.SceneManager;
 import com.app.core.session.UserSession;
 import com.app.core.threading.AppExecutor;
@@ -121,11 +122,11 @@ public class LoginController {
 
         AppExecutor.runAsync(() -> {
 
-            boolean success = authService.login(user, pass);
+            boolean success = true;//authService.login(user, pass);//NECESITA AJUSTES CUANDO SE IMPLEMENTE LECTURA DE BASE DE DATOS
 
             Platform.runLater(() -> {
                 if (success) {
-                    UserSession.setUser(user);
+                    UserSession.setUser(user, "Usuario"); //NECESITA AJUSTES CUANDO SE IMPLEMENTE LECTURA DE BASE DE DATOS
                     SceneManager.showHome();
                 } else {
                     showError("Usuario o contraseña incorrectos");
@@ -148,38 +149,34 @@ public class LoginController {
     @FXML
     private void onContactSales() {
         try {
-            String to = "drojasv1800@alumno.ipn.mx";
-            String subject = encodeMailParam(
-                    "Solicitud de información - Sistema BI TT"
-            );
+            String mailto =
+                    "mailto:correo@gmail.com" +
+                            "?subject=" + encodeMailParam("Información Sistema BI TT") +
+                            "&body=" + encodeMailParam(
+                            "Hola,\n\n" +
+                                    "Estoy interesado en utilizar su aplicación y me gustaría recibir información " +
+                                    "sobre la contratación del Sistema BI TT.\n\n" +
+                                    "Gracias.");
 
-            String body = encodeMailParam(
-                    "Hola,\n\n" +
-                            "Estoy interesado en utilizar su aplicación y me gustaría " +
-                            "recibir información sobre la contratación del Sistema BI TT.\n\n" +
-                            "Gracias."
-            );
+            Main.getHost().showDocument(mailto);
 
-            URI mailto = new URI(
-                    "mailto:" + to +
-                            "?subject=" + subject +
-                            "&body=" + body
-            );
-
-            if (Desktop.isDesktopSupported()) {
-                Desktop.getDesktop().mail(mailto);
-            }
-        } catch (Exception e) {
-            e.printStackTrace();
+        } catch (Exception ex) {
+            ex.printStackTrace();
         }
     }
 
     //Método auxiliar
     private String encodeMailParam(String value) {
-        return value
-                .replace(" ", "%20")
-                .replace("\n", "%0A")
-                .replace("\r", "");
+        return URLEncoder.encode(value, StandardCharsets.UTF_8)
+                .replace("+", "%20");
+//        if(!ValidationUtil.isMac()){
+//
+//        }else{
+//            return value
+//                    .replace(" ", "%20")
+//                    .replace("\n", "%0A")
+//                    .replace("\r", "");
+//        }
     }
 
 

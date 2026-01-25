@@ -1,0 +1,62 @@
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.VBox?>
+<?import javafx.scene.layout.Region?>
+<?import javafx.scene.control.Label?>
+
+<?import javafx.scene.layout.StackPane?>
+<?import javafx.geometry.Insets?>
+<HBox xmlns="http://javafx.com/javafx/21"
+      xmlns:fx="http://javafx.com/fxml/1"
+      fx:controller="com.app.ui.components.navbar.NavbarController"
+      fx:id="navbarRoot"
+      alignment="CENTER_LEFT"
+      spacing="16"
+      styleClass="navbar"
+      stylesheets="@/styles/navbar.css">
+
+<!-- IZQUIERDA: TÍTULOS -->
+<VBox spacing="3"
+      alignment="CENTER_LEFT"
+      fx:id="titleBox">
+
+    <Label fx:id="screenTitle"
+           text="Título"
+           styleClass="navbar-title"/>
+
+    <Label fx:id="screenSubtitle"
+           text="Subtítulo"
+           styleClass="navbar-subtitle"/>
+
+</VBox>
+
+<!-- ESPACIO FLEXIBLE -->
+<Region HBox.hgrow="ALWAYS"/>
+
+<!-- DERECHA: PERFIL -->
+    <HBox spacing="10"
+          alignment="CENTER_RIGHT"
+          fx:id="profileBox"
+          styleClass="navbar-user">
+
+        <!-- Nombre + acción -->
+        <VBox spacing="2"
+              alignment="CENTER_RIGHT">
+
+            <Label fx:id="userNameLabel"
+                   text="Nombre Usuario"
+                   styleClass="navbar-user-name"/>
+
+            <Label fx:id="userRoleLabel"
+                   text="Usuario"
+                   styleClass="navbar-user-subtitle"/>
+
+        </VBox>
+
+        <!-- Avatar simbólico -->
+        <StackPane styleClass="navbar-avatar">
+            <Label text="👤"/>
+        </StackPane>
+
+    </HBox>
+
+</HBox>

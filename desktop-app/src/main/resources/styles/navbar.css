@@ -1,0 +1,27 @@
+.navbar-avatar {
+    -fx-min-width: 36;
+    -fx-min-height: 36;
+    -fx-max-width: 36;
+    -fx-max-height: 36;
+    -fx-background-color: #DDE6ED;
+    -fx-background-radius: 50%;
+    -fx-alignment: center;
+}
+
+.navbar-user-name {
+    -fx-font-weight: bold;
+    -fx-font-size: 12px;
+}
+
+.navbar-title{
+    -fx-font-weight: bold;
+    -fx-font-size: 16px;
+}
+
+.navbar-subtitle{
+    -fx-font-size: 12px;
+}
+
+.navbar-user-subtitle{
+    -fx-font-size: 10px;
+}

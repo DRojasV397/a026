@@ -32,4 +32,10 @@ public class ValidationUtil {
     public static boolean isPasswordLengthValid(String password) {
         return password.length() >= 6;
     }
+
+    public static boolean isMac() {
+        String os = System.getProperty("os.name").toLowerCase();
+        return os.contains("mac");
+    }
+
 }

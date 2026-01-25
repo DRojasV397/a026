@@ -1,5 +1,6 @@
 package com.app.core.navigation;
 
+import com.app.ui.layout.BaseLayoutController;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
@@ -13,6 +14,7 @@ import java.util.Objects;
 public class SceneManager {
 
     private static Stage stage;
+    private static BaseLayoutController baseController;
 
     public static void init(Stage primaryStage) {
         stage = primaryStage;
@@ -35,7 +37,44 @@ public class SceneManager {
     }
 
     public static void showHome() {
-        loadScene("/fxml/home/HomeView.fxml");
+        try {
+            FXMLLoader loader = new FXMLLoader(
+                    SceneManager.class.getResource("/fxml/layout/BaseLayout.fxml")
+            );
+
+            Parent root = loader.load();
+            baseController = loader.getController();
+
+            Scene scene = new Scene(root);
+            scene.getStylesheets().add("/styles/main.css");
+
+            stage.setScene(scene);
+
+            // Cargamos el contenido inicial
+            setContent("/fxml/home/HomeView.fxml", "Dashboard", "Resumen general de tu negocio");
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    public static void setContent(String fxmlPath, String title, String subtitle) {
+        try {
+            FXMLLoader loader = new FXMLLoader(
+                    SceneManager.class.getResource(fxmlPath)
+            );
+            Parent content = loader.load();
+
+            baseController.setContent(content);
+
+            // Actualizar navbar si se proporcionan títulos
+            if (title != null && baseController != null) {
+                baseController.updateNavbarTitle(title, subtitle);
+            }
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
     }
 
     private static void loadScene(String fxmlPath) {
@@ -86,6 +125,5 @@ public class SceneManager {
             e.printStackTrace();
         }
     }
-
 
 }
