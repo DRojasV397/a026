@@ -1,14 +1,90 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
-<?import javafx.scene.layout.BorderPane?>
+<?import javafx.scene.layout.*?>
 <?import javafx.scene.control.Label?>
-<BorderPane xmlns:fx="http://javafx.com/fxml"
+<?import javafx.scene.control.ScrollPane?>
+<?import javafx.scene.control.Button?>
+<?import javafx.geometry.Insets?>
+
+<ScrollPane xmlns="http://javafx.com/javafx/21"
+            xmlns:fx="http://javafx.com/fxml/1"
             fx:controller="com.app.ui.home.HomeController"
+            fitToWidth="true"
+            fitToHeight="false"
+            styleClass="dashboard-root"
             stylesheets="@/styles/dashboard.css"
-            styleClass="dashboard-root">
+            fx:id="dashboardRoot">
 
-    <center>
-        <Label text="Bienvenido al Home"/>
-    </center>
+    <VBox fx:id="dashboardContainer" styleClass="dashboard-container" spacing="24" VBox.vgrow="ALWAYS">
 
-</BorderPane>
+        <!-- KPI Cards (Stats Cards) - Versión simplificada -->
+        <HBox fx:id="statsCardsContainer" spacing="20" >
+
+        </HBox>
+
+        <!-- Sección de Gráficos -->
+        <VBox spacing="16" VBox.vgrow="ALWAYS">
+            <HBox alignment="CENTER_LEFT" spacing="10">
+                <Label text="Análisis Detallado"
+                       styleClass="dashboard-section-title"/>
+<!--                <Button text="Cargar más gráficos"-->
+<!--                        onAction="#loadMoreCharts"-->
+<!--                        style="-fx-font-size: 12px;"/>-->
+            </HBox>
+
+            <!-- Grid con Chart (izquierda) y Lista (derecha) -->
+            <GridPane hgap="20" vgap="20">
+                <columnConstraints>
+                    <ColumnConstraints percentWidth="65"/>
+                    <ColumnConstraints percentWidth="35"/>
+                </columnConstraints>
+
+                <!-- Line Chart - Columna izquierda -->
+                <fx:include source="/fxml/components/charts/LineChartCard.fxml"
+                            fx:id="salesTrendChart"
+                            GridPane.columnIndex="0"
+                            GridPane.rowIndex="0"/>
+
+                <!-- Lista vertical - Columna derecha -->
+                <fx:include source="/fxml/components/lists/VerticalListCard.fxml"
+                            fx:id="topProductsList"
+                            GridPane.columnIndex="1"
+                            GridPane.rowIndex="0"/>
+            </GridPane>
+
+            <!-- Contenedor para charts adicionales -->
+            <VBox fx:id="chartsContainer" spacing="20" VBox.vgrow="ALWAYS">
+
+                <!-- Bar Chart -->
+<!--                <fx:include source="/fxml/components/charts/BarChartCard.fxml"-->
+<!--                            fx:id="regionSalesChart"/>-->
+
+            </VBox>
+        </VBox>
+
+        <!-- Sección de Alertas Recientes -->
+        <VBox styleClass="alerts-section" VBox.vgrow="ALWAYS">
+            <VBox styleClass="alerts-section-header">
+                <Label text="Alertas Recientes"
+                       styleClass="alerts-section-title"/>
+            </VBox>
+
+            <!-- ScrollPane horizontal para las alertas -->
+            <ScrollPane hbarPolicy="AS_NEEDED"
+                        vbarPolicy="NEVER"
+                        fitToHeight="false"
+                        fitToWidth="true"
+                        styleClass="alerts-scroll"
+                        prefViewportHeight="160">
+                <!-- Contenedor horizontal de alertas (se llena dinámicamente) -->
+                <HBox fx:id="alertsContainer"
+                      styleClass="alerts-container"
+                      spacing="12">
+                    <!-- Las alertas se cargan aquí dinámicamente -->
+                </HBox>
+            </ScrollPane>
+        </VBox>
+
+    </VBox>
+
+</ScrollPane>

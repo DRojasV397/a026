@@ -122,7 +122,7 @@ public class LoginController {
 
         AppExecutor.runAsync(() -> {
 
-            boolean success = true;//authService.login(user, pass);//NECESITA AJUSTES CUANDO SE IMPLEMENTE LECTURA DE BASE DE DATOS
+            boolean success = authService.login(user, pass);//NECESITA AJUSTES CUANDO SE IMPLEMENTE LECTURA DE BASE DE DATOS
 
             Platform.runLater(() -> {
                 if (success) {

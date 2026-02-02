@@ -276,3 +276,7 @@
 }
 
 /* ------------------------- END LOGIN -------------------------*/
+
+.base-layout{
+    -fx-background-color: #E3EDF7;
+}

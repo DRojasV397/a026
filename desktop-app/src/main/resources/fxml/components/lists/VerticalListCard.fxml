@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.scene.layout.VBox?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.ScrollPane?>
+<?import javafx.geometry.Insets?>
+
+<VBox xmlns="http://javafx.com/javafx/21"
+      xmlns:fx="http://javafx.com/fxml/1"
+      fx:controller="com.app.ui.components.lists.VerticalListCardController"
+      fx:id="cardContainer"
+      styleClass="list-card"
+      stylesheets="@/styles/lists.css"
+      spacing="12">
+
+    <!-- Header de la Card -->
+    <VBox spacing="4" styleClass="list-header">
+        <Label fx:id="listTitle"
+               text="Título de la Lista"
+               styleClass="list-title"/>
+
+        <Label fx:id="listSubtitle"
+               text="Subtítulo opcional"
+               styleClass="list-subtitle"
+               managed="false"
+               visible="false"/>
+    </VBox>
+
+    <!-- ScrollPane para la lista -->
+    <ScrollPane fitToWidth="true"
+                vbarPolicy="AS_NEEDED"
+                hbarPolicy="NEVER"
+                styleClass="list-scroll"
+                VBox.vgrow="ALWAYS">
+        <!-- Contenedor de items -->
+        <VBox fx:id="listContainer"
+              styleClass="list-items-container"
+              spacing="8">
+            <!-- Los items se cargan aquí dinámicamente -->
+        </VBox>
+    </ScrollPane>
+
+    <padding>
+        <Insets top="20" right="20" bottom="20" left="20"/>
+    </padding>
+
+</VBox>
