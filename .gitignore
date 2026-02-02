@@ -105,8 +105,11 @@ logs/
 *.tmp
 *.temp
 *~
+__pycache__/
 
 ### Environment variables ###
 .env
 .env.local
 .env.*.local
+
+.claude/

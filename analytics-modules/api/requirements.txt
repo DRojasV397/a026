@@ -1,0 +1,28 @@
+# FastAPI y servidor
+fastapi==0.109.0
+uvicorn[standard]==0.27.0
+python-multipart==0.0.6
+
+# Pydantic para validación
+pydantic==2.5.3
+pydantic-settings==2.1.0
+email-validator==2.1.0
+
+# SQLAlchemy y base de datos
+sqlalchemy==2.0.25
+pyodbc==5.0.1
+
+# Utilidades
+python-dotenv==1.0.0
+
+# Logging y monitoreo
+python-json-logger==2.0.7
+
+# Testing (opcional)
+pytest==7.4.4
+pytest-asyncio==0.21.1
+httpx==0.26.0
+
+# Seguridad (para futuro OAuth2)
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
