@@ -1,0 +1,263 @@
+.predictive-root {
+    -fx-background-color: #E3EDF7;
+}
+
+/* ================= PHASE MONITOR ================= */
+
+.phase-monitor {
+    -fx-padding: 16 24;
+    -fx-background-color: white;
+    -fx-border-color: #e1e5eb;
+    -fx-border-width: 0 0 1 0;
+    -fx-background-radius: 16;
+}
+
+.phase-circle {
+    -fx-min-width: 36;
+    -fx-min-height: 36;
+    -fx-max-width: 36;
+    -fx-max-height: 36;
+
+    -fx-background-color: white;
+    -fx-border-radius: 50%;
+    -fx-border-color: #64748b;
+    -fx-border-width: 2;
+    -fx-background-radius: 50%;
+
+    -fx-alignment: center;
+}
+
+.phase-circle Label {
+    -fx-text-fill: #64748b;
+    -fx-font-weight: bold;
+}
+
+.phase-circle.active {
+    -fx-background-color: #3B8EA5; /* azul */
+}
+
+.phase-circle.current {
+    -fx-background-color: #3B8EA5;
+    -fx-border-color: #3B8EA5;
+}
+
+.phase-circle.current Label {
+    -fx-text-fill: white;
+    -fx-background-color: #3B8EA5;
+    -fx-border-color: #3B8EA5;
+}
+
+.phase-label {
+    -fx-font-size: 11px;
+    -fx-text-fill: #64748b;
+}
+
+.phase-circle.completed {
+    -fx-background-color: #58BD8B;
+    -fx-border-color: #58BD8B;
+}
+
+.phase-circle.completed Label {
+    -fx-text-fill: white;
+    -fx-font-weight: bold;
+}
+
+
+/* ================= SCROLL ================= */
+
+.predictive-scroll {
+    -fx-background-color: transparent;
+}
+
+.predictive-scroll > .viewport {
+    -fx-background-color: transparent;
+}
+
+/* ================= SECTION ================= */
+
+.section-title {
+    -fx-font-size: 16px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #0f172a;
+}
+
+/* ================= MODELS CONTAINER ================= */
+
+.models-container {
+    -fx-padding: 4;
+}
+
+/* ================= MODEL CARD ================= */
+
+.model-card {
+    -fx-background-color: white;
+    -fx-background-radius: 12;
+    -fx-border-radius: 12;
+    -fx-border-color: #e5e7eb;
+    -fx-border-width: 1;
+
+    -fx-padding: 16;
+    -fx-spacing: 10;
+
+    -fx-pref-width: 290;
+}
+
+.model-card:hover {
+    -fx-border-color: #94a3b8;
+}
+
+.model-card.selected {
+    -fx-border-color: #3B8EA5;
+    -fx-border-width: 3;
+}
+
+/* Icon */
+
+.model-icon {
+    -fx-font-size: 28px;
+}
+
+/* Title */
+
+.model-title {
+    -fx-font-size: 14px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #0f172a;
+}
+
+/* Description */
+
+.model-description {
+    -fx-font-size: 12px;
+    -fx-text-fill: #475569;
+    -fx-wrap-text: true;
+}
+
+.info-row {
+    -fx-alignment: CENTER_LEFT;
+}
+
+.info-label {
+    -fx-text-fill: #64748b;
+    -fx-font-size: 12px;
+}
+
+.info-value {
+    -fx-font-weight: bold;
+    -fx-font-size: 12px;
+    -fx-text-fill: #0f172a;
+}
+
+
+/* ================= DIVIDERS ================= */
+
+.model-divider {
+    -fx-background-color: #e5e7eb;
+}
+
+/* ================= CHIPS ================= */
+
+.chips-container {
+    -fx-spacing: 8;
+}
+
+.model-chip {
+    -fx-background-color: #e5e7eb;
+    -fx-background-radius: 999;
+    -fx-padding: 4 10;
+
+    -fx-font-size: 11px;
+    -fx-text-fill: #3B8EA5;
+    -fx-font-weight: bold;
+}
+
+/* ================= SELECT BUTTON ================= */
+
+.select-button {
+    -fx-background-color: #3B8EA5;
+    -fx-text-fill: white;
+    -fx-font-weight: bold;
+
+    -fx-background-radius: 8;
+    -fx-pref-height: 36;
+}
+
+.select-button:selected,
+.card.selected .select-button {
+    -fx-background-color: #3B8EA5;
+}
+
+/* ================= DETAIL PANEL ================= */
+
+.model-detail {
+    -fx-background-color: white;
+    -fx-background-radius: 12;
+    -fx-border-radius: 12;
+    -fx-border-color: #e5e7eb;
+
+    -fx-padding: 16;
+}
+
+.detail-title {
+    -fx-font-size: 15px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #0f172a;
+}
+
+.detail-extra {
+    -fx-font-size: 12px;
+    -fx-text-fill: #475569;
+}
+
+/* ================= FOOTER ================= */
+
+.predictive-footer {
+    -fx-padding: 12 24;
+    -fx-background-color: white;
+    -fx-border-color: #e1e5eb;
+    -fx-border-width: 1 0 0 0;
+    -fx-background-radius: 16;
+}
+
+.predictive-footer Button {
+    -fx-background-radius: 8;
+    -fx-pref-width: 120;
+    -fx-pref-height: 36;
+}
+
+#btnNext {
+    -fx-background-color: #3B8EA5;
+    -fx-text-fill: white;
+    -fx-font-weight: bold;
+    -fx-cursor: hand;
+}
+
+#btnPrevious {
+    -fx-background-color: #e5e7eb;
+    -fx-text-fill: #0f172a;
+}
+
+
+
+/* Ocultar scrollbar completamente */
+.predictive-scroll .scroll-bar:vertical {
+    -fx-opacity: 0;
+    -fx-pref-width: 0;
+    -fx-min-width: 0;
+    -fx-max-width: 0;
+}
+
+.predictive-scroll .scroll-bar:horizontal {
+    -fx-opacity: 0;
+    -fx-pref-height: 0;
+    -fx-min-height: 0;
+    -fx-max-height: 0;
+}
+
+.predictive-scroll .scroll-bar .thumb,
+.predictive-scroll .scroll-bar .track,
+.predictive-scroll .scroll-bar .increment-button,
+.predictive-scroll .scroll-bar .decrement-button {
+    -fx-opacity: 0;
+    -fx-padding: 0;
+}

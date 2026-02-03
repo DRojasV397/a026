@@ -1,14 +1,187 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
-<?import javafx.scene.layout.BorderPane?>
-<?import javafx.scene.control.Label?>
-<BorderPane xmlns:fx="http://javafx.com/fxml"
-            fx:controller="com.app.ui.predictive.PredictiveController"
-            stylesheets="@/styles/dashboard.css"
-            styleClass="dashboard-root">
+<?import javafx.scene.layout.*?>
+<?import javafx.scene.control.*?>
+<?import javafx.geometry.Insets?>
 
+<BorderPane xmlns="http://javafx.com/javafx/21"
+            xmlns:fx="http://javafx.com/fxml/1"
+            fx:controller="com.app.ui.predictive.PredictiveController"
+            stylesheets="@/styles/predictive.css"
+            styleClass="predictive-root">
+
+    <!-- ================= TOP: MONITOR DE FASES ================= -->
+    <top>
+        <HBox spacing="24"
+              alignment="CENTER"
+              styleClass="phase-monitor">
+
+            <BorderPane.margin>
+                <Insets top="20" right="20" left="20"/>
+            </BorderPane.margin>
+
+            <VBox alignment="CENTER" spacing="6">
+                <StackPane fx:id="phase1" styleClass="phase-circle">
+                    <Label text="1"/>
+                </StackPane>
+                <Label text="Seleccionar Modelo" styleClass="phase-label"/>
+            </VBox>
+
+            <Separator/>
+
+            <VBox alignment="CENTER" spacing="6">
+                <StackPane fx:id="phase2" styleClass="phase-circle">
+                    <Label text="2"/>
+                </StackPane>
+                <Label text="Configurar Parámetros" styleClass="phase-label"/>
+            </VBox>
+
+            <Separator/>
+
+            <VBox alignment="CENTER" spacing="6">
+                <StackPane fx:id="phase3" styleClass="phase-circle">
+                    <Label text="3"/>
+                </StackPane>
+                <Label text="Entrenar Modelo" styleClass="phase-label"/>
+            </VBox>
+
+            <Separator/>
+
+            <VBox alignment="CENTER" spacing="6">
+                <StackPane fx:id="phase4" styleClass="phase-circle">
+                    <Label text="4"/>
+                </StackPane>
+                <Label text="Ver Resultados" styleClass="phase-label"/>
+            </VBox>
+        </HBox>
+    </top>
+
+    <!-- ================= CENTER: CONTENIDO SCROLLEABLE ================= -->
     <center>
-        <Label text="Bienvenido al módulo de análisis predictivo"/>
+        <ScrollPane fitToWidth="true"
+                    styleClass="predictive-scroll">
+
+            <BorderPane.margin>
+                <Insets top="0" right="20" bottom="0" left="20"/>
+            </BorderPane.margin>
+
+            <content>
+                <VBox spacing="24"
+                      fx:id="mainContent">
+
+                    <padding>
+                        <Insets top="20" bottom="20"/>
+                    </padding>
+
+                    <!-- ================= FASE 1 ================= -->
+                    <VBox fx:id="phase1Content" spacing="16">
+
+                        <Label text="Seleccionar modelo predictivo"
+                               styleClass="section-title"/>
+
+                        <HBox spacing="10" alignment="TOP_LEFT">
+
+                            <FlowPane fx:id="modelsContainer"
+                                      hgap="16"
+                                      vgap="16"
+                                      prefWrapLength="620"
+                                      HBox.hgrow="ALWAYS"
+                                      styleClass="models-container"/>
+
+                            <VBox fx:id="modelDetailPane"
+                                  spacing="12"
+                                  prefWidth="350"
+                                  minWidth="350"
+                                  maxWidth="350"
+                                  styleClass="model-detail">
+
+                                <Label fx:id="detailTitle"
+                                       styleClass="detail-title"/>
+
+                                <Label fx:id="detailDescription"
+                                       wrapText="true"/>
+
+                                <Separator/>
+
+                                <Label fx:id="detailExtra"
+                                       wrapText="true"
+                                       styleClass="detail-extra"/>
+                            </VBox>
+
+                        </HBox>
+                    </VBox>
+
+                    <!-- ================= FASE 2 ================= -->
+                    <VBox fx:id="phase2Content"
+                          spacing="16"
+                          visible="false"
+                          managed="false">
+
+                        <Label text="Configurar parámetros del modelo"
+                               styleClass="section-title"/>
+
+                        <HBox spacing="10" alignment="TOP_LEFT">
+
+                            <!-- Panel central dinámico -->
+                            <VBox fx:id="parametersContainer"
+                                  spacing="16"
+                                  HBox.hgrow="ALWAYS"
+                                  styleClass="parameters-container"/>
+
+                            <!-- Panel lateral resumen -->
+                            <VBox fx:id="parametersSummaryPane"
+                                  spacing="12"
+                                  prefWidth="350"
+                                  minWidth="350"
+                                  maxWidth="350"
+                                  styleClass="model-detail">
+
+                                <Label text="Resumen de configuración"
+                                       styleClass="detail-title"/>
+
+                                <VBox fx:id="parametersSummary"
+                                      spacing="8"/>
+                            </VBox>
+
+                        </HBox>
+                    </VBox>
+
+                    <!-- ================= FASE 3 ================= -->
+                    <VBox fx:id="phase3Content"
+                          spacing="16"
+                          visible="false"
+                          managed="false">
+
+                        <Label text="Entrenamiento del modelo"
+                               styleClass="section-title"/>
+                    </VBox>
+
+                </VBox>
+
+            </content>
+        </ScrollPane>
     </center>
+
+    <!-- ================= FOOTER ================= -->
+    <bottom>
+        <HBox spacing="12"
+              alignment="CENTER"
+              styleClass="predictive-footer">
+
+            <BorderPane.margin>
+                <Insets right="20" bottom="16" left="20"/>
+            </BorderPane.margin>
+
+            <Button text="← Anterior"
+                    fx:id="btnPrevious"
+                    onAction="#onPreviousPhase"/>
+
+            <Region HBox.hgrow="ALWAYS"/>
+
+            <Button text="Siguiente →"
+                    fx:id="btnNext"
+                    onAction="#onNextPhase"/>
+        </HBox>
+    </bottom>
 
 </BorderPane>
