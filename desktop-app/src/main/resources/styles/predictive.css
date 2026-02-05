@@ -261,3 +261,35 @@
     -fx-opacity: 0;
     -fx-padding: 0;
 }
+
+
+/* ------------------------ TRAINING ------------------------ */
+.training-card {
+    -fx-background-color: white;
+    -fx-background-radius: 16;
+    -fx-border-radius: 16;
+    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.12), 18, 0.2, 0, 6);
+}
+
+.icon-circle {
+    -fx-background-color: #F3F6FA;
+    -fx-background-radius: 100;
+    -fx-alignment: center;
+}
+
+.training-title {
+    -fx-font-size: 15px;
+    -fx-font-weight: bold;
+    -fx-text-alignment: center;
+}
+
+.training-info {
+    -fx-font-size: 13px;
+    -fx-text-fill: #6B7280;
+    -fx-text-alignment: center;
+}
+
+.train-button {
+    -fx-padding: 10 24;
+    -fx-font-weight: bold;
+}

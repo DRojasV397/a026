@@ -4,6 +4,7 @@
 <?import javafx.scene.control.*?>
 <?import javafx.geometry.Insets?>
 
+<?import javafx.scene.image.ImageView?>
 <BorderPane xmlns="http://javafx.com/javafx/21"
             xmlns:fx="http://javafx.com/fxml/1"
             fx:controller="com.app.ui.predictive.PredictiveController"
@@ -148,13 +149,76 @@
 
                     <!-- ================= FASE 3 ================= -->
                     <VBox fx:id="phase3Content"
-                          spacing="16"
+                          spacing="24"
+                          alignment="CENTER"
                           visible="false"
                           managed="false">
 
-                        <Label text="Entrenamiento del modelo"
-                               styleClass="section-title"/>
+                        <StackPane prefWidth="600"
+                                   prefHeight="420"
+                                   styleClass="training-card">
+
+                            <VBox spacing="18"
+                                  alignment="CENTER">
+
+                                <!-- ===== ICONO PRINCIPAL ===== -->
+                                <StackPane fx:id="iconContainer"
+                                           prefWidth="120"
+                                           prefHeight="120"
+                                           styleClass="icon-circle">
+
+                                    <ImageView fx:id="trainingIcon"
+                                               fitWidth="130"
+                                               fitHeight="130"
+                                               preserveRatio="true"/>
+                                </StackPane>
+
+                                <!-- ===== MÉTRICAS ===== -->
+                                <HBox fx:id="trainingMetrics"
+                                      spacing="24"
+                                      alignment="CENTER"
+                                      visible="false"
+                                      managed="false">
+
+                                    <VBox alignment="CENTER">
+                                        <ImageView fitWidth="18" fitHeight="18"/>
+                                        <Label fx:id="lblTrainingTime"/>
+                                    </VBox>
+
+                                    <VBox alignment="CENTER">
+                                        <ImageView fitWidth="18" fitHeight="18"/>
+                                        <Label fx:id="lblMetric"/>
+                                    </VBox>
+
+                                    <VBox alignment="CENTER">
+                                        <ImageView fitWidth="18" fitHeight="18"/>
+                                        <Label fx:id="lblResult"/>
+                                    </VBox>
+                                </HBox>
+
+                                <Separator/>
+
+                                <!-- ===== TEXTO ===== -->
+                                <Label text="Da clic en el botón de Entrenar para iniciar el proceso de entrenamiento del modelo."
+                                       wrapText="true"
+                                       maxWidth="420"
+                                       styleClass="training-title"/>
+
+                                <Label fx:id="trainingInfo"
+                                       wrapText="true"
+                                       maxWidth="460"
+                                       styleClass="training-info"/>
+
+                                <!-- ===== BOTÓN ===== -->
+                                <Button fx:id="btnTrain"
+                                        text="Entrenar modelo"
+                                        onAction="#onTrainModel"
+                                        styleClass="train-button"/>
+
+                            </VBox>
+                        </StackPane>
                     </VBox>
+
 
                 </VBox>
 

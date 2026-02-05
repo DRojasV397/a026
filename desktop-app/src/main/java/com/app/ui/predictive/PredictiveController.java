@@ -1,10 +1,18 @@
 package com.app.ui.predictive;
 
 import com.app.model.PredictiveModelDTO;
+import com.app.model.TrainingResult;
 import com.app.service.alerts.WarningService;
+import javafx.animation.Animation;
+import javafx.animation.RotateTransition;
+import javafx.concurrent.Task;
 import javafx.fxml.FXML;
 import javafx.scene.control.*;
+import javafx.scene.image.Image;
+import javafx.scene.image.ImageView;
 import javafx.scene.layout.*;
+import javafx.util.Duration;
+
 import java.util.*;
 
 public class PredictiveController {
@@ -14,9 +22,19 @@ public class PredictiveController {
     @FXML private Label detailTitle;
     @FXML private Label detailDescription;
     @FXML private Label detailExtra;
+    @FXML private Label trainingInfo;
+    @FXML private Label lblResult;
+    @FXML private Label lblMetric;
+    @FXML private Label lblTrainingTime;
+
+    @FXML private ImageView trainingIcon;
+
+    @FXML private HBox trainingMetrics;
 
     @FXML private Button btnNext;
     @FXML private Button btnPrevious;
+    @FXML private Button btnTrain;
+
 
     @FXML private VBox phase1Content;
     @FXML private VBox phase2Content;
@@ -37,6 +55,8 @@ public class PredictiveController {
     private PredictiveModelDTO selectedModel;
     private boolean validPhase2 = false;
     private final List<VBox> modelCards = new ArrayList<>();
+
+    private RotateTransition loadingRotation;
 
     @FXML
     private void initialize() {
@@ -225,6 +245,10 @@ public class PredictiveController {
             if (currentPhaseIndex == 1 && !validPhase2) { // se soliicta la fase 2 y aún no es valida la información seleccionada
                 buildPhase2UI();
             }
+
+            if(currentPhaseIndex == 2){
+                showPhase3();
+            }
         }
     }
 
@@ -330,6 +354,108 @@ public class PredictiveController {
         );
 
         parametersSummary.getChildren().add(summary);
+    }
+
+    private void startLoadingAnimation() {
+        loadingRotation = new RotateTransition(Duration.seconds(1.2), trainingIcon);
+        loadingRotation.setFromAngle(0);
+        loadingRotation.setToAngle(360);
+        loadingRotation.setCycleCount(Animation.INDEFINITE);
+        loadingRotation.play();
+    }
+
+    private void stopLoadingAnimation() {
+        if (loadingRotation != null) {
+            loadingRotation.stop();
+        }
+    }
+
+    @FXML
+    private void onTrainModel() {
+
+        btnTrain.setDisable(true);
+        trainingInfo.setText("Entrenando el modelo, este proceso puede tardar unos minutos...");
+        startLoadingAnimation();
+
+        Task<TrainingResult> task = new Task<>() {
+            @Override
+            protected TrainingResult call() throws Exception {
+                // 🔌 llamada real a backend
+                Thread.sleep(3000);
+                return new TrainingResult(
+                        "2m 15s",
+                        "Accuracy",
+                        true
+                );
+            }
+        };
+
+        task.setOnSucceeded(e -> {
+            stopLoadingAnimation();
+            showTrainingResult(task.getValue());
+        });
+
+        task.setOnFailed(e -> {
+            stopLoadingAnimation();
+            showTrainingError();
+        });
+
+        new Thread(task).start();
+    }
+
+    private void showTrainingResult(TrainingResult result) {
+
+        trainingIcon.setRotate(0);
+        trainingIcon.setImage(new Image(
+                Objects.requireNonNull(getClass().getResourceAsStream("/images/icons/check.png"))
+        ));
+
+        lblTrainingTime.setText(result.time());
+        lblMetric.setText(result.metric());
+        lblResult.setText("Exitoso");
+
+        trainingMetrics.setVisible(true);
+        trainingMetrics.setManaged(true);
+
+        trainingInfo.setText("El modelo fue entrenado correctamente y está listo para su uso.");
+    }
+
+    private void showTrainingError() {
+
+        trainingIcon.setRotate(0);
+        trainingIcon.setImage(new Image(
+                Objects.requireNonNull(getClass().getResourceAsStream("/images/icons/fail.png"))
+        ));
+
+        lblTrainingTime.setText("-");
+        lblMetric.setText("-");
+        lblResult.setText("Erróneo");
+
+        trainingMetrics.setVisible(true);
+        trainingMetrics.setManaged(true);
+
+        trainingInfo.setText("El modelo fue entrenado incorrectamente y reintentalo más tarde.");
+    }
+
+    private void showPhase3() {
+
+        // 🔹 Estado inicial del icono
+        trainingIcon.setRotate(0);
+        trainingIcon.setImage(new Image(
+                Objects.requireNonNull(getClass().getResourceAsStream("/images/icons/brain.png"))
+        ));
+
+        // 🔹 Texto inicial
+        trainingInfo.setText(
+                "El entrenamiento se ejecutará con los parámetros configurados en la fase anterior."
+        );
+
+        // 🔹 Métricas ocultas
+        trainingMetrics.setVisible(false);
+        trainingMetrics.setManaged(false);
+
+        // 🔹 Botón habilitado
+        btnTrain.setDisable(false);
     }
 
 
