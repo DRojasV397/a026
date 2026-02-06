@@ -1,5 +1,6 @@
 package com.app.core.navigation;
 
+import com.app.model.AppRoute;
 import com.app.ui.layout.BaseLayoutController;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Parent;
@@ -10,11 +11,19 @@ import javafx.stage.Stage;
 import javafx.stage.StageStyle;
 
 import java.util.Objects;
+import java.util.function.Consumer;
 
 public class SceneManager {
 
     private static Stage stage;
     private static BaseLayoutController baseController;
+
+    private static Consumer<AppRoute> onRouteChanged;
+
+    public static void setOnRouteChanged(Consumer<AppRoute> listener) {
+        onRouteChanged = listener;
+    }
+
 
     public static void init(Stage primaryStage) {
         stage = primaryStage;
@@ -51,14 +60,14 @@ public class SceneManager {
             stage.setScene(scene);
 
             // Cargamos el contenido inicial
-            setContent("/fxml/home/HomeView.fxml", "Dashboard", "Resumen general de tu negocio");
+            setContent("/fxml/home/HomeView.fxml", "Dashboard", "Resumen general de tu negocio", AppRoute.DASHBOARD);
 
         } catch (Exception e) {
             e.printStackTrace();
         }
     }
 
-    public static void setContent(String fxmlPath, String title, String subtitle) {
+    public static void setContent(String fxmlPath, String title, String subtitle, AppRoute route) {
         try {
             FXMLLoader loader = new FXMLLoader(
                     SceneManager.class.getResource(fxmlPath)
@@ -75,6 +84,11 @@ public class SceneManager {
         } catch (Exception e) {
             e.printStackTrace();
         }
+
+        if (onRouteChanged != null && route != null) {
+            onRouteChanged.accept(route);
+        }
+
     }
 
     private static void loadScene(String fxmlPath) {

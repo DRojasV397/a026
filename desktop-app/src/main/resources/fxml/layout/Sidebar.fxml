@@ -41,7 +41,8 @@
     <!-- MENU -->
     <VBox spacing="6" fx:id="menuBox">
 
-        <Button onAction="#goDashboard"
+        <Button fx:id="dashboardBtn"
+                onAction="#goDashboard"
                 styleClass="sidebar-item"
                 graphicTextGap="10"
                 alignment="CENTER_LEFT"
@@ -61,7 +62,8 @@
 
         </Button>
 
-        <Button onAction="#goPredictive"
+        <Button fx:id="predictiveBtn"
+                onAction="#goPredictive"
                 styleClass="sidebar-item"
                 graphicTextGap="10"
                 alignment="CENTER_LEFT"
@@ -81,7 +83,8 @@
 
         </Button>
 
-        <Button onAction="#goProfit"
+        <Button fx:id="profitBtn"
+                onAction="#goProfit"
                 styleClass="sidebar-item"
                 graphicTextGap="10"
                 alignment="CENTER_LEFT"
@@ -101,7 +104,8 @@
 
         </Button>
 
-        <Button onAction="#goSimulation"
+        <Button fx:id="simulationBtn"
+                onAction="#goSimulation"
                 styleClass="sidebar-item"
                 graphicTextGap="10"
                 alignment="CENTER_LEFT"
@@ -121,7 +125,8 @@
 
         </Button>
 
-        <Button onAction="#goAlerts"
+        <Button fx:id="alertsBtn"
+                onAction="#goAlerts"
                 styleClass="sidebar-item"
                 graphicTextGap="10"
                 alignment="CENTER_LEFT"
@@ -141,7 +146,8 @@
 
         </Button>
 
-        <Button onAction="#goReports"
+        <Button fx:id="reportsBtn"
+                onAction="#goReports"
                 styleClass="sidebar-item"
                 graphicTextGap="10"
                 alignment="CENTER_LEFT"
@@ -183,7 +189,8 @@
 
         </Button>
 
-        <Button onAction="#goData"
+        <Button fx:id="dataBtn"
+                onAction="#goData"
                 styleClass="sidebar-item"
                 graphicTextGap="10"
                 alignment="CENTER_LEFT"
@@ -228,7 +235,8 @@
                        text="Nombre Usuario"
                        styleClass="sidebar-user-name, sidebar-text"/>
 
-                <Hyperlink text="Ver perfil"
+                <Hyperlink fx:id="profileBtn"
+                           text="Ver perfil"
                            onAction="#goProfile"
                            styleClass="sidebar-profile-link, sidebar-text"/>
             </VBox>

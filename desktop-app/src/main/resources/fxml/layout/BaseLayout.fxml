@@ -5,8 +5,7 @@
 <?import javafx.geometry.Insets?>
 <BorderPane xmlns="http://javafx.com/javafx/21"
             xmlns:fx="http://javafx.com/fxml/1"
-            fx:controller="com.app.ui.layout.BaseLayoutController"
-            styleClass="base-layout">
+            fx:controller="com.app.ui.layout.BaseLayoutController">
 
     <!-- Sidebar -->
     <left>
@@ -34,7 +33,8 @@
 
             <!-- Contenido dinámico -->
             <center>
-                <StackPane fx:id="contentPane"/>
+                <StackPane fx:id="contentPane"
+                           styleClass="base-layout"/>
             </center>
         </BorderPane>
     </center>

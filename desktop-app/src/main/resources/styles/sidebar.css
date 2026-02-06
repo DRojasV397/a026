@@ -32,9 +32,11 @@
     -fx-background-color: #E6F0F5;
 }
 
-.sidebar-item:focused {
+.sidebar-item.active {
     -fx-background-color: #D9EBF3;
+    -fx-font-weight: bold;
 }
+
 
 /* FOOTER */
 .sidebar-footer {
@@ -83,4 +85,19 @@
     -fx-text-fill: #3B8EA5;
     -fx-cursor: hand;
     -fx-border-color: transparent;
+}
+
+.sidebar-profile-link:hover{
+    -fx-background-color: #D9EBF3;
+}
+.sidebar-profile-link.active {
+    -fx-background-color: #D9EBF3;
+}
+
+.sidebar-profile-link:focused,
+.sidebar-profile-link.active,
+.sidebar-profile-link:pressed,
+.sidebar-profile-link:visited,
+.sidebar-profile-link:hover {
+    -fx-underline: false;
 }

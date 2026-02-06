@@ -1,0 +1,209 @@
+/* ============================================
+   CHARTS CARD STYLES
+   ============================================ */
+
+.chart-card {
+    -fx-background-color: white;
+    -fx-background-radius: 12px;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.08), 8, 0, 0, 2);
+    -fx-min-height: 300px;
+}
+
+.chart-card:hover {
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.12), 12, 0, 0, 4);
+}
+
+/* Header de la Card */
+.chart-header {
+    -fx-border-color: #E5E7EB;
+    -fx-border-width: 0 0 1 0;
+    -fx-padding: 0 0 12 0;
+}
+
+.chart-title {
+    -fx-font-size: 16px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #1F2937;
+}
+
+.chart-subtitle {
+    -fx-font-size: 13px;
+    -fx-text-fill: #6B7280;
+}
+
+/* ============================================
+   CHART CUSTOMIZATION
+   ============================================ */
+
+/* Estilos generales para todos los charts */
+.chart {
+    -fx-padding: 10px;
+    -fx-background-color: transparent;
+}
+
+.chart-content {
+    -fx-background-color: transparent;
+}
+
+.chart-plot-background {
+    -fx-background-color: #FAFBFC;
+}
+
+/* Grid lines */
+.chart-horizontal-grid-lines,
+.chart-vertical-grid-lines {
+    -fx-stroke: #E5E7EB;
+    -fx-stroke-width: 0.5;
+}
+
+/* Axes */
+.axis {
+    -fx-tick-label-fill: #6B7280;
+    -fx-font-size: 11px;
+}
+
+.axis-label {
+    -fx-text-fill: #374151;
+    -fx-font-size: 12px;
+    -fx-font-weight: bold;
+}
+
+/* Legend */
+.chart-legend {
+    -fx-background-color: transparent;
+    -fx-padding: 10px;
+}
+
+.chart-legend-item {
+    -fx-text-fill: #374151;
+    -fx-font-size: 12px;
+}
+
+/* ============================================
+   LINE CHART COLORS
+   ============================================ */
+
+.chart-series-line {
+    -fx-stroke-width: 2.5px;
+}
+
+/* Serie 1 - Azul */
+.default-color0.chart-series-line { -fx-stroke: #3B82F6; }
+.default-color0.chart-line-symbol {
+    -fx-background-color: #3B82F6, white;
+    -fx-background-insets: 0, 2;
+    -fx-background-radius: 5px;
+    -fx-padding: 5px;
+}
+
+/* Serie 2 - Verde */
+.default-color1.chart-series-line { -fx-stroke: #10B981; }
+.default-color1.chart-line-symbol {
+    -fx-background-color: #10B981, white;
+    -fx-background-insets: 0, 2;
+    -fx-background-radius: 5px;
+    -fx-padding: 5px;
+}
+
+/* Serie 3 - Morado */
+.default-color2.chart-series-line { -fx-stroke: #8B5CF6; }
+.default-color2.chart-line-symbol {
+    -fx-background-color: #8B5CF6, white;
+    -fx-background-insets: 0, 2;
+    -fx-background-radius: 5px;
+    -fx-padding: 5px;
+}
+
+/* ============================================
+   BAR CHART COLORS
+   ============================================ */
+
+/* Serie 1 - Azul */
+.default-color0.chart-bar {
+    -fx-bar-fill: #3B82F6;
+}
+
+/* Serie 2 - Verde */
+.default-color1.chart-bar {
+    -fx-bar-fill: #10B981;
+}
+
+/* Serie 3 - Morado */
+.default-color2.chart-bar {
+    -fx-bar-fill: #8B5CF6;
+}
+
+/* Serie 4 - Naranja */
+.default-color3.chart-bar {
+    -fx-bar-fill: #F59E0B;
+}
+
+/* Serie 5 - Rojo */
+.default-color4.chart-bar {
+    -fx-bar-fill: #EF4444;
+}
+
+/* ============================================
+   PIE CHART COLORS
+   ============================================ */
+
+.chart-pie {
+    -fx-pie-color: #3B82F6;
+    -fx-border-color: white;
+    -fx-border-width: 2;
+}
+
+.data0.chart-pie { -fx-pie-color: #3B82F6; }
+.data1.chart-pie { -fx-pie-color: #10B981; }
+.data2.chart-pie { -fx-pie-color: #8B5CF6; }
+.data3.chart-pie { -fx-pie-color: #F59E0B; }
+.data4.chart-pie { -fx-pie-color: #EF4444; }
+.data5.chart-pie { -fx-pie-color: #EC4899; }
+.data6.chart-pie { -fx-pie-color: #6366F1; }
+
+.chart-pie-label {
+    -fx-fill: #374151;
+    -fx-font-size: 11px;
+    -fx-font-weight: bold;
+}
+
+.chart-pie-label-line {
+    -fx-stroke: #9CA3AF;
+    -fx-stroke-width: 1;
+}
+
+/* ============================================
+   AREA CHART COLORS
+   ============================================ */
+
+/* Serie 1 - Azul */
+.default-color0.chart-series-area-line { -fx-stroke: #3B82F6; -fx-stroke-width: 2px; }
+.default-color0.chart-series-area-fill { -fx-fill: rgba(59, 130, 246, 0.3); }
+
+/* Serie 2 - Verde */
+.default-color1.chart-series-area-line { -fx-stroke: #10B981; -fx-stroke-width: 2px; }
+.default-color1.chart-series-area-fill { -fx-fill: rgba(16, 185, 129, 0.3); }
+
+/* Serie 3 - Morado */
+.default-color2.chart-series-area-line { -fx-stroke: #8B5CF6; -fx-stroke-width: 2px; }
+.default-color2.chart-series-area-fill { -fx-fill: rgba(139, 92, 246, 0.3); }
+
+/* Símbolos en Area Chart */
+.chart-area-symbol {
+    -fx-background-color: white;
+    -fx-background-radius: 5px;
+    -fx-padding: 4px;
+}
+
+.default-color0.chart-area-symbol { -fx-background-color: #3B82F6, white; -fx-background-insets: 0, 2; }
+.default-color1.chart-area-symbol { -fx-background-color: #10B981, white; -fx-background-insets: 0, 2; }
+.default-color2.chart-area-symbol { -fx-background-color: #8B5CF6, white; -fx-background-insets: 0, 2; }
+
+/* ============================================
+   RESPONSIVE ADJUSTMENTS
+   ============================================ */
+
+.chart-card .chart {
+    -fx-min-height: 250px;
+    -fx-pref-height: 300px;
+}

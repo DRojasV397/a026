@@ -1,0 +1,137 @@
+/* ============================================
+   LIST CARD
+   ============================================ */
+
+.list-card {
+    -fx-background-color: white;
+    -fx-background-radius: 12px;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.05), 4, 0, 0, 2);
+    -fx-min-height: 300px;
+}
+
+.list-card:hover {
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.08), 6, 0, 0, 3);
+}
+
+/* ============================================
+   LIST HEADER
+   ============================================ */
+
+.list-header {
+    -fx-border-color: #E5E7EB;
+    -fx-border-width: 0 0 1px 0;
+    -fx-padding: 0 0 12px 0;
+}
+
+.list-title {
+    -fx-font-size: 16px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #1F2937;
+}
+
+.list-subtitle {
+    -fx-font-size: 13px;
+    -fx-text-fill: #6B7280;
+}
+
+/* ============================================
+   LIST SCROLL
+   ============================================ */
+
+.list-scroll {
+    -fx-background-color: transparent;
+    -fx-border-color: transparent;
+    -fx-padding: 0;
+}
+
+.list-scroll .viewport {
+    -fx-background-color: transparent;
+}
+
+.list-scroll .scroll-bar:vertical {
+    -fx-background-color: transparent;
+    -fx-padding: 0 2px 0 2px;
+}
+
+.list-scroll .scroll-bar:vertical .track {
+    -fx-background-color: #F3F4F6;
+    -fx-background-radius: 4px;
+}
+
+.list-scroll .scroll-bar:vertical .thumb {
+    -fx-background-color: #D1D5DB;
+    -fx-background-radius: 4px;
+}
+
+.list-scroll .scroll-bar:vertical .thumb:hover {
+    -fx-background-color: #9CA3AF;
+}
+
+/* ============================================
+   LIST ITEMS
+   ============================================ */
+
+.list-items-container {
+    -fx-padding: 4px 0px;
+}
+
+.list-item {
+    -fx-padding: 12px 0;
+    -fx-border-color: #F3F4F6;
+    -fx-border-width: 0 0 1px 0;
+}
+
+.list-item:hover {
+    -fx-background-color: #F9FAFB;
+    -fx-background-radius: 6px;
+    -fx-padding: 12px 8px;
+}
+
+.list-item-icon {
+    -fx-font-size: 18px;
+}
+
+.list-item-title {
+    -fx-font-size: 14px;
+    -fx-font-weight: 600;
+    -fx-text-fill: #111827;
+}
+
+.list-item-subtitle {
+    -fx-font-size: 12px;
+    -fx-text-fill: #6B7280;
+    -fx-padding: 0 0 0 26px;
+}
+
+.list-item-value {
+    -fx-font-size: 14px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #111827;
+}
+
+.list-item-value-success {
+    -fx-text-fill: #10B981;
+}
+
+.list-item-value-warning {
+    -fx-text-fill: #F59E0B;
+}
+
+.list-item-value-info {
+    -fx-text-fill: #3B82F6;
+}
+
+/* ============================================
+   EMPTY STATE
+   ============================================ */
+
+.list-empty-state {
+    -fx-padding: 40px 20px;
+    -fx-min-height: 150px;
+}
+
+.list-empty-text {
+    -fx-font-size: 14px;
+    -fx-text-fill: #9CA3AF;
+    -fx-font-style: italic;
+}

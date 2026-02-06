@@ -1,4 +1,112 @@
 
+@import "alerts.css";
+
 .dashboard-root {
     -fx-background-color: #E3EDF7;
+}
+
+/* ============================================
+   DASHBOARD/HOME STYLES
+   ============================================ */
+
+.dashboard-container {
+    -fx-background-color: #E3EDF7;
+    -fx-padding: 20;
+}
+
+/* Grid de Cards */
+.dashboard-grid {
+    -fx-hgap: 20;
+    -fx-vgap: 20;
+}
+
+/* ============================================
+   STATS CARDS (KPI Cards pequeñas)
+   ============================================ */
+
+.stats-card {
+    -fx-background-color: white;
+    -fx-background-radius: 12px;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.06), 6, 0, 0, 2);
+    -fx-padding: 20;
+    -fx-min-height: 120px;
+}
+
+.stats-card:hover {
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.1), 10, 0, 0, 4);
+}
+
+.stats-card-icon {
+    -fx-min-width: 48px;
+    -fx-min-height: 48px;
+    -fx-max-width: 48px;
+    -fx-max-height: 48px;
+    -fx-background-radius: 12px;
+    -fx-alignment: center;
+}
+
+/* Variantes de color para stats cards */
+
+
+.stats-card-value {
+    -fx-font-size: 28px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #111827;
+}
+
+.stats-card-label {
+    -fx-font-size: 13px;
+    -fx-text-fill: #6B7280;
+    -fx-font-weight: 500;
+}
+
+.stats-card-change {
+    -fx-font-size: 12px;
+    -fx-font-weight: 600;
+}
+
+.stats-card-change.positive {
+    -fx-text-fill: #10B981;
+}
+
+.stats-card-change.negative {
+    -fx-text-fill: #EF4444;
+}
+
+/* ============================================
+   SECTION HEADERS
+   ============================================ */
+
+.dashboard-section-title {
+    -fx-font-size: 18px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #111827;
+}
+
+.dashboard-section-subtitle {
+    -fx-font-size: 14px;
+    -fx-text-fill: #6B7280;
+}
+
+/* ============================================
+   RESPONSIVE LAYOUTS
+   ============================================ */
+
+/* Para grids responsivos */
+.chart-card.full-width {
+    -fx-pref-width: Infinity;
+}
+
+.chart-card.half-width {
+    -fx-pref-width: 49%;
+}
+
+.chart-card.third-width {
+    -fx-pref-width: 32%;
+}
+
+.alerts-section-title {
+    -fx-font-size: 18px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #111827;
 }
