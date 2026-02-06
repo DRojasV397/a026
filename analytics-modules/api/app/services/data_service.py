@@ -1,0 +1,558 @@
+"""
+Servicio de carga y procesamiento de datos.
+Maneja la carga de archivos CSV/Excel y su procesamiento.
+"""
+
+import pandas as pd
+import numpy as np
+from typing import Optional, Dict, Any, List
+from datetime import datetime
+from sqlalchemy.orm import Session
+import uuid
+import logging
+
+from app.utils.file_parser import FileParser, ParseResult
+from app.utils.exceptions import FileParseError, ValidationError
+from app.schemas.data_upload import (
+    DataType, UploadStatus, UploadResponse,
+    ValidateResponse, ColumnValidation, PreviewResponse,
+    CleaningOptions, CleaningResult, CleanResponse,
+    QualityReportResponse, QualityMetric,
+    REQUIRED_COLUMNS, OPTIONAL_COLUMNS
+)
+from app.models import Venta, DetalleVenta, Compra, DetalleCompra, Producto
+from app.repositories import VentaRepository, CompraRepository, ProductoRepository
+
+logger = logging.getLogger(__name__)
+
+# Almacenamiento compartido a nivel de modulo (en produccion usar Redis/cache)
+_shared_uploads: Dict[str, Dict[str, Any]] = {}
+
+
+class DataService:
+    """Servicio de gestion de datos."""
+
+    def __init__(self, db: Session):
+        self.db = db
+        self.parser = FileParser()
+        # Usar almacenamiento compartido
+        self._uploads = _shared_uploads
+
+    def upload_file(
+        self,
+        file_content: bytes,
+        filename: str,
+        sheet_name: Optional[str] = None
+    ) -> UploadResponse:
+        """
+        Carga un archivo y lo almacena temporalmente.
+
+        Args:
+            file_content: Contenido del archivo
+            filename: Nombre del archivo
+            sheet_name: Hoja de Excel (opcional)
+
+        Returns:
+            UploadResponse: Respuesta con info del upload
+        """
+        upload_id = str(uuid.uuid4())
+
+        try:
+            result = self.parser.parse_file(file_content, filename, sheet_name)
+
+            if not result.success:
+                return UploadResponse(
+                    upload_id=upload_id,
+                    filename=filename,
+                    file_type=result.file_type.value if result.file_type else "unknown",
+                    total_rows=0,
+                    status=UploadStatus.ERROR,
+                    message="; ".join(result.errors),
+                    column_info={}
+                )
+
+            # Almacenar datos temporalmente
+            self._uploads[upload_id] = {
+                "filename": filename,
+                "data": result.data,
+                "column_info": result.column_info,
+                "status": UploadStatus.PENDING,
+                "created_at": datetime.now(),
+                "file_type": result.file_type
+            }
+
+            logger.info(f"Archivo cargado: {upload_id} - {filename} ({result.total_rows} filas)")
+
+            return UploadResponse(
+                upload_id=upload_id,
+                filename=filename,
+                file_type=result.file_type.value,
+                total_rows=result.total_rows,
+                status=UploadStatus.PENDING,
+                message="Archivo cargado exitosamente",
+                column_info=result.column_info
+            )
+
+        except FileParseError as e:
+            logger.error(f"Error al cargar archivo: {str(e)}")
+            return UploadResponse(
+                upload_id=upload_id,
+                filename=filename,
+                file_type="unknown",
+                total_rows=0,
+                status=UploadStatus.ERROR,
+                message=str(e),
+                column_info={}
+            )
+
+    def get_upload(self, upload_id: str) -> Optional[Dict[str, Any]]:
+        """Obtiene un upload por ID."""
+        return self._uploads.get(upload_id)
+
+    def validate_structure(
+        self,
+        upload_id: str,
+        data_type: DataType,
+        column_mappings: Optional[Dict[str, str]] = None
+    ) -> ValidateResponse:
+        """
+        Valida la estructura del archivo contra el tipo de datos.
+
+        Args:
+            upload_id: ID del upload
+            data_type: Tipo de datos esperado
+            column_mappings: Mapeo personalizado de columnas
+
+        Returns:
+            ValidateResponse: Resultado de validacion
+        """
+        upload = self.get_upload(upload_id)
+        if not upload:
+            return ValidateResponse(
+                upload_id=upload_id,
+                valid=False,
+                data_type=data_type,
+                columns=[],
+                errors=["Upload no encontrado"]
+            )
+
+        df = upload["data"]
+        required = REQUIRED_COLUMNS.get(data_type, [])
+        optional = OPTIONAL_COLUMNS.get(data_type, [])
+
+        columns_validation = []
+        missing_required = []
+        warnings = []
+
+        # Aplicar mapeo si existe
+        df_columns = set(df.columns.str.lower())
+        if column_mappings:
+            for source, target in column_mappings.items():
+                if source.lower() in df_columns:
+                    df_columns.add(target.lower())
+
+        # Validar columnas requeridas
+        for col in required:
+            found = col.lower() in df_columns
+            if not found:
+                missing_required.append(col)
+
+            col_info = upload["column_info"].get(col, {})
+            columns_validation.append(ColumnValidation(
+                name=col,
+                found=found,
+                data_type=col_info.get("suggested_type"),
+                null_count=col_info.get("null_count", 0),
+                null_percentage=col_info.get("null_percentage", 0)
+            ))
+
+        # Validar columnas opcionales
+        for col in optional:
+            found = col.lower() in df_columns
+            if not found:
+                warnings.append(f"Columna opcional '{col}' no encontrada")
+
+            columns_validation.append(ColumnValidation(
+                name=col,
+                found=found,
+                data_type=upload["column_info"].get(col, {}).get("suggested_type")
+            ))
+
+        # Actualizar estado
+        is_valid = len(missing_required) == 0
+        upload["status"] = UploadStatus.READY if is_valid else UploadStatus.ERROR
+
+        return ValidateResponse(
+            upload_id=upload_id,
+            valid=is_valid,
+            data_type=data_type,
+            columns=columns_validation,
+            missing_required=missing_required,
+            warnings=warnings,
+            errors=[f"Columna requerida faltante: {c}" for c in missing_required]
+        )
+
+    def get_preview(
+        self,
+        upload_id: str,
+        rows: int = 10
+    ) -> PreviewResponse:
+        """
+        Obtiene una vista previa de los datos.
+
+        Args:
+            upload_id: ID del upload
+            rows: Numero de filas
+
+        Returns:
+            PreviewResponse: Vista previa
+        """
+        upload = self.get_upload(upload_id)
+        if not upload:
+            return PreviewResponse(
+                upload_id=upload_id,
+                total_rows=0,
+                preview_rows=0,
+                columns=[],
+                data=[]
+            )
+
+        df = upload["data"]
+        preview = self.parser.get_preview(df, rows)
+
+        return PreviewResponse(
+            upload_id=upload_id,
+            total_rows=len(df),
+            preview_rows=len(preview),
+            columns=list(df.columns),
+            data=preview
+        )
+
+    def clean_data(
+        self,
+        upload_id: str,
+        options: CleaningOptions
+    ) -> CleanResponse:
+        """
+        Limpia los datos segun las opciones especificadas.
+
+        Args:
+            upload_id: ID del upload
+            options: Opciones de limpieza
+
+        Returns:
+            CleanResponse: Resultado de limpieza
+        """
+        upload = self.get_upload(upload_id)
+        if not upload:
+            return CleanResponse(
+                upload_id=upload_id,
+                status=UploadStatus.ERROR,
+                result=CleaningResult(
+                    original_rows=0, cleaned_rows=0, removed_rows=0,
+                    duplicates_removed=0, nulls_handled=0, outliers_detected=0,
+                    quality_score=0
+                ),
+                message="Upload no encontrado"
+            )
+
+        upload["status"] = UploadStatus.CLEANING
+        df = upload["data"].copy()
+        original_rows = len(df)
+        warnings = []
+
+        duplicates_removed = 0
+        nulls_handled = 0
+        outliers_detected = 0
+
+        # Eliminar duplicados
+        if options.remove_duplicates:
+            before = len(df)
+            df = df.drop_duplicates()
+            duplicates_removed = before - len(df)
+            if duplicates_removed > 0:
+                warnings.append(f"Se eliminaron {duplicates_removed} filas duplicadas")
+
+        # Manejar nulos
+        if options.handle_nulls:
+            null_counts = df.isna().sum().sum()
+            if options.null_strategy == "drop":
+                before = len(df)
+                df = df.dropna()
+                nulls_handled = before - len(df)
+            elif options.null_strategy == "fill_zero":
+                df = df.fillna(0)
+                nulls_handled = null_counts
+            elif options.null_strategy == "fill_mean":
+                numeric_cols = df.select_dtypes(include=[np.number]).columns
+                df[numeric_cols] = df[numeric_cols].fillna(df[numeric_cols].mean())
+                nulls_handled = null_counts
+            elif options.null_strategy == "fill_median":
+                numeric_cols = df.select_dtypes(include=[np.number]).columns
+                df[numeric_cols] = df[numeric_cols].fillna(df[numeric_cols].median())
+                nulls_handled = null_counts
+
+        # Detectar outliers usando Z-score
+        if options.detect_outliers:
+            numeric_cols = df.select_dtypes(include=[np.number]).columns
+            for col in numeric_cols:
+                if len(df) > 0:
+                    z_scores = np.abs((df[col] - df[col].mean()) / df[col].std())
+                    outliers = z_scores > options.outlier_threshold
+                    outliers_detected += outliers.sum()
+
+            if outliers_detected > 0:
+                warnings.append(f"Se detectaron {outliers_detected} valores atipicos")
+
+        # Normalizar texto
+        if options.normalize_text:
+            text_cols = df.select_dtypes(include=['object']).columns
+            for col in text_cols:
+                df[col] = df[col].astype(str).str.strip()
+
+        # Calcular calidad
+        cleaned_rows = len(df)
+        removed_rows = original_rows - cleaned_rows
+
+        # Verificar regla RN-02.05: mantener al menos 70% de registros
+        retention_rate = cleaned_rows / original_rows * 100 if original_rows > 0 else 0
+        if retention_rate < 70:
+            warnings.append(f"Atencion: Solo se retiene {retention_rate:.1f}% de los datos (minimo recomendado: 70%)")
+
+        quality_score = self._calculate_quality_score(df)
+
+        # Actualizar datos
+        upload["data"] = df
+        upload["status"] = UploadStatus.READY
+
+        result = CleaningResult(
+            original_rows=original_rows,
+            cleaned_rows=cleaned_rows,
+            removed_rows=removed_rows,
+            duplicates_removed=duplicates_removed,
+            nulls_handled=nulls_handled,
+            outliers_detected=outliers_detected,
+            quality_score=quality_score,
+            warnings=warnings
+        )
+
+        logger.info(f"Datos limpiados: {upload_id} - {cleaned_rows}/{original_rows} filas")
+
+        return CleanResponse(
+            upload_id=upload_id,
+            status=UploadStatus.READY,
+            result=result,
+            message=f"Limpieza completada. {cleaned_rows} filas validas de {original_rows}"
+        )
+
+    def _calculate_quality_score(self, df: pd.DataFrame) -> float:
+        """Calcula un puntaje de calidad de los datos."""
+        if len(df) == 0:
+            return 0.0
+
+        # Completitud: porcentaje de valores no nulos
+        completeness = (1 - df.isna().sum().sum() / df.size) * 100
+
+        # Unicidad: porcentaje de filas unicas
+        uniqueness = len(df.drop_duplicates()) / len(df) * 100
+
+        # Promedio ponderado
+        score = (completeness * 0.6 + uniqueness * 0.4)
+        return round(score, 2)
+
+    def get_quality_report(self, upload_id: str) -> QualityReportResponse:
+        """
+        Genera un reporte de calidad de datos.
+
+        Args:
+            upload_id: ID del upload
+
+        Returns:
+            QualityReportResponse: Reporte de calidad
+        """
+        upload = self.get_upload(upload_id)
+        if not upload:
+            return QualityReportResponse(
+                upload_id=upload_id,
+                overall_score=0,
+                total_rows=0,
+                valid_rows=0,
+                metrics=[],
+                issues=["Upload no encontrado"]
+            )
+
+        df = upload["data"]
+        metrics = []
+        issues = []
+        recommendations = []
+
+        for col in df.columns:
+            col_data = df[col]
+
+            # Completitud
+            completeness = (1 - col_data.isna().sum() / len(df)) * 100
+
+            # Unicidad
+            uniqueness = col_data.nunique() / len(df) * 100 if len(df) > 0 else 0
+
+            # Validez (simplificado)
+            validity = completeness  # Se puede mejorar con reglas especificas
+
+            # Contar outliers
+            outliers = 0
+            if pd.api.types.is_numeric_dtype(col_data):
+                if col_data.std() > 0:
+                    z_scores = np.abs((col_data - col_data.mean()) / col_data.std())
+                    outliers = (z_scores > 3).sum()
+
+            metrics.append(QualityMetric(
+                column=col,
+                completeness=round(completeness, 2),
+                uniqueness=round(uniqueness, 2),
+                validity=round(validity, 2),
+                outliers_count=int(outliers)
+            ))
+
+            # Detectar issues
+            if completeness < 90:
+                issues.append(f"Columna '{col}' tiene {100-completeness:.1f}% de valores nulos")
+            if outliers > 0:
+                issues.append(f"Columna '{col}' tiene {outliers} valores atipicos")
+
+        overall_score = self._calculate_quality_score(df)
+
+        # Recomendaciones
+        if overall_score < 70:
+            recommendations.append("Considere revisar la fuente de datos")
+        if any(m.completeness < 80 for m in metrics):
+            recommendations.append("Algunas columnas tienen muchos valores faltantes")
+
+        return QualityReportResponse(
+            upload_id=upload_id,
+            overall_score=overall_score,
+            total_rows=len(df),
+            valid_rows=len(df.dropna()),
+            metrics=metrics,
+            issues=issues,
+            recommendations=recommendations
+        )
+
+    def confirm_upload(
+        self,
+        upload_id: str,
+        data_type: DataType,
+        column_mappings: Dict[str, str]
+    ) -> Dict[str, Any]:
+        """
+        Confirma la carga e inserta los datos en la BD.
+
+        Args:
+            upload_id: ID del upload
+            data_type: Tipo de datos
+            column_mappings: Mapeo de columnas
+
+        Returns:
+            Dict: Resultado de la insercion
+        """
+        upload = self.get_upload(upload_id)
+        if not upload:
+            return {"success": False, "message": "Upload no encontrado"}
+
+        df = upload["data"]
+
+        # Renombrar columnas segun mapeo
+        df = df.rename(columns={v: k for k, v in column_mappings.items()})
+
+        try:
+            if data_type == DataType.VENTAS:
+                inserted = self._insert_ventas(df)
+            elif data_type == DataType.COMPRAS:
+                inserted = self._insert_compras(df)
+            elif data_type == DataType.PRODUCTOS:
+                inserted = self._insert_productos(df)
+            else:
+                return {"success": False, "message": f"Tipo de datos no soportado: {data_type}"}
+
+            upload["status"] = UploadStatus.CONFIRMED
+
+            logger.info(f"Datos confirmados: {upload_id} - {inserted} registros")
+
+            return {
+                "success": True,
+                "records_inserted": inserted,
+                "records_updated": 0,
+                "message": f"Se insertaron {inserted} registros exitosamente"
+            }
+
+        except Exception as e:
+            logger.error(f"Error al confirmar upload: {str(e)}")
+            return {"success": False, "message": str(e)}
+
+    def _insert_ventas(self, df: pd.DataFrame) -> int:
+        """Inserta datos de ventas en la BD."""
+        repo = VentaRepository(self.db)
+        inserted = 0
+
+        for _, row in df.iterrows():
+            try:
+                venta = Venta(
+                    fecha=pd.to_datetime(row.get('fecha')).date(),
+                    total=float(row.get('total', 0))
+                )
+                created = repo.create(venta)
+                if created:
+                    inserted += 1
+            except Exception as e:
+                logger.warning(f"Error al insertar venta: {str(e)}")
+                continue
+
+        return inserted
+
+    def _insert_compras(self, df: pd.DataFrame) -> int:
+        """Inserta datos de compras en la BD."""
+        repo = CompraRepository(self.db)
+        inserted = 0
+
+        for _, row in df.iterrows():
+            try:
+                compra = Compra(
+                    fecha=pd.to_datetime(row.get('fecha')).date(),
+                    proveedor=str(row.get('proveedor', '')),
+                    total=float(row.get('total', 0))
+                )
+                created = repo.create(compra)
+                if created:
+                    inserted += 1
+            except Exception as e:
+                logger.warning(f"Error al insertar compra: {str(e)}")
+                continue
+
+        return inserted
+
+    def _insert_productos(self, df: pd.DataFrame) -> int:
+        """Inserta datos de productos en la BD."""
+        repo = ProductoRepository(self.db)
+        inserted = 0
+
+        for _, row in df.iterrows():
+            try:
+                producto = Producto(
+                    sku=str(row.get('sku')),
+                    nombre=str(row.get('nombre')),
+                    precioUnitario=float(row.get('precio', 0))
+                )
+                created = repo.create(producto)
+                if created:
+                    inserted += 1
+            except Exception as e:
+                logger.warning(f"Error al insertar producto: {str(e)}")
+                continue
+
+        return inserted
+
+    def delete_upload(self, upload_id: str) -> bool:
+        """Elimina un upload temporal."""
+        if upload_id in self._uploads:
+            del self._uploads[upload_id]
+            return True
+        return False
