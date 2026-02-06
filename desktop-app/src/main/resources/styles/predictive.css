@@ -272,7 +272,7 @@
 }
 
 .icon-circle {
-    -fx-background-color: #F3F6FA;
+    -fx-background-color: white;
     -fx-background-radius: 100;
     -fx-alignment: center;
 }

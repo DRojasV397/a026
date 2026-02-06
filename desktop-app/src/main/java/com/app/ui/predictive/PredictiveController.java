@@ -43,6 +43,10 @@ public class PredictiveController {
     @FXML private VBox parametersContainer;
     @FXML private VBox parametersSummary;
 
+    @FXML private ImageView timeIcon;
+    @FXML private ImageView metricIcon;
+    @FXML private ImageView resultIcon;
+    @FXML private Label trainingTitleTxt;
 
     @FXML private StackPane phase1;
     @FXML private StackPane phase2;
@@ -54,6 +58,7 @@ public class PredictiveController {
     private int currentPhaseIndex = 0;
     private PredictiveModelDTO selectedModel;
     private boolean validPhase2 = false;
+    private boolean validPhase3 = false;
     private final List<VBox> modelCards = new ArrayList<>();
 
     private RotateTransition loadingRotation;
@@ -270,7 +275,7 @@ public class PredictiveController {
         return switch (currentPhaseIndex) {
             case 0 -> selectedModel != null; // Fase 1
             case 1 -> validPhase2;                  // Fase 2 (ejemplo)
-            case 2 -> true;                  // Fase 3
+            case 2 -> validPhase3;                  // Fase 3
             case 3 -> true;                  // Fase 4
             default -> true;
         };
@@ -372,9 +377,13 @@ public class PredictiveController {
 
     @FXML
     private void onTrainModel() {
-
+        btnPrevious.setDisable(true);
+        btnNext.setDisable(true);
         btnTrain.setDisable(true);
-        trainingInfo.setText("Entrenando el modelo, este proceso puede tardar unos minutos...");
+        trainingIcon.setImage(new Image(
+                Objects.requireNonNull(getClass().getResourceAsStream("/images/icons/loading.png"))
+        ));
+        trainingTitleTxt.setText("Entrenando el modelo, este proceso puede tardar unos minutos...");
         startLoadingAnimation();
 
         Task<TrainingResult> task = new Task<>() {
@@ -414,10 +423,15 @@ public class PredictiveController {
         lblMetric.setText(result.metric());
         lblResult.setText("Exitoso");
 
+        loadMetricIcons();
+
         trainingMetrics.setVisible(true);
         trainingMetrics.setManaged(true);
 
-        trainingInfo.setText("El modelo fue entrenado correctamente y está listo para su uso.");
+        trainingTitleTxt.setText("El modelo fue entrenado correctamente y está listo para su uso.");
+
+        validPhase3 = true;
+        updateFooterState();
     }
 
     private void showTrainingError() {
@@ -427,14 +441,10 @@ public class PredictiveController {
                 Objects.requireNonNull(getClass().getResourceAsStream("/images/icons/fail.png"))
         ));
 
-        lblTrainingTime.setText("-");
-        lblMetric.setText("-");
-        lblResult.setText("Erróneo");
+        trainingTitleTxt.setText("El modelo fue entrenado incorrectamente y reintentalo más tarde.");
 
-        trainingMetrics.setVisible(true);
-        trainingMetrics.setManaged(true);
-
-        trainingInfo.setText("El modelo fue entrenado incorrectamente y reintentalo más tarde.");
+        btnTrain.setDisable(false);
+        btnPrevious.setDisable(false);
     }
 
     private void showPhase3() {
@@ -456,6 +466,18 @@ public class PredictiveController {
 
         // 🔹 Botón habilitado
         btnTrain.setDisable(false);
+    }
+
+    private void loadMetricIcons() {
+        timeIcon.setImage(new Image(
+                Objects.requireNonNull(getClass().getResourceAsStream("/images/icons/time.png"))
+        ));
+        metricIcon.setImage(new Image(
+                Objects.requireNonNull(getClass().getResourceAsStream("/images/icons/metric.png"))
+        ));
+        resultIcon.setImage(new Image(
+                Objects.requireNonNull(getClass().getResourceAsStream("/images/icons/result.png"))
+        ));
     }
 
 

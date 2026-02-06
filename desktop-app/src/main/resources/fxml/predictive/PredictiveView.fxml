@@ -154,17 +154,21 @@
                           visible="false"
                           managed="false">
 
-                        <StackPane prefWidth="600"
+                        <StackPane
                                    prefHeight="420"
                                    styleClass="training-card">
+
+                            <StackPane.margin>
+                                <Insets top="20" bottom="20"/>
+                            </StackPane.margin>
 
                             <VBox spacing="18"
                                   alignment="CENTER">
 
                                 <!-- ===== ICONO PRINCIPAL ===== -->
                                 <StackPane fx:id="iconContainer"
-                                           prefWidth="120"
-                                           prefHeight="120"
+                                           maxWidth="140"
+                                           maxHeight="140"
                                            styleClass="icon-circle">
 
                                     <ImageView fx:id="trainingIcon"
@@ -172,6 +176,13 @@
                                                fitHeight="130"
                                                preserveRatio="true"/>
                                 </StackPane>
+
+                                <!-- ===== TEXTO ===== -->
+                                <Label fx:id="trainingTitleTxt"
+                                       text="Da clic en el botón de Entrenar para iniciar el proceso de entrenamiento del modelo."
+                                       wrapText="true"
+                                       maxWidth="420"
+                                       styleClass="training-title"/>
 
                                 <!-- ===== MÉTRICAS ===== -->
                                 <HBox fx:id="trainingMetrics"
@@ -181,28 +192,27 @@
                                       managed="false">
 
                                     <VBox alignment="CENTER">
-                                        <ImageView fitWidth="18" fitHeight="18"/>
+                                        <ImageView fx:id="resultIcon" fitWidth="45" fitHeight="45"/>
+                                        <Label fx:id="lblResult"/>
+                                    </VBox>
+
+                                    <Separator/>
+
+                                    <VBox alignment="CENTER">
+                                        <ImageView fx:id="timeIcon" fitWidth="45" fitHeight="45"/>
                                         <Label fx:id="lblTrainingTime"/>
                                     </VBox>
 
+                                    <Separator/>
+
                                     <VBox alignment="CENTER">
-                                        <ImageView fitWidth="18" fitHeight="18"/>
+                                        <ImageView fx:id="metricIcon" fitWidth="45" fitHeight="45"/>
                                         <Label fx:id="lblMetric"/>
                                     </VBox>
 
-                                    <VBox alignment="CENTER">
-                                        <ImageView fitWidth="18" fitHeight="18"/>
-                                        <Label fx:id="lblResult"/>
-                                    </VBox>
                                 </HBox>
 
                                 <Separator/>
-
-                                <!-- ===== TEXTO ===== -->
-                                <Label text="Da clic en el botón de Entrenar para iniciar el proceso de entrenamiento del modelo."
-                                       wrapText="true"
-                                       maxWidth="420"
-                                       styleClass="training-title"/>
 
                                 <Label fx:id="trainingInfo"
                                        wrapText="true"
