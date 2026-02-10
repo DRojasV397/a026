@@ -1,14 +1,97 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
-<?import javafx.scene.layout.BorderPane?>
-<?import javafx.scene.control.Label?>
+<?import javafx.scene.layout.*?>
+<?import javafx.scene.control.*?>
+<?import javafx.geometry.Insets?>
+
 <BorderPane xmlns:fx="http://javafx.com/fxml"
             fx:controller="com.app.ui.profit.ProfitController"
-            stylesheets="@/styles/dashboard.css"
-            styleClass="dashboard-root">
+            stylesheets="@/styles/profit.css"
+            styleClass="profit-root">
 
+    <!-- ================= TOP: MENÚ DE NAVEGACIÓN ================= -->
+    <top>
+        <HBox spacing="12"
+              alignment="CENTER_LEFT"
+              styleClass="profit-header">
+
+            <padding>
+                <Insets top="16" right="24" bottom="16" left="24"/>
+            </padding>
+
+            <Button fx:id="btnIndicators"
+                    text="📊 Indicadores Financieros"
+                    onAction="#showIndicators"
+                    styleClass="nav-button, nav-active"/>
+
+            <Button fx:id="btnProduct"
+                    text="📦 Por Producto"
+                    onAction="#showByProduct"
+                    styleClass="nav-button"/>
+
+            <Button fx:id="btnCategory"
+                    text="🗂️ Por Categoría"
+                    onAction="#showByCategory"
+                    styleClass="nav-button"/>
+
+            <Button fx:id="btnProjection"
+                    text="📈 Proyección Futura"
+                    onAction="#showProjection"
+                    styleClass="nav-button"/>
+        </HBox>
+    </top>
+
+    <!-- ================= CENTER: CONTENIDO CON SCROLL ================= -->
     <center>
-        <Label text="Bienvenido al módulo de Rentabilidad"/>
+        <ScrollPane fitToWidth="true"
+                    styleClass="profit-scroll">
+
+            <BorderPane.margin>
+                <Insets top="0" right="24" bottom="24" left="24"/>
+            </BorderPane.margin>
+
+            <content>
+                <StackPane fx:id="contentStack">
+
+                    <padding>
+                        <Insets top="24"/>
+                    </padding>
+
+                    <!-- ========== CU-29: INDICADORES FINANCIEROS ========== -->
+                    <VBox fx:id="indicatorsView"
+                          spacing="0"
+                          visible="false"
+                          managed="false">
+                        <!-- Contenido dinámico desde controller -->
+                    </VBox>
+
+                    <!-- ========== CU-30: RENTABILIDAD POR PRODUCTO ========== -->
+                    <VBox fx:id="productView"
+                          spacing="24"
+                          visible="false"
+                          managed="false">
+                        <!-- Contenido dinámico desde controller -->
+                    </VBox>
+
+                    <!-- ========== CU-31: RENTABILIDAD POR CATEGORÍA ========== -->
+                    <VBox fx:id="categoryView"
+                          spacing="24"
+                          visible="false"
+                          managed="false">
+                        <!-- Contenido dinámico desde controller -->
+                    </VBox>
+
+                    <!-- ========== CU-32: PROYECCIÓN FUTURA ========== -->
+                    <VBox fx:id="projectionView"
+                          spacing="24"
+                          visible="false"
+                          managed="false">
+                        <!-- Contenido dinámico desde controller -->
+                    </VBox>
+
+                </StackPane>
+            </content>
+        </ScrollPane>
     </center>
 
 </BorderPane>

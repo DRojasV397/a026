@@ -119,32 +119,41 @@
                           managed="false">
 
                         <Label text="Configurar parámetros del modelo"
-                               styleClass="section-title"/>
+                               styleClass="section-title">
+                            <VBox.margin>
+                                <Insets bottom="16"/>
+                            </VBox.margin>
+                        </Label>
 
-                        <HBox spacing="10" alignment="TOP_LEFT">
+                        <HBox spacing="20" alignment="TOP_LEFT">
 
-                            <!-- Panel central dinámico -->
+                            <!-- ========== PANEL PRINCIPAL - PARÁMETROS (IZQUIERDA) ========== -->
                             <VBox fx:id="parametersContainer"
-                                  spacing="16"
+                                  spacing="20"
                                   HBox.hgrow="ALWAYS"
-                                  styleClass="parameters-container"/>
+                                  styleClass="parameters-container">
 
-                            <!-- Panel lateral resumen -->
-                            <VBox fx:id="parametersSummaryPane"
-                                  spacing="12"
-                                  prefWidth="350"
-                                  minWidth="350"
-                                  maxWidth="350"
-                                  styleClass="model-detail">
 
-                                <Label text="Resumen de configuración"
-                                       styleClass="detail-title"/>
+                            </VBox>
 
+                            <!-- ========== PANEL LATERAL - RESUMEN Y VALIDACIÓN (DERECHA) ========== -->
+                            <VBox spacing="16"
+                                  prefWidth="300"
+                                  minWidth="300"
+                                  maxWidth="300"
+                                  styleClass="phase2-sidebar">
+
+                                <!-- Contenedor de cards de resumen -->
                                 <VBox fx:id="parametersSummary"
-                                      spacing="8"/>
+                                      spacing="16">
+
+
+                                </VBox>
+
                             </VBox>
 
                         </HBox>
+
                     </VBox>
 
                     <!-- ================= FASE 3 ================= -->
@@ -230,6 +239,121 @@
                     </VBox>
 
 
+                    <!-- ================= FASE 4 - RESULTADOS ================= -->
+                    <VBox fx:id="phase4Content"
+                          visible="false"
+                          managed="false">
+
+                        <HBox spacing="0" VBox.vgrow="ALWAYS">
+
+                            <!-- ========== PANEL PRINCIPAL (IZQUIERDA) ========== -->
+                            <VBox spacing="20"
+                                  HBox.hgrow="ALWAYS"
+                                  styleClass="results-main-panel">
+
+                                <padding>
+                                    <Insets top="0" right="20" bottom="20" left="0"/>
+                                </padding>
+
+                                <!-- Título de sección -->
+                                <Label text="Resultados del Análisis"
+                                       styleClass="results-section-title"/>
+
+                                <!-- ========== KPI CARDS ROW ========== -->
+                                <FlowPane fx:id="resultsKpiContainer"
+                                          hgap="16"
+                                          vgap="16"
+                                          styleClass="results-kpi-row">
+                                    <!-- Las KPI cards se cargan dinámicamente -->
+                                </FlowPane>
+
+                                <!-- ========== CHARTS CONTAINER ========== -->
+                                <VBox fx:id="resultsChartsContainer"
+                                      spacing="20"
+                                      styleClass="results-charts-container">
+                                    <!-- Los charts se cargan dinámicamente -->
+                                </VBox>
+
+                            </VBox>
+
+                            <!-- ========== PANEL LATERAL (DERECHA) ========== -->
+                            <VBox spacing="20"
+                                  prefWidth="280"
+                                  maxWidth="280"
+                                  styleClass="results-sidebar">
+
+                                <padding>
+                                    <Insets  top="20" bottom="20"  left="20" right="20"/>
+                                </padding>
+
+                                <!-- ========== ACCIONES RÁPIDAS ========== -->
+                                <VBox spacing="12"
+                                      styleClass="sidebar-section">
+
+                                    <Label text="Acciones Rápidas"
+                                           styleClass="sidebar-section-title"/>
+
+                                    <VBox spacing="8">
+                                        <Button text="💾  Guardar Predicción"
+                                                maxWidth="Infinity"
+                                                onAction="#onSavePrediction"
+                                                styleClass="sidebar-action-btn, primary"/>
+
+                                        <Button text="📄  Generar Reporte"
+                                                maxWidth="Infinity"
+                                                onAction="#onGenerateReport"
+                                                styleClass="sidebar-action-btn, secondary"/>
+
+                                        <Button text="🔄  Reentrenar Modelo"
+                                                maxWidth="Infinity"
+                                                onAction="#onRetrainModel"
+                                                styleClass="sidebar-action-btn, secondary"/>
+
+                                        <Separator/>
+
+                                        <Button text="📊  Exportar Datos"
+                                                maxWidth="Infinity"
+                                                onAction="#onExportData"
+                                                styleClass="sidebar-action-btn, tertiary"/>
+                                    </VBox>
+                                </VBox>
+
+                                <!-- ========== RESUMEN DEL ENTRENAMIENTO ========== -->
+                                <VBox spacing="12"
+                                      styleClass="sidebar-section">
+
+                                    <Label text="Resumen del Entrenamiento"
+                                           styleClass="sidebar-section-title"/>
+
+                                    <VBox fx:id="trainingSummaryContainer"
+                                          spacing="8"
+                                          styleClass="summary-items-container">
+                                        <!-- Los items se cargan dinámicamente -->
+                                    </VBox>
+                                </VBox>
+
+                                <!-- ========== INFORMACIÓN DEL MODELO ========== -->
+                                <VBox spacing="12"
+                                      styleClass="sidebar-section">
+
+                                    <Label text="Información del Modelo"
+                                           styleClass="sidebar-section-title"/>
+
+                                    <VBox fx:id="modelInfoContainer"
+                                          spacing="8"
+                                          styleClass="summary-items-container">
+                                        <!-- Los items se cargan dinámicamente -->
+                                    </VBox>
+                                </VBox>
+
+                            </VBox>
+
+                        </HBox>
+
+                    </VBox>
+
+
+
                 </VBox>
 
             </content>
@@ -238,7 +362,8 @@
 
     <!-- ================= FOOTER ================= -->
     <bottom>
-        <HBox spacing="12"
+        <HBox fx:id="predictiveFooter"
+              spacing="12"
               alignment="CENTER"
               styleClass="predictive-footer">
 

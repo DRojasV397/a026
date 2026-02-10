@@ -19,6 +19,7 @@ import javafx.scene.layout.VBox;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.Objects;
 
 /**
  * Controlador principal del Dashboard/Home
@@ -102,7 +103,7 @@ public class HomeController {
      */
     private void loadAlertsCSS() {
         try {
-            String alertsCSS = getClass().getResource("/styles/alerts.css").toExternalForm();
+            String alertsCSS = Objects.requireNonNull(getClass().getResource("/styles/alerts.css")).toExternalForm();
             alertsContainer.getStylesheets().add(alertsCSS);
         } catch (Exception e) {
             System.err.println("No se pudo cargar alerts.css: " + e.getMessage());
