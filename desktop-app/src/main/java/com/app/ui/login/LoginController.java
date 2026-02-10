@@ -4,6 +4,7 @@ import com.app.Main;
 import com.app.core.navigation.SceneManager;
 import com.app.core.session.UserSession;
 import com.app.core.threading.AppExecutor;
+import com.app.model.LoginResponseDTO;
 import com.app.service.auth.AuthService;
 import com.app.util.ValidationUtil;
 import javafx.application.Platform;
@@ -121,12 +122,11 @@ public class LoginController {
         String pass = passwordField.getText();
 
         AppExecutor.runAsync(() -> {
-
-            boolean success = true;//authService.login(user, pass);//NECESITA AJUSTES CUANDO SE IMPLEMENTE LECTURA DE BASE DE DATOS
+            LoginResponseDTO response = authService.login(user, pass);
 
             Platform.runLater(() -> {
-                if (success) {
-                    UserSession.setUser(user, "Usuario"); //NECESITA AJUSTES CUANDO SE IMPLEMENTE LECTURA DE BASE DE DATOS
+                if (response != null) {
+                    UserSession.setFromLoginResponse(response);
                     SceneManager.showHome();
                 } else {
                     showError("Usuario o contraseña incorrectos");

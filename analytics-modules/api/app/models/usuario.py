@@ -18,7 +18,7 @@ class Usuario(Base):
     nombreCompleto = Column(String(120), nullable=False)
     nombreUsuario = Column(String(60), unique=True, nullable=False, index=True)
     email = Column(String(160), unique=True, nullable=False, index=True)
-    hashPassword = Column(String(50), nullable=True)
+    hashPassword = Column(String(255), nullable=True)
     estado = Column(String(20), nullable=True)
     creadoEn = Column(DateTime, nullable=True, default=datetime.now)
 
