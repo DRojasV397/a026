@@ -1,11 +1,11 @@
+/* Avatar circular navbar */
 .navbar-avatar {
-    -fx-min-width: 36;
-    -fx-min-height: 36;
-    -fx-max-width: 36;
-    -fx-max-height: 36;
-    -fx-background-color: #DDE6ED;
-    -fx-background-radius: 50%;
-    -fx-alignment: center;
+    -fx-min-width: 36px;
+    -fx-min-height: 36px;
+    -fx-max-width: 36px;
+    -fx-max-height: 36px;
+    -fx-background-radius: 18;
+    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.15), 6, 0, 0, 2);
 }
 
 .navbar-user-name {

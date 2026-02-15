@@ -4,6 +4,12 @@ import com.app.model.LoginResponseDTO;
 
 import java.util.List;
 
+import javafx.beans.property.ObjectProperty;
+import javafx.beans.property.SimpleObjectProperty;
+import javafx.beans.property.SimpleStringProperty;
+import javafx.beans.property.StringProperty;
+import javafx.scene.image.Image;
+
 public class UserSession {
 
     private static String accessToken;
@@ -13,6 +19,8 @@ public class UserSession {
     private static String nombreUsuario;
     private static String email;
     private static List<String> roles;
+
+
 
     private UserSession() {}
 
@@ -52,6 +60,7 @@ public class UserSession {
     }
 
     public static int getUserId() {
+        System.out.println("getUserId " +  userId);
         return userId;
     }
 
@@ -91,5 +100,38 @@ public class UserSession {
 
     public static List<String> getRoles() {
         return roles != null ? roles : List.of();
+    }
+
+    // ── Propiedades observables globales ─────────────────────────────────────
+    private static final ObjectProperty<Image> avatarProperty =
+            new SimpleObjectProperty<>(null);
+
+    private static final StringProperty displayNameProperty =
+            new SimpleStringProperty("");
+
+    // ── API pública ───────────────────────────────────────────────────────────
+
+    public static ObjectProperty<Image> avatarProperty() {
+        return avatarProperty;
+    }
+
+    public static Image getAvatar() {
+        return avatarProperty.get();
+    }
+
+    public static void setAvatar(Image image) {
+        avatarProperty.set(image);
+    }
+
+    public static StringProperty displayNameProperty() {
+        return displayNameProperty;
+    }
+
+    public static void setDisplayName(String name) {
+        displayNameProperty.set(name);
+    }
+
+    public static String getDisplayName() {
+        return displayNameProperty.get();
     }
 }

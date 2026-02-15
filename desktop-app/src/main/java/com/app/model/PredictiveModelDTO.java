@@ -9,6 +9,8 @@ public record PredictiveModelDTO(
         String detailMessage,
         String icon,
         String presicion,
-        String tiempoTrain
-) {}
-
+        String tiempoTrain,
+        List<ModelFeature> features // <--- Nueva lista estructurada
+) {
+    public record ModelFeature(String icon, String label, String value, String color) {}
+}

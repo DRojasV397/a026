@@ -99,8 +99,7 @@
                                 <Label fx:id="detailTitle"
                                        styleClass="detail-title"/>
 
-                                <Label fx:id="detailDescription"
-                                       wrapText="true"/>
+                                <VBox fx:id="detailDescriptionContainer"/>
 
                                 <Separator/>
 

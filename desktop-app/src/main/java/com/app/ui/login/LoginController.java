@@ -122,17 +122,17 @@ public class LoginController {
         String pass = passwordField.getText();
 
         AppExecutor.runAsync(() -> {
-            LoginResponseDTO response = authService.login(user, pass);
+            //LoginResponseDTO response = authService.login(user, pass);
 
             Platform.runLater(() -> {
-                if (response != null) {
-                    UserSession.setFromLoginResponse(response);
+                //if (response != null) {
+                    //UserSession.setFromLoginResponse(response);
                     SceneManager.showHome();
-                } else {
-                    showError("Usuario o contraseña incorrectos");
-                    loginButton.setDisable(false);
-                    loginButton.setText("Iniciar sesión →");
-                }
+//                } else {
+//                    showError("Usuario o contraseña incorrectos");
+//                    loginButton.setDisable(false);
+//                    loginButton.setText("Iniciar sesión →");
+//                }
             });
         });
     }
@@ -151,11 +151,11 @@ public class LoginController {
         try {
             String mailto =
                     "mailto:correo@gmail.com" +
-                            "?subject=" + encodeMailParam("Información Sistema BI TT") +
+                            "?subject=" + encodeMailParam("Información sobre herramienta SANI") +
                             "&body=" + encodeMailParam(
                             "Hola,\n\n" +
                                     "Estoy interesado en utilizar su aplicación y me gustaría recibir información " +
-                                    "sobre la contratación del Sistema BI TT.\n\n" +
+                                    "sobre la contratación de SANI.\n\n" +
                                     "Gracias.");
 
             Main.getHost().showDocument(mailto);

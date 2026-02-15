@@ -1,5 +1,8 @@
 package com.app.ui.profit;
 
+import javafx.collections.FXCollections;
+import javafx.collections.ObservableList;
+import javafx.collections.transformation.SortedList;
 import javafx.fxml.FXML;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
@@ -386,7 +389,7 @@ public class ProfitController {
 
         TableView<ProductProfit> table = new TableView<>();
         table.getStyleClass().add("profit-table");
-        table.setPrefHeight(400);
+        table.setPrefHeight(650);
 
         // Columnas con ancho automático (quita espacio vacío)
         TableColumn<ProductProfit, String> nameCol = new TableColumn<>("Producto");
@@ -499,10 +502,15 @@ public class ProfitController {
         // ✅ LAZY LOADING: Cargar solo la primera página inicialmente
         table.getItems().addAll(allProducts.subList(0, Math.min(ROWS_PER_PAGE, allProducts.size())));
 
-        // ✅ Paginación mejorada con soporte de sorting completo
-        Pagination pagination = createDynamicPaginationWithSorting(allProducts, table);
+        // ✅ LABEL ESTÁTICO FUERA DEL PAGINATION (sin animación)
+        Label pageInfoLabel = new Label(String.format("Mostrando 1-%d de %d registros",
+                Math.min(ROWS_PER_PAGE, allProducts.size()), allProducts.size()));
+        pageInfoLabel.getStyleClass().add("page-info-label");
 
-        card.getChildren().addAll(cardTitle, table, pagination);
+        // ✅ Paginación mejorada con soporte de sorting completo
+        Pagination pagination = createDynamicPaginationWithSorting(allProducts, table, pageInfoLabel);
+
+        card.getChildren().addAll(cardTitle, table, pageInfoLabel, pagination);
         return card;
     }
 
@@ -539,7 +547,7 @@ public class ProfitController {
 
         TableView<ProductProfit> table = new TableView<>();
         table.getStyleClass().add("profit-table");
-        table.setPrefHeight(400);
+        table.setPrefHeight(600);
 
 
         // Columnas con ancho automático
@@ -646,16 +654,23 @@ public class ProfitController {
 
         List<ProductProfit> allCategories = getMockCategoryData();
 
-        // ✅ Orden inicial A-Z por nombre de categoría
+        // Orden inicial A-Z — ahora sí funciona
+        nameCol.setSortType(TableColumn.SortType.ASCENDING);
         table.getSortOrder().add(nameCol);
+        table.sort();  //
 
         // ✅ LAZY LOADING: Cargar solo la primera página inicialmente
         table.getItems().addAll(allCategories.subList(0, Math.min(ROWS_PER_PAGE, allCategories.size())));
 
-        // ✅ Paginación mejorada con soporte de sorting completo
-        Pagination pagination = createDynamicPaginationWithSorting(allCategories, table);
+        // ✅ LABEL ESTÁTICO FUERA DEL PAGINATION (sin animación)
+        Label pageInfoLabel = new Label(String.format("Mostrando 1-%d de %d registros",
+                Math.min(ROWS_PER_PAGE, allCategories.size()), allCategories.size()));
+        pageInfoLabel.getStyleClass().add("page-info-label");
 
-        card.getChildren().addAll(cardTitle, table, pagination);
+        // ✅ Paginación mejorada con soporte de sorting completo
+        Pagination pagination = createDynamicPaginationWithSorting(allCategories, table, pageInfoLabel);
+
+        card.getChildren().addAll(cardTitle, table, pageInfoLabel, pagination);
         return card;
     }
 
@@ -705,99 +720,114 @@ public class ProfitController {
     }
 
     /* =========================
-       PAGINACIÓN CON SORTING COMPLETO Y LAZY LOADING ✅
+       PAGINACIÓN CON SORTING COMPLETO
        ========================= */
 
     private Pagination createDynamicPaginationWithSorting(List<ProductProfit> allData,
-                                                          TableView<ProductProfit> table) {
-        // Calcular número de páginas dinámicamente
+                                                          TableView<ProductProfit> table,
+                                                          Label pageInfoLabel) {
+
+        // 1. Lista observable maestra
+        ObservableList<ProductProfit> masterData =
+                FXCollections.observableArrayList(allData);
+
+        // 2. SortedList vinculada al comparador del table
+        SortedList<ProductProfit> sortedData = new SortedList<>(masterData);
+        sortedData.comparatorProperty().bind(table.comparatorProperty());
+
+        // 3. CRÍTICO: Usar una ObservableList de "página actual" como items del table
+        //    Esta lista NUNCA se reemplaza, solo se actualiza su contenido
+        ObservableList<ProductProfit> pageItems = FXCollections.observableArrayList();
+        table.setItems(pageItems);  // Solo se llama UNA VEZ
+
         int pageCount = (int) Math.ceil((double) allData.size() / ROWS_PER_PAGE);
-
-        Pagination pagination = new Pagination(pageCount, 0);
+        Pagination pagination = new Pagination(Math.max(pageCount, 1), 0);
         pagination.getStyleClass().add("profit-pagination");
-
-        // ✅ CRÍTICO: Configurar el número máximo de indicadores de página visibles
         pagination.setMaxPageIndicatorCount(7);
 
-        // Solo mostrar si hay más de 1 página
         if (pageCount <= 1) {
             pagination.setVisible(false);
             pagination.setManaged(false);
         }
 
-        // ✅ Mantener referencia mutable a los datos para sorting
-        final List<ProductProfit>[] sortedData = new List[]{new ArrayList<>(allData)};
+        // 4. Función de actualización usando setAll() en lugar de setItems()
+        Runnable updatePage = () -> {
+            int pageIndex = pagination.getCurrentPageIndex();
+            int from = pageIndex * ROWS_PER_PAGE;
+            int to = Math.min(from + ROWS_PER_PAGE, sortedData.size());
 
-        // ✅ LISTENER para detectar cambios en el ordenamiento
-        table.getSortOrder().addListener((javafx.collections.ListChangeListener<TableColumn<ProductProfit, ?>>) change -> {
-            if (table.getSortOrder().isEmpty()) {
-                // Sin ordenamiento, usar datos originales
-                sortedData[0] = new ArrayList<>(allData);
+            pageItems.setAll(sortedData.subList(from, to));  // ← setAll, no setItems
+
+            pageInfoLabel.setText(String.format("Mostrando %d-%d de %d registros",
+                    from + 1, to, sortedData.size()));
+        };
+
+        // 5. Al cambiar sort → ir a página 0 y refrescar
+        table.comparatorProperty().addListener((obs, oldVal, newVal) -> {
+            if (pagination.getCurrentPageIndex() == 0) {
+                updatePage.run();  // Ya estamos en pág 0, actualizar directamente
             } else {
-                // Crear una lista temporal con todos los datos
-                List<ProductProfit> tempList = new ArrayList<>(allData);
-
-                // Aplicar el ordenamiento de la tabla a la lista completa
-                tempList.sort((a, b) -> {
-                    for (TableColumn<ProductProfit, ?> col : table.getSortOrder()) {
-                        int comparison = 0;
-                        String colName = col.getText();
-
-                        // Comparar según la columna
-                        if (colName.contains("Producto") || colName.contains("Categoría")) {
-                            comparison = a.getName().compareToIgnoreCase(b.getName());
-                        } else if (colName.contains("Ventas")) {
-                            comparison = compareMoneyStrings(a.getSales(), b.getSales());
-                        } else if (colName.contains("Margen")) {
-                            comparison = comparePercentageStrings(a.getMargin(), b.getMargin());
-                        } else if (colName.contains("Ganancia")) {
-                            comparison = compareMoneyStrings(a.getProfit(), b.getProfit());
-                        }
-
-                        // Aplicar orden ascendente o descendente
-                        if (col.getSortType() == TableColumn.SortType.DESCENDING) {
-                            comparison = -comparison;
-                        }
-
-                        if (comparison != 0) {
-                            return comparison;
-                        }
-                    }
-                    return 0;
-                });
-
-                sortedData[0] = tempList;
+                pagination.setCurrentPageIndex(0);  // El pageFactory lo actualizará
             }
-
-            // ✅ Volver a página 1 después de ordenar
-            pagination.setCurrentPageIndex(0);
         });
 
+        // 6. pageFactory retorna un nodo VÁLIDO y VISIBLE (requerido por JavaFX)
         pagination.setPageFactory(pageIndex -> {
-            int fromIndex = pageIndex * ROWS_PER_PAGE;
-            int toIndex = Math.min(fromIndex + ROWS_PER_PAGE, sortedData[0].size());
-
-            // ✅ LAZY LOADING: Solo cargar los datos de la página actual desde sortedData
-            table.getItems().setAll(sortedData[0].subList(fromIndex, toIndex));
-
-            // ✅ Mantener el orden visual aplicado
-            table.sort();
-
-            // ✅ Crear contenedor ALINEADO A LA IZQUIERDA
-            HBox pageInfoContainer = new HBox();
-            pageInfoContainer.getStyleClass().add("page-info-container");
-
-            Label pageInfo = new Label(String.format("Mostrando %d-%d de %d registros",
-                    fromIndex + 1, toIndex, sortedData[0].size()));
-            pageInfo.getStyleClass().add("page-info-label");
-
-            pageInfoContainer.getChildren().add(pageInfo);
-
-            return pageInfoContainer;
+            updatePage.run();
+            Label dummy = new Label();  // Nodo válido pero sin altura visual
+            dummy.setMaxHeight(0);
+            dummy.setPrefHeight(0);
+            return dummy;
         });
+
+        // Cargar primera página
+        updatePage.run();
 
         return pagination;
     }
+
+    private void updatePage(TableView<ProductProfit> table,
+                            SortedList<ProductProfit> sortedData,
+                            int pageIndex,
+                            Label pageInfoLabel) {
+
+        int fromIndex = pageIndex * ROWS_PER_PAGE;
+        int toIndex = Math.min(fromIndex + ROWS_PER_PAGE, sortedData.size());
+
+        ObservableList<ProductProfit> page =
+                javafx.collections.FXCollections.observableArrayList(
+                        sortedData.subList(fromIndex, toIndex)
+                );
+
+        table.setItems(page);
+
+        pageInfoLabel.setText(String.format(
+                "Mostrando %d-%d de %d registros",
+                fromIndex + 1,
+                toIndex,
+                sortedData.size()
+        ));
+    }
+
+
+    private void prettyPrintList(List<ProductProfit> list) {
+        System.out.println("------------------------------------------");
+        System.out.printf("%-30s | %-10s | %-8s | %-10s\n",
+                "NAME", "SALES", "MARGIN", "PROFIT");
+        System.out.println("------------------------------------------");
+
+        for (ProductProfit p : list) {
+            System.out.printf("%-30s | %-10s | %-8s | %-10s\n",
+                    p.getName(),
+                    p.getSales(),
+                    p.getMargin(),
+                    p.getProfit());
+        }
+
+        System.out.println("------------------------------------------\n");
+    }
+
+
 
     /* =========================
        COMPARADORES PARA SORTING
@@ -864,7 +894,7 @@ public class ProfitController {
         VBox card = new VBox(12);
         card.getStyleClass().add("summary-card");
 
-        Label title = new Label("⚠️ Productos que Requieren Atención");
+        Label title = new Label("⚠ Productos que Requieren Atención");
         title.getStyleClass().add("summary-card-title");
 
         List<TopProduct> lossProducts = getMockLossProducts();
@@ -949,7 +979,7 @@ public class ProfitController {
         VBox card = new VBox(12);
         card.getStyleClass().add("summary-card");
 
-        Label title = new Label("⚠️ Categorías que Requieren Atención");
+        Label title = new Label("⚠ Categorías que Requieren Atención");
         title.getStyleClass().add("summary-card-title");
 
         // ✅ Mensaje centrado
@@ -1007,67 +1037,59 @@ public class ProfitController {
 
     private List<ProductProfit> getMockProductData() {
         return List.of(
-                // Página 1
-                new ProductProfit("Laptop Dell XPS 13", "$45,230", "28.5%", "$12,890", "Excelente"),
-                new ProductProfit("Mouse Logitech MX", "$8,450", "32.1%", "$2,713", "Excelente"),
-                new ProductProfit("Teclado Mecánico", "$12,340", "18.7%", "$2,308", "Bueno"),
-                new ProductProfit("Monitor LG 27\"", "$23,560", "15.2%", "$3,581", "Bueno"),
-                new ProductProfit("Webcam HD Pro", "$6,780", "9.4%", "$638", "Regular"),
-                new ProductProfit("Cable HDMI 2.0", "$2,340", "5.8%", "$136", "Regular"),
-                new ProductProfit("Auriculares Básicos", "$3,450", "-2.3%", "-$79", "Crítico"),
-                new ProductProfit("SSD Samsung 1TB", "$34,120", "24.2%", "$8,257", "Excelente"),
-                new ProductProfit("RAM Corsair 16GB", "$14,890", "21.3%", "$3,171", "Excelente"),
-                new ProductProfit("Tarjeta Gráfica RTX", "$89,450", "19.8%", "$17,711", "Bueno"),
-
-                // Página 2
-                new ProductProfit("Procesador Intel i7", "$56,230", "17.4%", "$9,784", "Bueno"),
-                new ProductProfit("Motherboard ASUS", "$28,670", "16.1%", "$4,616", "Bueno"),
-                new ProductProfit("Fuente Poder 750W", "$9,340", "14.7%", "$1,373", "Bueno"),
-                new ProductProfit("Case Gaming RGB", "$7,560", "12.3%", "$930", "Bueno"),
-                new ProductProfit("Cooler Master", "$4,230", "11.8%", "$499", "Bueno"),
-                new ProductProfit("Pasta Térmica", "$890", "8.2%", "$73", "Regular"),
-                new ProductProfit("Hub USB 3.0", "$1,450", "6.9%", "$100", "Regular"),
                 new ProductProfit("Adaptador HDMI", "$780", "4.1%", "$32", "Regular"),
-                new ProductProfit("Cable Ethernet", "$450", "2.8%", "$13", "Regular"),
-                new ProductProfit("Funda Laptop", "$2,100", "1.2%", "$25", "Regular"),
-
-                // Página 3
-                new ProductProfit("MacBook Pro M2", "$125,890", "26.7%", "$33,612", "Excelente"),
-                new ProductProfit("iPad Pro 12.9", "$67,340", "23.4%", "$15,758", "Excelente"),
                 new ProductProfit("AirPods Pro", "$18,450", "29.8%", "$5,498", "Excelente"),
                 new ProductProfit("Apple Watch Ultra", "$42,560", "25.1%", "$10,683", "Excelente"),
-                new ProductProfit("Magic Keyboard", "$9,230", "20.3%", "$1,874", "Excelente"),
-                new ProductProfit("Audífonos Sony XM5", "$22,340", "18.9%", "$4,222", "Bueno"),
-                new ProductProfit("Cámara Canon EOS", "$78,450", "16.5%", "$12,944", "Bueno"),
-                new ProductProfit("Drone DJI Mini", "$34,780", "15.8%", "$5,495", "Bueno"),
-                new ProductProfit("GoPro Hero 12", "$28,920", "14.2%", "$4,107", "Bueno"),
-                new ProductProfit("Ring Video Doorbell", "$12,560", "13.7%", "$1,721", "Bueno"),
-
-                // Página 4
-                new ProductProfit("Nintendo Switch OLED", "$19,780", "19.2%", "$3,798", "Bueno"),
-                new ProductProfit("PlayStation 5", "$56,340", "17.8%", "$10,028", "Bueno"),
-                new ProductProfit("Xbox Series X", "$48,920", "16.9%", "$8,267", "Bueno"),
-                new ProductProfit("Steam Deck", "$32,450", "15.3%", "$4,965", "Bueno"),
-                new ProductProfit("Oculus Quest 3", "$29,670", "22.4%", "$6,646", "Excelente"),
-                new ProductProfit("Samsung Galaxy Tab", "$35,890", "18.6%", "$6,676", "Bueno"),
-                new ProductProfit("Kindle Paperwhite", "$8,230", "24.8%", "$2,041", "Excelente"),
-                new ProductProfit("Logitech G502", "$4,560", "27.3%", "$1,245", "Excelente"),
-                new ProductProfit("Razer BlackWidow", "$11,340", "21.7%", "$2,461", "Excelente"),
-                new ProductProfit("HyperX Cloud II", "$7,890", "19.4%", "$1,531", "Bueno"),
-
-                // Página 5
-                new ProductProfit("SteelSeries Apex", "$13,240", "17.9%", "$2,370", "Bueno"),
-                new ProductProfit("Corsair K95", "$16,780", "16.2%", "$2,718", "Bueno"),
-                new ProductProfit("Elgato Stream Deck", "$9,560", "23.6%", "$2,256", "Excelente"),
-                new ProductProfit("Blue Yeti Microphone", "$11,230", "20.8%", "$2,336", "Excelente"),
-                new ProductProfit("Shure SM7B", "$24,560", "18.3%", "$4,494", "Bueno"),
-                new ProductProfit("Focusrite Scarlett", "$8,940", "22.1%", "$1,976", "Excelente"),
                 new ProductProfit("Audio-Technica AT2020", "$6,780", "25.4%", "$1,722", "Excelente"),
+                new ProductProfit("Audífonos Sony XM5", "$22,340", "18.9%", "$4,222", "Bueno"),
+                new ProductProfit("Auriculares Básicos", "$3,450", "-2.3%", "-$79", "Crítico"),
+                new ProductProfit("Beyerdynamic DT 770", "$12,450", "19.1%", "$2,378", "Bueno"),
+                new ProductProfit("Blue Yeti Microphone", "$11,230", "20.8%", "$2,336", "Excelente"),
+                new ProductProfit("Cable Ethernet", "$450", "2.8%", "$13", "Regular"),
+                new ProductProfit("Cable HDMI 2.0", "$2,340", "5.8%", "$136", "Regular"),
+                new ProductProfit("Cámara Canon EOS", "$78,450", "16.5%", "$12,944", "Bueno"),
+                new ProductProfit("Case Gaming RGB", "$7,560", "12.3%", "$930", "Bueno"),
+                new ProductProfit("Cooler Master", "$4,230", "11.8%", "$499", "Bueno"),
+                new ProductProfit("Corsair K95", "$16,780", "16.2%", "$2,718", "Bueno"),
+                new ProductProfit("Drone DJI Mini", "$34,780", "15.8%", "$5,495", "Bueno"),
+                new ProductProfit("Elgato Stream Deck", "$9,560", "23.6%", "$2,256", "Excelente"),
+                new ProductProfit("Focusrite Scarlett", "$8,940", "22.1%", "$1,976", "Excelente"),
+                new ProductProfit("Fuente Poder 750W", "$9,340", "14.7%", "$1,373", "Bueno"),
+                new ProductProfit("Funda Laptop", "$2,100", "1.2%", "$25", "Regular"),
+                new ProductProfit("GoPro Hero 12", "$28,920", "14.2%", "$4,107", "Bueno"),
+                new ProductProfit("Hub USB 3.0", "$1,450", "6.9%", "$100", "Regular"),
+                new ProductProfit("HyperX Cloud II", "$7,890", "19.4%", "$1,531", "Bueno"),
+                new ProductProfit("iPad Pro 12.9", "$67,340", "23.4%", "$15,758", "Excelente"),
+                new ProductProfit("Kindle Paperwhite", "$8,230", "24.8%", "$2,041", "Excelente"),
+                new ProductProfit("Laptop Dell XPS 13", "$45,230", "28.5%", "$12,890", "Excelente"),
+                new ProductProfit("Logitech G502", "$4,560", "27.3%", "$1,245", "Excelente"),
+                new ProductProfit("MacBook Pro M2", "$125,890", "26.7%", "$33,612", "Excelente"),
+                new ProductProfit("Magic Keyboard", "$9,230", "20.3%", "$1,874", "Excelente"),
+                new ProductProfit("Monitor LG 27\"", "$23,560", "15.2%", "$3,581", "Bueno"),
+                new ProductProfit("Motherboard ASUS", "$28,670", "16.1%", "$4,616", "Bueno"),
+                new ProductProfit("Mouse Logitech MX", "$8,450", "32.1%", "$2,713", "Excelente"),
+                new ProductProfit("Nintendo Switch OLED", "$19,780", "19.2%", "$3,798", "Bueno"),
+                new ProductProfit("Oculus Quest 3", "$29,670", "22.4%", "$6,646", "Excelente"),
+                new ProductProfit("Pasta Térmica", "$890", "8.2%", "$73", "Regular"),
+                new ProductProfit("PlayStation 5", "$56,340", "17.8%", "$10,028", "Bueno"),
+                new ProductProfit("Procesador Intel i7", "$56,230", "17.4%", "$9,784", "Bueno"),
+                new ProductProfit("RAM Corsair 16GB", "$14,890", "21.3%", "$3,171", "Excelente"),
+                new ProductProfit("Razer BlackWidow", "$11,340", "21.7%", "$2,461", "Excelente"),
+                new ProductProfit("Ring Video Doorbell", "$12,560", "13.7%", "$1,721", "Bueno"),
                 new ProductProfit("Rode PodMic", "$7,340", "21.9%", "$1,607", "Excelente"),
+                new ProductProfit("Samsung Galaxy Tab", "$35,890", "18.6%", "$6,676", "Bueno"),
                 new ProductProfit("Sennheiser HD 650", "$19,890", "17.6%", "$3,501", "Bueno"),
-                new ProductProfit("Beyerdynamic DT 770", "$12,450", "19.1%", "$2,378", "Bueno")
+                new ProductProfit("Shure SM7B", "$24,560", "18.3%", "$4,494", "Bueno"),
+                new ProductProfit("SSD Samsung 1TB", "$34,120", "24.2%", "$8,257", "Excelente"),
+                new ProductProfit("Steam Deck", "$32,450", "15.3%", "$4,965", "Bueno"),
+                new ProductProfit("SteelSeries Apex", "$13,240", "17.9%", "$2,370", "Bueno"),
+                new ProductProfit("Tarjeta Gráfica RTX", "$89,450", "19.8%", "$17,711", "Bueno"),
+                new ProductProfit("Teclado Mecánico", "$12,340", "18.7%", "$2,308", "Bueno"),
+                new ProductProfit("Webcam HD Pro", "$6,780", "9.4%", "$638", "Regular"),
+                new ProductProfit("Xbox Series X", "$48,920", "16.9%", "$8,267", "Bueno")
         );
     }
+
 
     private List<TopProduct> getMockTopProducts() {
         return List.of(

@@ -30,7 +30,7 @@
                     styleClass="nav-button"/>
 
             <Button fx:id="btnCategory"
-                    text="🗂️ Por Categoría"
+                    text="🛍 Por Categoría"
                     onAction="#showByCategory"
                     styleClass="nav-button"/>
 

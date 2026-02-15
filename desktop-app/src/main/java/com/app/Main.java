@@ -17,7 +17,7 @@ public class Main extends Application {
         hostServices = getHostServices();
         SceneManager.init(stage);
 
-        stage.setTitle("Sistema BI TT");
+        stage.setTitle("SANI");// Sistema de análiis de negocios inteligentes
 
         stage.getIcons().add(
                 new Image(

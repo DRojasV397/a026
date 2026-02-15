@@ -8,6 +8,7 @@
 <?import javafx.scene.layout.Region?>
 <?import javafx.scene.image.ImageView?>
 <?import javafx.scene.image.Image?>
+<?import javafx.scene.shape.Circle?>
 <VBox xmlns="http://javafx.com/javafx/21"
       xmlns:fx="http://javafx.com/fxml/1"
       fx:controller="com.app.ui.components.sidebar.SidebarController"
@@ -25,13 +26,13 @@
               alignment="CENTER_LEFT"
               styleClass="sidebar-header-content">
 
-            <ImageView fitWidth="24" fitHeight="24" preserveRatio="true">
+            <ImageView fitWidth="30" fitHeight="30" preserveRatio="true">
                 <image>
                     <Image url="@/images/app-icon.png"/>
                 </image>
             </ImageView>
 
-            <Label text="SISTEMA BI TT"
+            <Label text="SANI"
                    styleClass="sidebar-app-name, sidebar-text"/>
         </HBox>
 
@@ -221,38 +222,46 @@
           styleClass="sidebar-footer-container">
 
         <!-- Perfil -->
-        <HBox spacing="10"
+        <HBox fx:id="profileBtn"
+              spacing="10"
               alignment="CENTER_LEFT"
+              onMouseClicked="#goProfile"
               styleClass="sidebar-footer">
 
             <!-- Avatar -->
             <StackPane styleClass="sidebar-avatar">
-                <Label text="👤"/>
+                <ImageView fx:id="sidebarAvatarView"
+                           fitWidth="36" fitHeight="36"
+                           preserveRatio="false">
+                    <clip>
+                        <Circle xmlns="http://javafx.com/javafx/21"
+                                centerX="18" centerY="18" radius="18"/>
+                    </clip>
+                </ImageView>
             </StackPane>
 
-            <VBox spacing="2">
+            <VBox spacing="2" styleClass="sidebar-text" mouseTransparent="true">
                 <Label fx:id="userNameLabel"
                        text="Nombre Usuario"
-                       styleClass="sidebar-user-name, sidebar-text"/>
+                       styleClass="sidebar-user-name"/>
 
-                <Hyperlink fx:id="profileBtn"
-                           text="Ver perfil"
-                           onAction="#goProfile"
-                           styleClass="sidebar-profile-link, sidebar-text"/>
+                <Hyperlink text="Ver perfil"
+                           styleClass="sidebar-profile-link"/>
             </VBox>
 
         </HBox>
 
         <!-- Botón colapsar -->
-        <Button onAction="#toggleSidebar"
+        <Button fx:id="collapseIconBtn"
+                onAction="#toggleSidebar"
                 styleClass="sidebar-collapse-btn"
                 maxWidth="Infinity"
                 alignment="CENTER_LEFT">
 
             <graphic>
                 <HBox spacing="8" alignment="CENTER_LEFT">
-                    <Label fx:id="collapseIcon" text="⟨⟨⟨" styleClass="sidebar-collapse-icon"/>
-                    <Label text="Colapsar menú"
+                    <Label fx:id="collapseIcon" text="⏪" styleClass="sidebar-collapse-icon"/>
+                    <Label  text="Colapsar menú"
                            styleClass="sidebar-text"/>
                 </HBox>
             </graphic>

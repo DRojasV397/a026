@@ -24,8 +24,8 @@
             <HBox spacing="10" alignment="CENTER_LEFT">
                 <Label text="⬢" styleClass="app-icon"/>
                 <VBox>
-                    <Label text="Sistema BI TT" styleClass="app-name"/>
-                    <Label text="Business intelligence"
+                    <Label text="SANI" styleClass="app-name"/>
+                    <Label text="Negocios Inteligentes"
                            styleClass="app-subtitle"/>
                 </VBox>
             </HBox>

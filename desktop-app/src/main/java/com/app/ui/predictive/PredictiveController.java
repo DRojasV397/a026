@@ -14,6 +14,7 @@ import javafx.application.Platform;
 import javafx.concurrent.Task;
 import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
+import javafx.geometry.Pos;
 import javafx.scene.control.*;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
@@ -52,7 +53,7 @@ public class PredictiveController {
     @FXML private VBox resultsChartsContainer;
     @FXML private VBox trainingSummaryContainer;
     @FXML private VBox modelInfoContainer;
-
+    @FXML private VBox detailDescriptionContainer;
 
     @FXML private VBox parametersContainer;
     @FXML private VBox parametersSummary;
@@ -105,31 +106,52 @@ public class PredictiveController {
     private List<PredictiveModelDTO> getMockPredictiveModels() {
         return List.of(
                 new PredictiveModelDTO(
+                        "Regresión Lineal",
+                        "Análisis de tendencia directa y relaciones proporcionales.",
+                        List.of("Esencial", "Polinomial", "Ágil"),
+                        "La opción más estable para proyecciones de crecimiento base.",
+                        "📉", "85%", "< 1 min",
+                        List.of(
+                                new PredictiveModelDTO.ModelFeature("📐", "Complejidad", "Lineal / Polinomial", "#3498db"),
+                                new PredictiveModelDTO.ModelFeature("🛡", "Regularización", "Lasso / Ridge / ElasticNet", "#2ecc71"),
+                                new PredictiveModelDTO.ModelFeature("⚡", "Velocidad", "Entrenamiento instantáneo", "#f1c40f")
+                        )
+                ),
+                new PredictiveModelDTO(
                         "Modelo ARIMA",
-                        "Predicción basada en series temporales.",
-                        List.of("Series", "Estadístico", "Temporal"),
-                        "Ideal para datos históricos estables.",
-                        "📈",
-                        "98%",
-                        "1-2min"
+                        "Especializado en series de tiempo sin estacionalidad.",
+                        List.of("Cronológico", "Autoregresivo", "Histórico"),
+                        "Analiza el pasado inmediato para proyectar el futuro cercano.",
+                        "📈", "92%", "1-2 min",
+                        List.of(
+                                new PredictiveModelDTO.ModelFeature("🔢", "Componentes", "AR (Lags) + I (Diff) + MA", "#3498db"),
+                                new PredictiveModelDTO.ModelFeature("🤖", "Optimización", "Auto-order automático", "#9b59b6"),
+                                new PredictiveModelDTO.ModelFeature("📍", "Estado", "Requiere estacionariedad", "#e74c3c")
+                        )
                 ),
                 new PredictiveModelDTO(
-                        "Modelo LSTM",
-                        "Red neuronal recurrente.",
-                        List.of("IA", "Deep Learning", "Secuencial"),
-                        "Requiere alto volumen de datos.",
-                        "📊",
-                        "98%",
-                        "1-2min"
+                        "Modelo SARIMA",
+                        "Potente para negocios con picos estacionales (ventas, feriados).",
+                        List.of("Estacional", "Rítmico", "Recurrente"),
+                        "Identifica ciclos anuales, mensuales o semanales con precisión.",
+                        "🗓", "95%", "2-5 min",
+                        List.of(
+                                new PredictiveModelDTO.ModelFeature("🔄", "Ciclos", "Soporta periodos de 1-365 días", "#2ecc71"),
+                                new PredictiveModelDTO.ModelFeature("📊", "Criterios", "Selección vía AIC / BIC", "#3498db"),
+                                new PredictiveModelDTO.ModelFeature("⌛", "Carga", "Computacionalmente intensivo", "#e67e22")
+                        )
                 ),
                 new PredictiveModelDTO(
-                        "Modelo XGBoost",
-                        "Boosting de alto rendimiento.",
-                        List.of("Árboles", "Precisión", "Optimizado"),
-                        "Excelente para datos estructurados.",
-                        "⚡",
-                        "98%",
-                        "1-2min"
+                        "Random Forest",
+                        "Sistema de múltiples árboles para decisiones multivariable.",
+                        List.of("Jerárquico", "Robusto", "Multivariable"),
+                        "Ideal cuando intervienen muchas variables (clima, precios, stock).",
+                        "🌳", "98%", "3-8 min",
+                        List.of(
+                                new PredictiveModelDTO.ModelFeature("🌲", "Bosque", "Ensamble de 10-1000 árboles", "#27ae60"),
+                                new PredictiveModelDTO.ModelFeature("🏗", "Muestreo", "Técnica Bootstrap (Bagging)", "#8e44ad"),
+                                new PredictiveModelDTO.ModelFeature("🎯", "Precisión", "Mejor manejo de outliers", "#e74c3c")
+                        )
                 )
         );
     }
@@ -175,7 +197,14 @@ public class PredictiveController {
         selectButton.setMaxWidth(Double.MAX_VALUE);
         selectButton.getStyleClass().add("select-button");
 
-        selectButton.setOnAction(e -> selectModel(model, card, selectButton));
+        selectButton.setOnAction(e -> {
+            selectModel(model, card, selectButton);
+            e.consume(); // <--- IMPORTANTE: Evita que el clic se propague al card dos veces
+        });
+
+        card.setOnMouseClicked(e -> { // <--- CLIC EN EL CARD
+            selectModel(model, card, selectButton);
+        });
 
         card.getChildren().addAll(
                 icon,
@@ -237,14 +266,51 @@ public class PredictiveController {
 
     private void updateDetailPane(PredictiveModelDTO model) {
         detailTitle.setText(model.title());
-        detailDescription.setText(model.description());
         detailExtra.setText(model.detailMessage());
+
+        // Limpiamos el contenedor de la lista de características
+        detailDescriptionContainer.getChildren().clear();
+        detailDescriptionContainer.setSpacing(10);
+
+        for (PredictiveModelDTO.ModelFeature feature : model.features()) {
+            HBox row = new HBox(10);
+            row.setAlignment(Pos.CENTER_LEFT);
+            row.setStyle("-fx-padding: 5; -fx-background-color: #f8f9fa; -fx-background-radius: 5;");
+
+            // Icono con color personalizado
+            Label icon = new Label(feature.icon());
+            icon.setStyle("-fx-font-size: 16px; -fx-text-fill: " + feature.color() + ";");
+            icon.setMinWidth(25);
+
+            // Textos (Título y Valor)
+            VBox texts = new VBox(0);
+            Label label = new Label(feature.label().toUpperCase());
+            label.setStyle("-fx-font-size: 9px; -fx-font-weight: bold; -fx-text-fill: #95a5a6;");
+
+            Label value = new Label(feature.value());
+            value.setStyle("-fx-font-size: 12px; -fx-text-fill: #34495e; -fx-font-weight: bold;");
+            value.setWrapText(true);
+
+            texts.getChildren().addAll(label, value);
+            row.getChildren().addAll(icon, texts);
+
+            detailDescriptionContainer.getChildren().add(row);
+        }
     }
 
     private void clearDetailPanel() {
-        detailTitle.setText("Selecciona un modelo");
-        detailDescription.setText("Elige un modelo predictivo para ver sus detalles.");
-        detailExtra.setText("");
+        // 1. Resetear los textos simples
+        detailTitle.setText("Panel de Detalles");
+        detailExtra.setText("Selecciona un modelo de la izquierda para comenzar la configuración.");
+
+        // 2. Limpiar el contenedor de características (el VBox)
+        detailDescriptionContainer.getChildren().clear();
+
+        // 3. Opcional: Agregar un placeholder visual para que no se vea vacío
+        Label placeholder = new Label("No hay un modelo seleccionado");
+        placeholder.setStyle("-fx-text-fill: #bdc3c7; -fx-font-style: italic; -fx-padding: 20 0 0 0;");
+
+        detailDescriptionContainer.getChildren().add(placeholder);
     }
 
 
@@ -499,19 +565,23 @@ public class PredictiveController {
      */
     private List<String> getVariablesForModel(String modelName) {
         return switch (modelName) {
+            case "Regresión Lineal" -> List.of(
+                    "Ventas Históricas", "Tiempo (t)", "Tendencia Global"
+            );
             case "Modelo ARIMA" -> List.of(
-                    "Ventas", "Precio", "Demanda", "Inventario",
-                    "Temporada", "Promociones"
+                    "Ventas (Lag-1)", "Ventas (Lag-2)", "Error Previo", // ARIMA usa sus propios lags y errores
+                    "Diferencial (d)"
             );
-            case "Modelo LSTM" -> List.of(
-                    "Ventas", "Precio", "Demanda", "Clima",
-                    "Tendencia Web", "Competencia", "Marketing", "Stock"
+            case "Modelo SARIMA" -> List.of(
+                    "Ventas", "Mes del Año", "Día de la Semana", // Variables estacionales
+                    "Festivos", "Temporada Alta"
             );
-            case "Modelo XGBoost" -> List.of(
-                    "Ventas", "Precio", "Categoría", "Región",
-                    "Cliente Tipo", "Descuentos", "Competencia"
+            case "Random Forest" -> List.of(
+                    // El MD dice: "Múltiples features/variables", aquí metemos todo
+                    "Ventas", "Precio", "Competencia", "Stock",
+                    "Descuentos", "Clima", "Categoría", "Región"
             );
-            default -> List.of("Variable 1", "Variable 2", "Variable 3");
+            default -> List.of("Variable Base", "Variable Tiempo");
         };
     }
 
@@ -1517,8 +1587,7 @@ public class PredictiveController {
         System.out.println("Reentrenando modelo...");
         //Limpia fase 4
         clearPhase4Content();
-        // Volver a fase 2 o 3
-        currentPhaseIndex = 2;
+        currentPhaseIndex = 1;
         predictiveFooter.setVisible(true); //Desactivo los botones para que no haya forma de regresar o seguir
         predictiveFooter.setManaged(true);
         updatePhases();

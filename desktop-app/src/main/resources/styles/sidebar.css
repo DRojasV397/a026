@@ -15,7 +15,7 @@
 
 .sidebar-app-name {
     -fx-font-weight: bold;
-    -fx-font-size: 14px;
+    -fx-font-size: 18px;
 }
 
 /* ITEMS */
@@ -40,7 +40,17 @@
 
 /* FOOTER */
 .sidebar-footer {
-    -fx-padding: 10 0 0 0;
+    -fx-padding: 8 10;
+    -fx-cursor: hand;
+    -fx-background-radius: 12;
+}
+
+.sidebar-footer:hover{
+    -fx-background-color: #D9EBF3;
+}
+
+.sidebar-footer.active {
+    -fx-background-color: #D9EBF3;
 }
 
 .sidebar-footer-container {
@@ -49,9 +59,9 @@
 
 .sidebar-collapse-btn {
     -fx-background-color: transparent;
-    -fx-padding: 8 12;
+    -fx-padding: 8 10;
     -fx-cursor: hand;
-    -fx-font-size: 16px;
+    -fx-font-size: 13px;
     -fx-font-weight: bold;
 }
 
@@ -60,19 +70,19 @@
 }
 
 .sidebar-collapse-icon {
-    -fx-font-size: 16px;
+    -fx-font-size: 18px;
     -fx-font-weight: bold;
 }
 
 
+/* Avatar circular sidebar footer */
 .sidebar-avatar {
-    -fx-min-width: 36;
-    -fx-min-height: 36;
-    -fx-max-width: 36;
-    -fx-max-height: 36;
-    -fx-background-color: #DDE6ED;
-    -fx-background-radius: 50%;
-    -fx-alignment: center;
+    -fx-min-width: 36px;
+    -fx-min-height: 36px;
+    -fx-max-width: 36px;
+    -fx-max-height: 36px;
+    -fx-background-radius: 18;
+    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.20), 6, 0, 0, 2);
 }
 
 .sidebar-user-name {

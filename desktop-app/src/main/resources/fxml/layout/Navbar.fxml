@@ -5,6 +5,8 @@
 
 <?import javafx.scene.layout.StackPane?>
 <?import javafx.geometry.Insets?>
+<?import javafx.scene.shape.Circle?>
+<?import javafx.scene.image.ImageView?>
 <HBox xmlns="http://javafx.com/javafx/21"
       xmlns:fx="http://javafx.com/fxml/1"
       fx:controller="com.app.ui.components.navbar.NavbarController"
@@ -54,7 +56,14 @@
 
         <!-- Avatar simbólico -->
         <StackPane styleClass="navbar-avatar">
-            <Label text="👤"/>
+            <ImageView fx:id="navbarAvatarView"
+                       fitWidth="36" fitHeight="36"
+                       preserveRatio="false">
+                <clip>
+                    <Circle xmlns="http://javafx.com/javafx/21"
+                            centerX="18" centerY="18" radius="18"/>
+                </clip>
+            </ImageView>
         </StackPane>
 
     </HBox>

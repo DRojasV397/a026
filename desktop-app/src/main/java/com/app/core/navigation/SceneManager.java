@@ -20,8 +20,26 @@ public class SceneManager {
 
     private static Consumer<AppRoute> onRouteChanged;
 
+    private static AppRoute currentRoute = null;
+
     public static void setOnRouteChanged(Consumer<AppRoute> listener) {
         onRouteChanged = listener;
+    }
+
+    // Interfaz funcional para el guard de navegación
+    public interface NavigationGuard {
+        /** @return true si la navegación puede proceder, false para cancelarla */
+        boolean canLeave();
+    }
+
+    private static NavigationGuard navigationGuard;
+
+    public static void setNavigationGuard(NavigationGuard guard) {
+        navigationGuard = guard;
+    }
+
+    public static void clearNavigationGuard() {
+        navigationGuard = null;
     }
 
 
@@ -68,6 +86,19 @@ public class SceneManager {
     }
 
     public static void setContent(String fxmlPath, String title, String subtitle, AppRoute route) {
+        // 1. Validación de repetición: Si ya estamos en esta ruta, ignoramos la petición
+        if (route != null && route == currentRoute) {
+            System.out.println("[Navigation] Bloqueado: Ya te encuentras en " + route);
+            return;
+        }
+
+        // ── Guard de navegación ──────────────────────────────────
+        if (navigationGuard != null && !navigationGuard.canLeave()) {
+            return; // El guard mostró su propio diálogo y el usuario canceló
+        }
+        clearNavigationGuard(); // Limpia el guard tras navegar exitosamente
+        // ────────────────────────────────────────────────────────
+
         try {
             FXMLLoader loader = new FXMLLoader(
                     SceneManager.class.getResource(fxmlPath)
@@ -80,6 +111,9 @@ public class SceneManager {
             if (title != null && baseController != null) {
                 baseController.updateNavbarTitle(title, subtitle);
             }
+
+            // Éxito: Actualizamos la ruta actual solo después de una carga exitosa
+            currentRoute = route;
 
         } catch (Exception e) {
             e.printStackTrace();

@@ -1,14 +1,331 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
-<?import javafx.scene.layout.BorderPane?>
-<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.image.*?>
+<?import javafx.scene.layout.*?>
+<?import javafx.scene.shape.Circle?>
+
 <BorderPane xmlns:fx="http://javafx.com/fxml"
             fx:controller="com.app.ui.profile.ProfileController"
-            stylesheets="@/styles/dashboard.css"
-            styleClass="dashboard-root">
+            stylesheets="@/styles/profile.css"
+            styleClass="profile-root">
 
     <center>
-        <Label text="Bienvenido a tu perfil"/>
-    </center>
+        <ScrollPane fitToWidth="true" styleClass="main-scroll">
+            <VBox spacing="20" styleClass="profile-container">
 
+                <!-- ═══════════════════════════════════════════════ -->
+                <!--  CARD 1 — Cabecera                             -->
+                <!-- ═══════════════════════════════════════════════ -->
+                <HBox styleClass="profile-card, header-card"
+                      alignment="CENTER_LEFT" spacing="25">
+
+                    <!-- Avatar + overlay de cambio -->
+                    <StackPane styleClass="avatar-wrapper">
+                        <ImageView fx:id="profileImageView"
+                                   fitHeight="100" fitWidth="100"
+                                   preserveRatio="false"
+                                   styleClass="avatar-image">
+                            <clip><Circle centerX="50" centerY="50" radius="50"/></clip>
+                        </ImageView>
+                        <!-- Overlay: siempre presente en el DOM, visible al hover via CSS -->
+                        <StackPane styleClass="avatar-overlay"
+                                   onMouseClicked="#onChangeAvatar">
+                            <Label text="📷" styleClass="avatar-overlay-icon"/>
+                        </StackPane>
+                    </StackPane>
+
+                    <VBox spacing="6" HBox.hgrow="ALWAYS">
+                        <Label fx:id="lblHeaderName"  styleClass="profile-name-title"/>
+                        <HBox alignment="CENTER_LEFT" spacing="10">
+                            <Label fx:id="lblHeaderRole" styleClass="role-pill"/>
+                        </HBox>
+                        <Label fx:id="lblHeaderEmail" styleClass="profile-email-sub"/>
+                        <Label fx:id="lblMemberSince" styleClass="header-meta-item"/>
+                        <Label fx:id="lblLastAccess"  styleClass="header-meta-item"/>
+                    </VBox>
+
+                    <HBox spacing="10" alignment="CENTER_RIGHT">
+                        <Button fx:id="btnEditProfile"
+                                text="Editar Perfil"
+                                styleClass="btn-secondary"
+                                onAction="#onEditProfile"/>
+                        <Button fx:id="btnSecurity"
+                                text="Seguridad"
+                                styleClass="btn-primary"
+                                onAction="#onGoToSecurity"/>
+                    </HBox>
+                </HBox>
+
+                <!-- ═══════════════════════════════════════════════ -->
+                <!--  CARD 2 — Tabs + Contenido                     -->
+                <!-- ═══════════════════════════════════════════════ -->
+                <VBox styleClass="profile-card" VBox.vgrow="ALWAYS" spacing="20">
+
+                    <!-- Tab bar -->
+                    <HBox fx:id="tabBar" styleClass="tab-container" spacing="0">
+                        <Button fx:id="tabPersonal"
+                                text="Datos Personales"
+                                styleClass="tab-btn, tab-active"
+                                onAction="#onTabPersonal"/>
+                        <Button fx:id="tabDashboard"
+                                text="Ajustes de Dashboard"
+                                styleClass="tab-btn"
+                                onAction="#onTabDashboard"/>
+                        <Button fx:id="tabSecurity"
+                                text="Seguridad"
+                                styleClass="tab-btn"
+                                onAction="#onTabSecurity"/>
+                        <Button fx:id="tabNotifications"
+                                text="Notificaciones"
+                                styleClass="tab-btn"
+                                onAction="#onTabNotifications"/>
+                    </HBox>
+
+                    <Separator/>
+
+                    <!-- ─────────────────────────────────────────── -->
+                    <!--  SECCIÓN 0: Datos Personales               -->
+                    <!-- ─────────────────────────────────────────── -->
+                    <VBox fx:id="sectionPersonal" spacing="25">
+
+                        <!-- Banner de modo edición -->
+                        <HBox fx:id="editBanner" styleClass="edit-banner"
+                              alignment="CENTER_LEFT" spacing="12"
+                              visible="false" managed="false">
+                            <Label text="✏  Modo edición activo — modifica los campos y guarda los cambios."
+                                   styleClass="edit-banner-text" HBox.hgrow="ALWAYS"/>
+                            <Button text="Guardar" styleClass="btn-save"
+                                    onAction="#onSaveChanges"/>
+                            <Button text="Cancelar" styleClass="btn-cancel-edit"
+                                    onAction="#onCancelEdit"/>
+                        </HBox>
+
+                        <GridPane hgap="30" vgap="20">
+                            <columnConstraints>
+                                <ColumnConstraints percentWidth="50"/>
+                                <ColumnConstraints percentWidth="50"/>
+                            </columnConstraints>
+
+                            <VBox spacing="5" GridPane.columnIndex="0" GridPane.rowIndex="0">
+                                <Label text="Nombre Completo" styleClass="form-label"/>
+                                <TextField fx:id="txtFullName"
+                                           styleClass="form-input"
+                                           editable="false"/>
+                            </VBox>
+
+                            <VBox spacing="5" GridPane.columnIndex="1" GridPane.rowIndex="0">
+                                <Label text="Nombre de Usuario" styleClass="form-label"/>
+                                <TextField fx:id="txtUsername"
+                                           styleClass="form-input"
+                                           editable="false"/>
+                            </VBox>
+
+                            <!-- Rol: NUNCA editable -->
+                            <VBox spacing="5" GridPane.columnIndex="0" GridPane.rowIndex="1">
+                                <Label text="Rol" styleClass="form-label"/>
+                                <TextField fx:id="txtRole"
+                                           editable="false"
+                                           styleClass="form-input, input-readonly"/>
+                            </VBox>
+
+                            <VBox spacing="5" GridPane.columnIndex="1" GridPane.rowIndex="1">
+                                <Label text="Departamento" styleClass="form-label"/>
+                                <TextField fx:id="txtDepartment"
+                                           styleClass="form-input"
+                                           editable="false"/>
+                            </VBox>
+
+                            <VBox spacing="5" GridPane.columnIndex="0" GridPane.rowIndex="2">
+                                <Label text="Correo Electrónico" styleClass="form-label"/>
+                                <HBox alignment="CENTER_LEFT" spacing="8">
+                                    <TextField fx:id="txtEmail"
+                                               styleClass="form-input"
+                                               HBox.hgrow="ALWAYS"
+                                               editable="false"/>
+                                    <Label fx:id="lblVerifiedStatus"/>
+                                </HBox>
+                            </VBox>
+
+                            <VBox spacing="5" GridPane.columnIndex="1" GridPane.rowIndex="2">
+                                <Label text="Teléfono" styleClass="form-label"/>
+                                <TextField fx:id="txtPhone"
+                                           styleClass="form-input"
+                                           editable="false"/>
+                            </VBox>
+                        </GridPane>
+
+                        <!-- Stats inner card -->
+                        <VBox styleClass="stats-inner-card" spacing="15">
+                            <Label text="Estadísticas de Uso" styleClass="inner-card-title"/>
+                            <HBox alignment="CENTER" spacing="50">
+                                <VBox alignment="CENTER" spacing="8" HBox.hgrow="ALWAYS">
+                                    <Label text="📅" styleClass="stat-icon"/>
+                                    <Label text="Días activo" styleClass="stat-label"/>
+                                    <Label fx:id="lblStatsDays" styleClass="stat-value"/>
+                                </VBox>
+                                <Separator orientation="VERTICAL"/>
+                                <VBox alignment="CENTER" spacing="8" HBox.hgrow="ALWAYS">
+                                    <Label text="🤖" styleClass="stat-icon"/>
+                                    <Label text="Predicciones" styleClass="stat-label"/>
+                                    <Label fx:id="lblStatsPredictions" styleClass="stat-value"/>
+                                </VBox>
+                                <Separator orientation="VERTICAL"/>
+                                <VBox alignment="CENTER" spacing="8" HBox.hgrow="ALWAYS">
+                                    <Label text="📊" styleClass="stat-icon"/>
+                                    <Label text="Reportes" styleClass="stat-label"/>
+                                    <Label fx:id="lblStatsReports" styleClass="stat-value"/>
+                                </VBox>
+                            </HBox>
+                        </VBox>
+                    </VBox>
+
+                    <!-- ─────────────────────────────────────────── -->
+                    <!--  SECCIÓN 1: Ajustes de Dashboard           -->
+                    <!-- ─────────────────────────────────────────── -->
+                    <VBox fx:id="sectionDashboard" spacing="20"
+                          visible="false" managed="false">
+
+                        <VBox styleClass="settings-group" spacing="0">
+                            <Label text="Visualización" styleClass="settings-group-title"/>
+                            <Separator styleClass="settings-separator"/>
+
+                            <HBox alignment="CENTER_LEFT" spacing="15" styleClass="settings-row">
+                                <VBox HBox.hgrow="ALWAYS" spacing="3">
+                                    <Label text="Tema de colores" styleClass="settings-item-title"/>
+                                    <Label text="Aplica al dashboard principal" styleClass="settings-item-sub"/>
+                                </VBox>
+                                <ComboBox fx:id="cmbTheme" styleClass="form-input"/>
+                            </HBox>
+
+                            <HBox alignment="CENTER_LEFT" spacing="15" styleClass="settings-row">
+                                <VBox HBox.hgrow="ALWAYS" spacing="3">
+                                    <Label text="Rango de fechas por defecto" styleClass="settings-item-title"/>
+                                    <Label text="Período inicial al abrir reportes" styleClass="settings-item-sub"/>
+                                </VBox>
+                                <ComboBox fx:id="cmbDateRange" styleClass="form-input"/>
+                            </HBox>
+
+                            <HBox fx:id="rowPredictionsPanel" alignment="CENTER_LEFT" spacing="15" styleClass="settings-row,settings-row-last">
+                                <VBox HBox.hgrow="ALWAYS" spacing="3">
+                                    <Label text="Mostrar panel de predicciones al inicio" styleClass="settings-item-title"/>
+                                    <Label text="Panel visible al abrir la aplicación" styleClass="settings-item-sub"/>
+                                </VBox>
+                            </HBox>
+                        </VBox>
+                    </VBox>
+
+                    <!-- ─────────────────────────────────────────── -->
+                    <!--  SECCIÓN 2: Seguridad                      -->
+                    <!-- ─────────────────────────────────────────── -->
+                    <VBox fx:id="sectionSecurity" spacing="20"
+                          visible="false" managed="false">
+
+                        <VBox styleClass="settings-group" spacing="0">
+                            <HBox alignment="CENTER_LEFT" styleClass="settings-group-header">
+                                <Label text="Cambiar Contrase&#xF1;a" styleClass="settings-group-title" HBox.hgrow="ALWAYS"/>
+                                <Button fx:id="btnChangePassword"
+                                        text="Cambiar"
+                                        styleClass="btn-secondary-sm"
+                                        onAction="#onRequestPasswordChange"/>
+                            </HBox>
+                            <Separator styleClass="settings-separator"/>
+
+                            <!-- Sección oculta por defecto -->
+                            <VBox fx:id="passwordSection" spacing="15" styleClass="settings-inner-form"
+                                  visible="false" managed="false">
+
+                                <PasswordField fx:id="txtCurrentPassword" promptText="Contrase&#xF1;a actual"
+                                               styleClass="form-input"/>
+                                <PasswordField fx:id="txtNewPassword"     promptText="Nueva contrase&#xF1;a"
+                                               styleClass="form-input"/>
+
+                                <!-- Campo confirmación con indicador visual de coincidencia -->
+                                <VBox spacing="4">
+                                    <PasswordField fx:id="txtConfirmPassword" promptText="Confirmar nueva contrase&#xF1;a"
+                                                   styleClass="form-input"/>
+                                    <Label fx:id="lblPasswordMatch" styleClass="password-match-hint"/>
+                                </VBox>
+
+                                <HBox spacing="10">
+                                    <Button text="Guardar contrase&#xF1;a" styleClass="btn-save"
+                                            onAction="#onSavePassword"/>
+                                    <Button text="Cancelar" styleClass="btn-cancel-edit"
+                                            onAction="#onCancelPassword"/>
+                                </HBox>
+                            </VBox>
+                        </VBox>
+
+                        <VBox styleClass="settings-group" spacing="0">
+                            <Label text="Autenticación" styleClass="settings-group-title"/>
+                            <Separator styleClass="settings-separator"/>
+
+                            <HBox fx:id="row2FA" alignment="CENTER_LEFT" spacing="15"
+                                  styleClass="settings-row, settings-row-last">
+                                <VBox HBox.hgrow="ALWAYS" spacing="3">
+                                    <Label text="Autenticación de dos factores (2FA)" styleClass="settings-item-title"/>
+                                    <Label text="Añade una capa extra de seguridad a tu cuenta" styleClass="settings-item-sub"/>
+                                </VBox>
+                            </HBox>
+                        </VBox>
+                    </VBox>
+
+                    <!-- ─────────────────────────────────────────── -->
+                    <!--  SECCIÓN 3: Notificaciones                 -->
+                    <!-- ─────────────────────────────────────────── -->
+                    <VBox fx:id="sectionNotifications" spacing="20"
+                          visible="false" managed="false">
+
+                        <VBox styleClass="settings-group" spacing="0">
+                            <Label text="Canales" styleClass="settings-group-title"/>
+                            <Separator styleClass="settings-separator"/>
+
+                            <HBox fx:id="rowEmailNotif" alignment="CENTER_LEFT" spacing="15" styleClass="settings-row">
+                                <VBox HBox.hgrow="ALWAYS" spacing="3">
+                                    <Label text="Notificaciones por correo" styleClass="settings-item-title"/>
+                                    <Label text="Recibe alertas en tu email registrado" styleClass="settings-item-sub"/>
+                                </VBox>
+                            </HBox>
+
+                            <HBox fx:id="rowSystemNotif" alignment="CENTER_LEFT" spacing="15"
+                                  styleClass="settings-row, settings-row-last">
+                                <VBox HBox.hgrow="ALWAYS" spacing="3">
+                                    <Label text="Notificaciones del sistema" styleClass="settings-item-title"/>
+                                    <Label text="Alertas dentro de la aplicación" styleClass="settings-item-sub"/>
+                                </VBox>
+                            </HBox>
+                        </VBox>
+
+                        <VBox styleClass="settings-group" spacing="0">
+                            <Label text="Tipo de eventos" styleClass="settings-group-title"/>
+                            <Separator styleClass="settings-separator"/>
+
+                            <HBox fx:id="rowNotifPredictions" alignment="CENTER_LEFT" spacing="15" styleClass="settings-row">
+                                <VBox HBox.hgrow="ALWAYS" spacing="3">
+                                    <Label text="Nuevas predicciones disponibles" styleClass="settings-item-title"/>
+                                    <Label text="Cuando el modelo genera nuevas proyecciones" styleClass="settings-item-sub"/>
+                                </VBox>
+                            </HBox>
+
+                            <HBox fx:id="rowNotifReports" alignment="CENTER_LEFT" spacing="15" styleClass="settings-row">
+                                <VBox HBox.hgrow="ALWAYS" spacing="3">
+                                    <Label text="Reportes generados" styleClass="settings-item-title"/>
+                                    <Label text="Al completarse la exportación de un reporte" styleClass="settings-item-sub"/>
+                                </VBox>
+                            </HBox>
+
+                            <HBox fx:id="rowNotifSecurity" alignment="CENTER_LEFT" spacing="15"
+                                  styleClass="settings-row, settings-row-last">
+                                <VBox HBox.hgrow="ALWAYS" spacing="3">
+                                    <Label text="Alertas de seguridad" styleClass="settings-item-title"/>
+                                    <Label text="Inicios de sesión sospechosos o cambios críticos" styleClass="settings-item-sub"/>
+                                </VBox>
+                            </HBox>
+                        </VBox>
+                    </VBox>
+
+                </VBox>
+            </VBox>
+        </ScrollPane>
+    </center>
 </BorderPane>
