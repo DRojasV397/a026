@@ -577,7 +577,7 @@ public class ProfileController {
             String cssPath = getClass().getResource("/styles/profile.css").toExternalForm();
             alert.getDialogPane().getStylesheets().add(cssPath);
             alert.getDialogPane().getStyleClass().add("custom-alert");
-            System.out.println("[Debug] CSS cargado correctamente.");
+            //System.out.println("[Debug] CSS cargado correctamente.");
         } catch (Exception e) {
             System.err.println("[Error] Falló la carga del CSS: " + e.getMessage());
         }
@@ -586,7 +586,7 @@ public class ProfileController {
         var scene = alert.getDialogPane().getScene();
         if (scene != null) {
             scene.windowProperty().addListener((obs, oldWin, newWin) -> {
-                System.out.println("[Debug] Cambio de ventana detectado: " + newWin);
+                //System.out.println("[Debug] Cambio de ventana detectado: " + newWin);
                 if (newWin instanceof Stage dialogStage) {
                     injectIcon(dialogStage);
                 }
@@ -595,7 +595,7 @@ public class ProfileController {
             // Caso crítico: Si la ventana ya existe, el listener no se dispara.
             // Forzamos la ejecución si ya hay una ventana vinculada.
             if (scene.getWindow() instanceof Stage stage) {
-                System.out.println("[Debug] Ventana ya presente, inyectando icono directamente.");
+                //System.out.println("[Debug] Ventana ya presente, inyectando icono directamente.");
                 injectIcon(stage);
             }
         }
@@ -609,7 +609,7 @@ public class ProfileController {
                 return;
             }
             stage.getIcons().add(new Image(iconStream));
-            System.out.println("[Debug] Icono inyectado con éxito en el Stage.");
+            //System.out.println("[Debug] Icono inyectado con éxito en el Stage.");
         } catch (Exception e) {
             System.err.println("[Error] Error al procesar la imagen del icono: " + e.getMessage());
         }

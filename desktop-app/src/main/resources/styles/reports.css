@@ -1,0 +1,438 @@
+/* ═══════════════════════════════════════════════════════════
+   ROOT & SCROLL
+═══════════════════════════════════════════════════════════ */
+.reports-root {
+    -fx-background-color: #E3EDF7;
+}
+
+.reports-container {
+    -fx-padding: 30;
+    -fx-background-color: transparent;
+}
+
+.main-scroll {
+    -fx-background-color: transparent;
+    -fx-background: transparent;
+}
+
+.main-scroll .scroll-bar:vertical,
+.main-scroll .scroll-bar:horizontal {
+    -fx-opacity: 0;
+    -fx-pref-width: 0;
+    -fx-pref-height: 0;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   CARD PRINCIPAL
+═══════════════════════════════════════════════════════════ */
+.report-card {
+    -fx-background-color: white;
+    -fx-background-radius: 15;
+    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.06), 14, 0, 0, 4);
+}
+
+/* ═══════════════════════════════════════════════════════════
+   TABS
+═══════════════════════════════════════════════════════════ */
+.tab-container {
+    -fx-padding: 0 25;
+    -fx-border-color: transparent;
+    -fx-border-width: 0;
+}
+
+.tab-separator {
+    -fx-background-color: #E2E8F0;
+    -fx-pref-height: 1;
+}
+
+.tab-btn {
+    -fx-background-color: transparent;
+    -fx-border-color: transparent transparent transparent transparent;
+    -fx-border-width: 0 0 3 0;
+    -fx-text-fill: #94A3B8;
+    -fx-padding: 14 24;
+    -fx-cursor: hand;
+    -fx-font-size: 13px;
+    -fx-font-weight: bold;
+    -fx-background-radius: 0;
+}
+
+.tab-btn:hover {
+    -fx-text-fill: #3B8EA5;
+    -fx-background-color: #F8FAFC;
+}
+
+.tab-active {
+    -fx-border-color: transparent transparent #3B8EA5 transparent;
+    -fx-text-fill: #3B8EA5;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   CONTENIDO DE SECCIONES
+═══════════════════════════════════════════════════════════ */
+.section-content {
+    -fx-padding: 24;
+}
+
+.panel-title {
+    -fx-font-size: 15px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #1E293B;
+}
+
+.subsection-title {
+    -fx-font-size: 13px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #475569;
+}
+
+.section-separator {
+    -fx-background-color: #E2E8F0;
+}
+
+.panel-divider {
+    -fx-padding: 0 12;
+}
+
+.panel-divider > .line {
+    -fx-border-color: #E8EDF3; /* color muy tenue, casi se pierde con el fondo */
+    -fx-border-width: 0.5;     /* línea delgada */
+}
+
+/* ═══════════════════════════════════════════════════════════
+   TIPOS DE REPORTE — Panel izquierdo
+═══════════════════════════════════════════════════════════ */
+.report-type-panel {
+    -fx-padding: 0 0 0 0;
+}
+
+.report-type-list {
+    -fx-background-color: transparent;
+}
+
+.report-type-card {
+    -fx-background-color: #F8FAFC;
+    -fx-background-radius: 10;
+    -fx-padding: 12 14;
+    -fx-border-color: #E2E8F0;
+    -fx-border-radius: 10;
+    -fx-border-width: 1;
+    -fx-cursor: hand;
+}
+
+.report-type-card:hover {
+    -fx-background-color: #EFF6FF;
+    -fx-border-color: #BFDBFE;
+}
+
+.report-type-card-selected {
+    -fx-background-color: #EFF6FF;
+    -fx-border-color: #3B8EA5;
+    -fx-border-width: 2;
+}
+
+.report-type-name {
+    -fx-font-size: 13px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #1E293B;
+}
+
+.report-type-desc {
+    -fx-font-size: 11px;
+    -fx-text-fill: #94A3B8;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   FORMULARIO DE CONFIGURACIÓN
+═══════════════════════════════════════════════════════════ */
+.form-label {
+    -fx-font-size: 12px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #475569;
+}
+
+.form-input {
+    -fx-background-color: #F8FAFC;
+    -fx-border-color: #E2E8F0;
+    -fx-border-radius: 8;
+    -fx-background-radius: 8;
+    -fx-padding: 9 12;
+    -fx-font-size: 13px;
+    -fx-text-fill: #1E293B;
+}
+
+.form-input:focused {
+    -fx-border-color: #3B8EA5;
+    -fx-background-color: white;
+    -fx-effect: dropshadow(gaussian, rgba(59,142,165,0.15), 6, 0, 0, 0);
+}
+
+.form-separator {
+    -fx-background-color: #E2E8F0;
+}
+
+/* ── Botones de formato (PDF / Excel) ── */
+.format-btn {
+    -fx-background-color: #F8FAFC;
+    -fx-background-radius: 10;
+    -fx-padding: 14 20;
+    -fx-border-color: #E2E8F0;
+    -fx-border-radius: 10;
+    -fx-border-width: 1.5;
+    -fx-cursor: hand;
+    -fx-min-width: 90;
+}
+
+.format-btn:hover {
+    -fx-background-color: #EFF6FF;
+    -fx-border-color: #93C5D8;
+}
+
+.format-btn-selected {
+    -fx-background-color: #EFF6FF;
+    -fx-border-color: #3B8EA5;
+    -fx-border-radius: 10;
+    -fx-background-radius: 10;
+    -fx-border-width: 2;
+}
+
+.format-btn-label {
+    -fx-font-size: 12px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #475569;
+}
+
+/* ── Estado de generación ── */
+.generate-status-label {
+    -fx-font-size: 12px;
+    -fx-font-weight: bold;
+}
+
+.status-success { -fx-text-fill: #059669; }
+.status-error   { -fx-text-fill: #DC2626; }
+
+/* ═══════════════════════════════════════════════════════════
+   BUSCADOR
+═══════════════════════════════════════════════════════════ */
+.search-input {
+    -fx-background-color: #F8FAFC;
+    -fx-border-color: #E2E8F0;
+    -fx-border-radius: 8;
+    -fx-background-radius: 8;
+    -fx-padding: 10 14;
+    -fx-font-size: 13px;
+    -fx-pref-height: 40;
+}
+
+.search-input:focused {
+    -fx-border-color: #3B8EA5;
+    -fx-background-color: white;
+}
+
+.result-count-label {
+    -fx-text-fill: #94A3B8;
+    -fx-font-size: 12px;
+    -fx-min-width: 90;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   REPORTES GUARDADOS — Filas de lista
+═══════════════════════════════════════════════════════════ */
+.saved-list {
+    -fx-background-color: transparent;
+}
+
+.saved-report-row {
+    -fx-background-color: #F8FAFC;
+    -fx-background-radius: 10;
+    -fx-padding: 12 16;
+    -fx-border-color: #E2E8F0;
+    -fx-border-radius: 10;
+    -fx-border-width: 1;
+}
+
+.saved-report-row:hover {
+    -fx-background-color: #F1F5F9;
+    -fx-border-color: #CBD5E1;
+}
+
+.saved-report-name {
+    -fx-font-size: 14px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #1E293B;
+}
+
+.saved-report-meta {
+    -fx-font-size: 11px;
+    -fx-text-fill: #94A3B8;
+}
+
+.saved-report-user {
+    -fx-font-size: 11px;
+    -fx-text-fill: #64748B;
+}
+
+.saved-report-size {
+    -fx-font-size: 11px;
+    -fx-text-fill: #94A3B8;
+    -fx-min-width: 60;
+    -fx-alignment: CENTER_RIGHT;
+}
+
+/* ── Badge NUEVO ── */
+.badge-new {
+    -fx-background-color: #22C55E;
+    -fx-text-fill: white;
+    -fx-font-size: 9px;
+    -fx-font-weight: bold;
+    -fx-padding: 2 7;
+    -fx-background-radius: 20;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   PROGRAMACIÓN — Cards
+═══════════════════════════════════════════════════════════ */
+.schedule-card {
+    -fx-background-color: white;
+    -fx-background-radius: 12;
+    -fx-padding: 16 20;
+    -fx-border-color: #E2E8F0;
+    -fx-border-radius: 12;
+    -fx-border-width: 1;
+    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.04), 8, 0, 0, 2);
+}
+
+.schedule-card:hover {
+    -fx-border-color: #CBD5E1;
+    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.08), 10, 0, 0, 3);
+}
+
+.schedule-name {
+    -fx-font-size: 14px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #1E293B;
+}
+
+.schedule-meta {
+    -fx-font-size: 12px;
+    -fx-text-fill: #64748B;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   HISTORIAL DE EJECUCIONES
+═══════════════════════════════════════════════════════════ */
+.history-row {
+    -fx-background-color: #F8FAFC;
+    -fx-background-radius: 8;
+    -fx-padding: 10 14;
+    -fx-border-color: #E2E8F0;
+    -fx-border-radius: 8;
+    -fx-border-width: 1;
+}
+
+.history-name {
+    -fx-font-size: 13px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #334155;
+}
+
+.history-meta {
+    -fx-font-size: 11px;
+    -fx-text-fill: #94A3B8;
+    -fx-min-width: 110;
+}
+
+/* Indicadores de estado */
+.status-dot         { -fx-font-size: 10px; }
+.status-dot-success { -fx-text-fill: #22C55E; }
+.status-dot-error   { -fx-text-fill: #EF4444; }
+.status-dot-warning { -fx-text-fill: #F59E0B; }
+
+.history-status-exitoso { -fx-text-fill: #059669; -fx-font-weight: bold; -fx-font-size: 11px; }
+.history-status-fallido { -fx-text-fill: #DC2626; -fx-font-weight: bold; -fx-font-size: 11px; }
+.history-status-parcial { -fx-text-fill: #D97706; -fx-font-weight: bold; -fx-font-size: 11px; }
+
+/* ═══════════════════════════════════════════════════════════
+   BOTONES DE ACCIÓN (icono)
+═══════════════════════════════════════════════════════════ */
+.icon-btn {
+    -fx-background-color: #F1F5F9;
+    -fx-background-radius: 6;
+    -fx-padding: 6 8;
+    -fx-cursor: hand;
+    -fx-border-color: transparent;
+}
+
+.icon-btn:hover {
+    -fx-background-color: #E2E8F0;
+}
+
+.icon-btn-danger:hover {
+    -fx-background-color: #FEE2E2;
+}
+
+.icon-btn-sm {
+    -fx-background-color: transparent;
+    -fx-background-radius: 4;
+    -fx-padding: 4 6;
+    -fx-cursor: hand;
+    -fx-border-color: transparent;
+}
+
+.icon-btn-sm:hover {
+    -fx-background-color: #E2E8F0;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   BOTÓN PRINCIPAL
+═══════════════════════════════════════════════════════════ */
+.btn-primary-report {
+    -fx-background-color: #3B8EA5;
+    -fx-text-fill: white;
+    -fx-background-radius: 8;
+    -fx-padding: 10 22;
+    -fx-font-weight: bold;
+    -fx-font-size: 13px;
+    -fx-cursor: hand;
+}
+
+.btn-primary-report:hover {
+    -fx-background-color: #32778A;
+}
+
+.btn-primary-report:disabled {
+    -fx-opacity: 0.55;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   ESTADOS VACÍOS
+═══════════════════════════════════════════════════════════ */
+.empty-state {
+    -fx-padding: 40 0;
+    -fx-min-height: 200;
+}
+
+.empty-state-text {
+    -fx-text-fill: #94A3B8;
+    -fx-font-size: 14px;
+    -fx-text-alignment: center;
+    -fx-wrap-text: true;
+}
+
+.empty-state-sm {
+    -fx-padding: 20 0;
+}
+
+.empty-state-text-sm {
+    -fx-text-fill: #94A3B8;
+    -fx-font-size: 12px;
+    -fx-text-alignment: center;
+}
+
+.log-text-area {
+    -fx-font-family: "Courier New", monospace;
+    -fx-font-size: 12px;
+    -fx-background-color: #1E293B;
+    -fx-text-fill: #E2E8F0;
+    -fx-control-inner-background: #1E293B;
+}

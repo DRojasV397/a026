@@ -1,14 +1,220 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
-<?import javafx.scene.layout.BorderPane?>
-<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.image.*?>
+<?import javafx.scene.layout.*?>
+<?import javafx.scene.shape.Circle?>
+
 <BorderPane xmlns:fx="http://javafx.com/fxml"
             fx:controller="com.app.ui.reports.ReportsController"
-            stylesheets="@/styles/dashboard.css"
-            styleClass="dashboard-root">
+            stylesheets="@/styles/reports.css"
+            styleClass="reports-root">
 
     <center>
-        <Label text="Bienvenido al módulo de Reportes"/>
-    </center>
+        <ScrollPane fitToWidth="true" styleClass="main-scroll">
+            <VBox spacing="20" styleClass="reports-container">
 
+                <!-- ═══════════════════════════════════════════════ -->
+                <!--  CARD PRINCIPAL con tabs                        -->
+                <!-- ═══════════════════════════════════════════════ -->
+                <VBox styleClass="report-card" VBox.vgrow="ALWAYS" spacing="0">
+
+                    <!-- Tab bar -->
+                    <HBox styleClass="tab-container" spacing="0">
+                        <Button fx:id="tabGenerate"
+                                styleClass="tab-btn, tab-active"
+                                onAction="#onTabGenerate"/>
+                        <Button fx:id="tabSaved"
+                                styleClass="tab-btn"
+                                onAction="#onTabSaved"/>
+                        <Button fx:id="tabSchedule"
+                                styleClass="tab-btn"
+                                onAction="#onTabSchedule"/>
+                    </HBox>
+
+                    <Separator styleClass="tab-separator"/>
+
+                    <!-- ─────────────────────────────────────────── -->
+                    <!--  SECCIÓN 0: Generar Reporte                 -->
+                    <!-- ─────────────────────────────────────────── -->
+                    <VBox fx:id="sectionGenerate" spacing="24" styleClass="section-content">
+
+                        <HBox spacing="20" VBox.vgrow="ALWAYS">
+
+                            <!-- Panel izquierdo: tipos de reporte -->
+                            <VBox spacing="12" styleClass="report-type-panel" prefWidth="260">
+                                <Label fx:id="lblTypesTitle" styleClass="panel-title"/>
+                                <VBox fx:id="reportTypeList" spacing="8" styleClass="report-type-list"/>
+                            </VBox>
+
+                            <!-- Separador vertical -->
+                            <Separator orientation="VERTICAL" styleClass="panel-divider"/>
+
+                            <!-- Panel derecho: configuración -->
+                            <VBox fx:id="configPanel" spacing="20" HBox.hgrow="ALWAYS">
+
+                                <!-- Estado: selecciona un tipo primero -->
+                                <VBox fx:id="configEmptyState" spacing="12"
+                                      styleClass="empty-state" alignment="CENTER"
+                                      VBox.vgrow="ALWAYS">
+                                    <ImageView fitWidth="64" fitHeight="64" preserveRatio="true">
+                                        <Image url="@/images/reports/empty-config.png"/>
+                                    </ImageView>
+                                    <Label fx:id="lblSelectTypeHint" styleClass="empty-state-text"/>
+                                </VBox>
+
+                                <!-- Configuración activa (oculta hasta seleccionar tipo) -->
+                                <VBox fx:id="configForm" spacing="20"
+                                      visible="false" managed="false">
+
+                                    <Label fx:id="lblConfigTitle" styleClass="panel-title"/>
+
+                                    <!-- Nombre del reporte -->
+                                    <VBox spacing="5">
+                                        <Label fx:id="lblReportName" styleClass="form-label"/>
+                                        <TextField fx:id="txtReportName" styleClass="form-input"/>
+                                    </VBox>
+
+                                    <!-- Sub-tipo de reporte (cambia según el tipo) -->
+                                    <VBox fx:id="subTypeBox" spacing="5">
+                                        <Label fx:id="lblSubType" styleClass="form-label"/>
+                                        <ComboBox fx:id="cmbSubType"
+                                                  styleClass="form-input"
+                                                  maxWidth="Infinity"/>
+                                    </VBox>
+
+                                    <!-- Período -->
+                                    <HBox spacing="16">
+                                        <VBox spacing="5" HBox.hgrow="ALWAYS">
+                                            <Label fx:id="lblDateFrom" styleClass="form-label"/>
+                                            <DatePicker fx:id="dpFrom"
+                                                        styleClass="form-input"
+                                                        maxWidth="Infinity"/>
+                                        </VBox>
+                                        <VBox spacing="5" HBox.hgrow="ALWAYS">
+                                            <Label fx:id="lblDateTo" styleClass="form-label"/>
+                                            <DatePicker fx:id="dpTo"
+                                                        styleClass="form-input"
+                                                        maxWidth="Infinity"/>
+                                        </VBox>
+                                    </HBox>
+
+                                    <!-- Separador -->
+                                    <Separator styleClass="form-separator"/>
+
+                                    <!-- Formato de salida -->
+                                    <VBox spacing="10">
+                                        <Label fx:id="lblFormatTitle" styleClass="form-label"/>
+                                        <HBox spacing="12">
+                                            <!-- Botón PDF -->
+                                            <VBox fx:id="btnFormatPdf"
+                                                  styleClass="format-btn, format-btn-selected"
+                                                  alignment="CENTER" spacing="8"
+                                                  onMouseClicked="#onSelectPdf">
+                                                <ImageView fitWidth="36" fitHeight="36"
+                                                           preserveRatio="true">
+                                                    <Image url="@/images/reports/format-pdf.png"/>
+                                                </ImageView>
+                                                <Label fx:id="lblPdfFormat" styleClass="format-btn-label"/>
+                                            </VBox>
+
+                                            <!-- Botón Excel -->
+                                            <VBox fx:id="btnFormatExcel"
+                                                  styleClass="format-btn"
+                                                  alignment="CENTER" spacing="8"
+                                                  onMouseClicked="#onSelectExcel">
+                                                <ImageView fitWidth="36" fitHeight="36"
+                                                           preserveRatio="true">
+                                                    <Image url="@/images/reports/format-excel.png"/>
+                                                </ImageView>
+                                                <Label fx:id="lblExcelFormat" styleClass="format-btn-label"/>
+                                            </VBox>
+                                        </HBox>
+                                    </VBox>
+
+                                    <!-- Botón generar -->
+                                    <HBox alignment="CENTER_RIGHT" spacing="10">
+                                        <Label fx:id="lblGenerateStatus"
+                                               styleClass="generate-status-label"
+                                               visible="false" managed="false"/>
+                                        <Button fx:id="btnGenerate"
+                                                styleClass="btn-primary-report"
+                                                onAction="#onGenerateReport"/>
+                                    </HBox>
+                                </VBox>
+                            </VBox>
+                        </HBox>
+                    </VBox>
+
+                    <!-- ─────────────────────────────────────────── -->
+                    <!--  SECCIÓN 1: Reportes Guardados              -->
+                    <!-- ─────────────────────────────────────────── -->
+                    <VBox fx:id="sectionSaved" spacing="16" styleClass="section-content"
+                          visible="false" managed="false">
+
+                        <!-- Barra de búsqueda -->
+                        <HBox spacing="10" alignment="CENTER_LEFT">
+                            <TextField fx:id="txtSearch"
+                                       styleClass="search-input"
+                                       HBox.hgrow="ALWAYS"/>
+                            <Label fx:id="lblResultCount" styleClass="result-count-label"/>
+                        </HBox>
+
+                        <!-- Lista de reportes guardados -->
+                        <VBox fx:id="savedReportsList" spacing="8" styleClass="saved-list"/>
+
+                        <!-- Estado vacío -->
+                        <VBox fx:id="savedEmptyState" spacing="12"
+                              styleClass="empty-state" alignment="CENTER"
+                              visible="false" managed="false" VBox.vgrow="ALWAYS">
+                            <Label fx:id="lblSavedEmpty" styleClass="empty-state-text"/>
+                        </VBox>
+                    </VBox>
+
+                    <!-- ─────────────────────────────────────────── -->
+                    <!--  SECCIÓN 2: Programación                    -->
+                    <!-- ─────────────────────────────────────────── -->
+                    <VBox fx:id="sectionSchedule" spacing="20" styleClass="section-content"
+                          visible="false" managed="false">
+
+                        <!-- Header con botón nueva programación -->
+                        <HBox alignment="CENTER_LEFT" spacing="12">
+                            <Label fx:id="lblScheduleTitle" styleClass="panel-title"
+                                   HBox.hgrow="ALWAYS"/>
+                            <Button fx:id="btnNewSchedule"
+                                    styleClass="btn-primary-report"
+                                    onAction="#onNewSchedule"/>
+                        </HBox>
+
+                        <!-- Cards de programaciones activas -->
+                        <VBox fx:id="scheduleCardsList" spacing="12"/>
+
+                        <!-- Estado vacío programaciones -->
+                        <VBox fx:id="scheduleEmptyState" spacing="12"
+                              styleClass="empty-state" alignment="CENTER"
+                              visible="false" managed="false">
+                            <Label fx:id="lblScheduleEmpty" styleClass="empty-state-text"/>
+                        </VBox>
+
+                        <Separator styleClass="section-separator"/>
+
+                        <!-- Historial de ejecuciones -->
+                        <VBox spacing="10">
+                            <Label fx:id="lblHistoryTitle" styleClass="subsection-title"/>
+
+                            <VBox fx:id="executionHistoryList" spacing="6"/>
+
+                            <!-- Estado vacío historial -->
+                            <VBox fx:id="historyEmptyState" spacing="8"
+                                  styleClass="empty-state-sm" alignment="CENTER"
+                                  visible="false" managed="false">
+                                <Label fx:id="lblHistoryEmpty" styleClass="empty-state-text-sm"/>
+                            </VBox>
+                        </VBox>
+                    </VBox>
+
+                </VBox>
+            </VBox>
+        </ScrollPane>
+    </center>
 </BorderPane>

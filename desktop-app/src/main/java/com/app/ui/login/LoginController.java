@@ -124,6 +124,12 @@ public class LoginController {
         AppExecutor.runAsync(() -> {
             //LoginResponseDTO response = authService.login(user, pass);
 
+            //Considerar este método para cuando se carge bien la info del backend
+//            Image avatar = AvatarStorageService.loadAvatar(authenticatedUser.getUsername());
+//            if (avatar != null) {
+//                UserSession.setAvatar(avatar);
+//            }
+
             Platform.runLater(() -> {
                 //if (response != null) {
                     //UserSession.setFromLoginResponse(response);
