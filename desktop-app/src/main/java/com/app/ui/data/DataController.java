@@ -1,13 +1,19 @@
 package com.app.ui.data;
 
+import com.app.model.data.CleaningReport;
 import com.app.model.data.UploadedFileDTO;
+import com.app.model.data.ValidationReport;
 import com.app.model.data.ValidationResultDTO;
 import com.app.model.data.ValidationResultDTO.ValidationRuleResult;
+import com.app.service.data.CleaningService;
+import com.app.service.data.TransformService;
+import com.app.service.data.ValidationService;
 import javafx.animation.PauseTransition;
 import javafx.application.Platform;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
+import javafx.concurrent.Task;
 import javafx.fxml.FXML;
 import javafx.scene.control.*;
 import javafx.scene.image.Image;
@@ -23,10 +29,7 @@ import java.nio.file.*;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Locale;
-import java.util.Objects;
+import java.util.*;
 import java.util.function.BiFunction;
 
 public class DataController {
@@ -398,44 +401,207 @@ public class DataController {
         syncValidationTab();
     }
 
-    /**
-     * Inicia el procesamiento del archivo.
-     * TODO: reemplazar por dataService.processFile(currentFile)
-     *       que ejecute CU-01 (lectura) → CU-02 (validación) → CU-03 (limpieza)
-     */
+    // ═════════════════════════════════════════════════════════════════════════
+//  PROCESAMIENTO — CU-02, CU-03, CU-04
+//  Reemplaza el método onProcessFile() existente en DataController
+//  y agrega readFile(), readCsv(), readXlsx() como métodos del controller.
+// ═════════════════════════════════════════════════════════════════════════
+
     @FXML
     private void onProcessFile() {
         if (currentFile == null) return;
 
+        // ── Diálogo: selección de tipo de archivo ─────────────────────────────
+        Dialog<String> tipoDialog = new Dialog<>();
+        tipoDialog.setTitle("Tipo de archivo");
+        tipoDialog.setHeaderText("¿Qué tipo de datos contiene este archivo?");
+        tipoDialog.setContentText(currentFile.getName());
+
+        ButtonType btnVentas  = new ButtonType("Ventas",  ButtonBar.ButtonData.LEFT);
+        ButtonType btnCompras = new ButtonType("Compras", ButtonBar.ButtonData.RIGHT);
+        ButtonType btnCancel  = new ButtonType("Cancelar", ButtonBar.ButtonData.CANCEL_CLOSE);
+        tipoDialog.getDialogPane().getButtonTypes().setAll(btnVentas, btnCompras, btnCancel);
+
+        tipoDialog.setResultConverter(btn -> {
+            if (btn == btnVentas)  return "Ventas";
+            if (btn == btnCompras) return "Compras";
+            return null;
+        });
+
+        Optional<String> tipoResult = tipoDialog.showAndWait();
+        if (tipoResult.isEmpty()) return; // canceló
+
+        String tipo = tipoResult.get();
+        System.out.printf("[DATA] Tipo seleccionado: %s — archivo: %s (%s)%n",
+                tipo, currentFile.getName(), formatSize(currentFile.length()));
+
+        // ── Bloquear UI durante el procesamiento ──────────────────────────────
         btnProcess.setDisable(true);
         btnProcess.setText("Procesando...");
 
-        System.out.printf("[DATA] Procesando archivo: %s (%s)%n",
-                currentFile.getName(), formatSize(currentFile.length()));
+        Task<CleaningReport> pipelineTask = new Task<>() {
 
-        // TODO: Task/Service de JavaFX para no bloquear el hilo UI:
-        // Task<ValidationResultDTO> task = new ProcessFileTask(currentFile);
-        // task.setOnSucceeded(e -> showProcessingResult(task.getValue()));
-        // task.setOnFailed(e -> showError(...));
-        // new Thread(task).start();
+            @Override
+            protected CleaningReport call() throws Exception {
 
-        // Simulación con delay
-        PauseTransition delay = new PauseTransition(Duration.seconds(2));
-        delay.setOnFinished(e -> {
-            btnProcess.setDisable(false);
-            btnProcess.setText("Procesar archivo");
-            loadRecentUploads(getMockRecentUploads());
+                // ── Lectura ───────────────────────────────────────────────────
+                List<List<String>> rows = readFile(currentFile);
 
-            // Platform.runLater saca el Alert del ciclo de animación
-            javafx.application.Platform.runLater(() ->
-                    showInfo("Archivo procesado",
-                            "Se han cargado los datos del archivo \""
-                                    + currentFile.getName() + "\" exitosamente.\n"
-                                    + "Puedes continuar en la pestaña de Validación y limpieza.")
-            );
-        });
-        delay.play();
+                if (rows.size() <= 1) {
+                    throw new Exception(
+                            "El archivo no contiene registros.\n" +
+                                    "Verifica que tenga datos y respete el formato de la plantilla.");
+                }
+
+                System.out.printf("[DATA] Lectura completada — %d registros leídos.%n",
+                        rows.size() - 1);
+
+                // ── CU-02: Validación ─────────────────────────────────────────
+                ValidationReport validation =
+                        new ValidationService().validate(rows, tipo);
+
+                if (!validation.structureValid()) {
+                    throw new Exception(
+                            "Estructura inválida. Faltan las siguientes columnas obligatorias:\n"
+                                    + String.join(", ", validation.missingColumns())
+                                    + "\n\nRevisa que el archivo use el formato de la plantilla.");
+                }
+
+                // ── CU-03: Limpieza ───────────────────────────────────────────
+                CleaningReport cleaning =
+                        new CleaningService().clean(rows, validation, tipo);
+
+                // ── CU-04: Transformación ─────────────────────────────────────
+                List<List<String>> transformed =
+                        new TransformService().transform(cleaning.cleanRows(), tipo);
+
+                System.out.printf("[DATA] Pipeline completado — %d filas listas para análisis.%n",
+                        transformed.size() - 1);
+
+                return cleaning;
+            }
+
+            @Override
+            protected void succeeded() {
+                CleaningReport report = getValue();
+                btnProcess.setDisable(false);
+                btnProcess.setText("Procesar archivo");
+                loadRecentUploads(getMockRecentUploads());
+
+                // Advertencia si retención < 70% (FA-01 CU-03)
+                if (!report.meetsThreshold()) {
+                    Platform.runLater(() -> {
+                        Alert warn = new Alert(Alert.AlertType.WARNING);
+                        warn.setTitle("Retención baja");
+                        warn.setHeaderText(String.format(
+                                "La limpieza resultó en %.1f%% de retención (mínimo recomendado: 70%%).",
+                                report.retentionPercent()));
+                        warn.setContentText(
+                                "Registros originales:  " + report.originalCount() + "\n" +
+                                        "Registros conservados: " + report.cleanCount()    + "\n\n" +
+                                        "Se recomienda revisar los datos de origen antes de continuar.");
+                        warn.showAndWait();
+                    });
+                } else {
+                    Platform.runLater(() ->
+                            showInfo("Procesamiento completado",
+                                    String.format("Archivo: %s\n\n" +
+                                                    "Registros leídos:    %d\n"   +
+                                                    "Registros válidos:   %d\n"   +
+                                                    "Duplicados eliminados: %d\n" +
+                                                    "Valores imputados:   %d\n"   +
+                                                    "Retención:           %.1f%%\n\n" +
+                                                    "Los datos están disponibles en la pestaña Validación y limpieza.",
+                                            currentFile.getName(),
+                                            report.originalCount(),
+                                            report.cleanCount(),
+                                            report.duplicatesRemoved(),
+                                            report.imputedValues(),
+                                            report.retentionPercent()))
+                    );
+                }
+            }
+
+            @Override
+            protected void failed() {
+                btnProcess.setDisable(false);
+                btnProcess.setText("Procesar archivo");
+                Throwable ex = getException();
+                System.err.println("[DATA] Error en pipeline: " + ex.getMessage());
+                Platform.runLater(() ->
+                        showError("Error al procesar", ex.getMessage()));
+            }
+        };
+
+        new Thread(pipelineTask).start();
     }
+
+// ─────────────────────────────────────────────────────────────────────────
+//  LECTURA DE ARCHIVOS — unifica CSV y XLSX
+// ─────────────────────────────────────────────────────────────────────────
+
+    /**
+     * Lee el archivo y devuelve todas las filas como List<List<String>>.
+     * La fila 0 siempre es la cabecera.
+     */
+    private List<List<String>> readFile(File file) throws Exception {
+        String ext = getExtension(file.getName()).toLowerCase();
+        return switch (ext) {
+            case "csv"  -> readCsv(file);
+            case "xlsx" -> readXlsx(file);
+            default     -> throw new IllegalArgumentException("Formato no soportado: " + ext);
+        };
+    }
+
+    /**
+     * Lee un CSV. Fila 0 = cabecera, resto = datos.
+     * TODO: sustituir por dataService.parseCsv(file) cuando exista persistencia
+     */
+    private List<List<String>> readCsv(File file) throws Exception {
+        List<List<String>> rows = new ArrayList<>();
+        try (BufferedReader reader = new BufferedReader(
+                new InputStreamReader(new FileInputStream(file), "UTF-8"))) {
+
+            String line;
+            while ((line = reader.readLine()) != null) {
+                if (line.isBlank()) continue;
+                List<String> cells = Arrays.asList(line.split(",", -1));
+                rows.add(new ArrayList<>(cells));
+            }
+        }
+        System.out.printf("[CSV] Leídas %d filas (incluye cabecera).%n", rows.size());
+        return rows;
+    }
+
+    /**
+     * Lee un XLSX usando Apache POI. Fila 0 = cabecera.
+     * Requiere: org.apache.poi:poi-ooxml:5.2.3 en pom.xml
+     * TODO: sustituir por dataService.parseXlsx(file) cuando exista persistencia
+     */
+    private List<List<String>> readXlsx(File file) throws Exception {
+        List<List<String>> rows = new ArrayList<>();
+
+        try (FileInputStream fis = new FileInputStream(file);
+             org.apache.poi.xssf.usermodel.XSSFWorkbook wb =
+                     new org.apache.poi.xssf.usermodel.XSSFWorkbook(fis)) {
+
+            org.apache.poi.ss.usermodel.Sheet sheet = wb.getSheetAt(0);
+            org.apache.poi.ss.usermodel.DataFormatter fmt =
+                    new org.apache.poi.ss.usermodel.DataFormatter();
+
+            for (org.apache.poi.ss.usermodel.Row row : sheet) {
+                List<String> cells = new ArrayList<>();
+                for (org.apache.poi.ss.usermodel.Cell cell : row)
+                    cells.add(fmt.formatCellValue(cell));
+                // Saltar filas completamente vacías
+                if (cells.stream().allMatch(String::isBlank)) continue;
+                rows.add(cells);
+            }
+        }
+        System.out.printf("[XLSX] Leídas %d filas (incluye cabecera).%n", rows.size());
+        return rows;
+    }
+
 
     // ═════════════════════════════════════════════════════════════════════════
     //  CARGAS RECIENTES
