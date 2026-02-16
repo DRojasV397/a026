@@ -32,37 +32,38 @@
    ============================================ */
 
 .profit-header {
-    -fx-background-color: white;
-    -fx-border-color: #E5E7EB;
-    -fx-border-width: 0 0 1px 0;
-    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.05), 4, 0, 0, 2);
+    -fx-background-color: #E3EDF7;
+    -fx-padding: 0 30;
+    -fx-border-color: transparent transparent #E2E8F0 transparent;
+    -fx-border-width: 0 0 1 0;
+    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.04), 6, 0, 0, 2);
 }
 
 .nav-button {
     -fx-background-color: transparent;
-    -fx-text-fill: #6B7280;
-    -fx-font-size: 14px;
-    -fx-font-weight: 600;
-    -fx-padding: 10px 20px;
-    -fx-background-radius: 8px;
+    -fx-border-color: transparent transparent transparent transparent;
+    -fx-border-width: 0 0 3 0;
+    -fx-text-fill:  #8197b6;
+    -fx-padding: 14 22;
     -fx-cursor: hand;
-    -fx-border-color: transparent;
-    -fx-border-width: 0;
+    -fx-font-size: 14px;
+    -fx-font-weight: bold;
+    -fx-background-radius: 0;
 }
 
 .nav-button:hover {
-    -fx-background-color: #F3F4F6;
-    -fx-text-fill: #374151;
+    -fx-text-fill: #3B8EA5;
+    -fx-background-color: #e5ebf1;
 }
 
 .nav-button.nav-active {
-    -fx-background-color: #3B8EA5;
-    -fx-text-fill: white;
+    -fx-border-color: transparent transparent #3B8EA5 transparent;
+    -fx-text-fill: #3B8EA5;
 }
 
-.nav-button.nav-active:hover {
-    -fx-background-color: #2d7088;
-}
+/*.nav-button.nav-active:hover {*/
+/*    -fx-background-color: #2d7088;*/
+/*}*/
 
 /* ============================================
    TITLES & LABELS

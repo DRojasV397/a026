@@ -15,10 +15,6 @@
               alignment="CENTER_LEFT"
               styleClass="profit-header">
 
-            <padding>
-                <Insets top="16" right="24" bottom="16" left="24"/>
-            </padding>
-
             <Button fx:id="btnIndicators"
                     text="📊 Indicadores Financieros"
                     onAction="#showIndicators"

@@ -35,9 +35,11 @@
    TABS
 ═══════════════════════════════════════════════════════════ */
 .tab-container {
-    -fx-padding: 0 25;
-    -fx-border-color: transparent;
-    -fx-border-width: 0;
+    -fx-background-color: #E3EDF7;
+    -fx-padding: 0 30;
+    -fx-border-color: transparent transparent #E2E8F0 transparent;
+    -fx-border-width: 0 0 1 0;
+    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.04), 6, 0, 0, 2);
 }
 
 .tab-separator {
@@ -49,7 +51,7 @@
     -fx-background-color: transparent;
     -fx-border-color: transparent transparent transparent transparent;
     -fx-border-width: 0 0 3 0;
-    -fx-text-fill: #94A3B8;
+    -fx-text-fill: #8197b6;
     -fx-padding: 14 24;
     -fx-cursor: hand;
     -fx-font-size: 13px;
@@ -59,7 +61,7 @@
 
 .tab-btn:hover {
     -fx-text-fill: #3B8EA5;
-    -fx-background-color: #F8FAFC;
+    -fx-background-color: #e5ebf1;
 }
 
 .tab-active {
@@ -132,14 +134,14 @@
 }
 
 .report-type-name {
-    -fx-font-size: 13px;
+    -fx-font-size: 16px;
     -fx-font-weight: bold;
     -fx-text-fill: #1E293B;
 }
 
 .report-type-desc {
-    -fx-font-size: 11px;
-    -fx-text-fill: #94A3B8;
+    -fx-font-size: 14px;
+    -fx-text-fill: #3f4b5a;
 }
 
 /* ═══════════════════════════════════════════════════════════
@@ -208,8 +210,8 @@
     -fx-font-weight: bold;
 }
 
-.status-success { -fx-text-fill: #059669; }
-.status-error   { -fx-text-fill: #DC2626; }
+.status-success { -fx-text-fill: #58BD8B; }
+.status-error   { -fx-text-fill: #A03C48; }
 
 /* ═══════════════════════════════════════════════════════════
    BUSCADOR
@@ -281,7 +283,7 @@
 
 /* ── Badge NUEVO ── */
 .badge-new {
-    -fx-background-color: #22C55E;
+    -fx-background-color: #54937a;
     -fx-text-fill: white;
     -fx-font-size: 9px;
     -fx-font-weight: bold;
@@ -344,13 +346,13 @@
 
 /* Indicadores de estado */
 .status-dot         { -fx-font-size: 10px; }
-.status-dot-success { -fx-text-fill: #22C55E; }
-.status-dot-error   { -fx-text-fill: #EF4444; }
-.status-dot-warning { -fx-text-fill: #F59E0B; }
+.status-dot-success { -fx-text-fill: #58BD8B; }
+.status-dot-error   { -fx-text-fill: #A03C48; }
+.status-dot-warning { -fx-text-fill: #D9A441; }
 
-.history-status-exitoso { -fx-text-fill: #059669; -fx-font-weight: bold; -fx-font-size: 11px; }
-.history-status-fallido { -fx-text-fill: #DC2626; -fx-font-weight: bold; -fx-font-size: 11px; }
-.history-status-parcial { -fx-text-fill: #D97706; -fx-font-weight: bold; -fx-font-size: 11px; }
+.history-status-exitoso { -fx-text-fill: #58BD8B; -fx-font-weight: bold; -fx-font-size: 11px; }
+.history-status-fallido { -fx-text-fill: #A03C48; -fx-font-weight: bold; -fx-font-size: 11px; }
+.history-status-parcial { -fx-text-fill: #D9A441; -fx-font-weight: bold; -fx-font-size: 11px; }
 
 /* ═══════════════════════════════════════════════════════════
    BOTONES DE ACCIÓN (icono)
@@ -414,7 +416,7 @@
 
 .empty-state-text {
     -fx-text-fill: #94A3B8;
-    -fx-font-size: 14px;
+    -fx-font-size: 16px;
     -fx-text-alignment: center;
     -fx-wrap-text: true;
 }

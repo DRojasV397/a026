@@ -18,8 +18,8 @@ public class AnimatedToggleSwitch extends StackPane {
     private static final double TRAVEL       = 18;
 
     private static final String COLOR_OFF   = "#CBD5E1";
-    private static final String COLOR_ON    = "#22C55E";
-    private static final String SHADOW_ON   = "dropshadow(gaussian, rgba(34,197,94,0.4), 6, 0, 0, 0)";
+    private static final String COLOR_ON    = "#6C91BF ";
+    private static final String SHADOW_ON   = "dropshadow(gaussian, rgba(108,145,191,0.4), 6, 0, 0, 0)";
     private static final String SHADOW_OFF  = "dropshadow(gaussian, rgba(0,0,0,0.15), 3, 0, 0, 1)";
 
     private final Rectangle track;

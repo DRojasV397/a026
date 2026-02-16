@@ -22,8 +22,8 @@
     <StackPane fx:id="iconContainer"
                styleClass="alert-icon">
         <ImageView fx:id="iconImage"
-                   fitWidth="24"
-                   fitHeight="24"
+                   fitWidth="40"
+                   fitHeight="40"
                    preserveRatio="true"/>
     </StackPane>
 

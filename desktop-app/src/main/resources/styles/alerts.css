@@ -91,7 +91,6 @@
 }
 
 .alert-icon-success {
-    -fx-background-color: #10B981;
     -fx-background-radius: 50%;
     -fx-min-width: 40px;
     -fx-min-height: 40px;
@@ -118,7 +117,6 @@
 }
 
 .alert-icon-warning {
-    -fx-background-color: #F59E0B;
     -fx-background-radius: 50%;
     -fx-min-width: 40px;
     -fx-min-height: 40px;
@@ -145,7 +143,6 @@
 }
 
 .alert-icon-error {
-    -fx-background-color: #EF4444;
     -fx-background-radius: 50%;
     -fx-min-width: 40px;
     -fx-min-height: 40px;

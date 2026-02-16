@@ -1,14 +1,402 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
-<?import javafx.scene.layout.BorderPane?>
-<?import javafx.scene.control.Label?>
-<BorderPane xmlns:fx="http://javafx.com/fxml"
-            fx:controller="com.app.ui.data.DataController"
-            stylesheets="@/styles/dashboard.css"
-            styleClass="dashboard-root">
+<?import javafx.scene.control.*?>
+<?import javafx.scene.image.*?>
+<?import javafx.scene.layout.*?>
+<?import javafx.scene.shape.Circle?>
 
-    <center>
-        <Label text="Bienvenido al módulo de Gestión de datos"/>
-    </center>
+<VBox xmlns:fx="http://javafx.com/fxml"
+      fx:controller="com.app.ui.data.DataController"
+      stylesheets="@/styles/data.css"
+      styleClass="data-root"
+      spacing="0">
 
-</BorderPane>
+    <!-- ═══════════════════════════════════════════════════════════
+         TAB BAR — fuera del card, directo sobre el root
+    ═══════════════════════════════════════════════════════════ -->
+    <HBox styleClass="data-tab-bar" spacing="0">
+        <Button fx:id="tabUpload"
+                styleClass="data-tab-btn, data-tab-active"
+                onAction="#onTabUpload"/>
+        <Button fx:id="tabHistory"
+                styleClass="data-tab-btn"
+                onAction="#onTabHistory"/>
+        <Button fx:id="tabValidation"
+                styleClass="data-tab-btn"
+                onAction="#onTabValidation"/>
+    </HBox>
+
+    <!-- ═══════════════════════════════════════════════════════════
+         SECCIÓN 0: CARGAR DATOS
+    ═══════════════════════════════════════════════════════════ -->
+    <ScrollPane fx:id="sectionUpload" fitToWidth="true"
+                styleClass="data-scroll" VBox.vgrow="ALWAYS">
+        <VBox styleClass="data-container" spacing="20">
+
+            <!-- Layout principal: zona de carga + sidebar -->
+            <HBox spacing="20" VBox.vgrow="ALWAYS">
+
+                <!-- ── Zona central de carga ─────────────────────────────── -->
+                <VBox spacing="16" HBox.hgrow="ALWAYS">
+
+                    <!-- Card drag & drop -->
+                    <VBox fx:id="dropZoneCard"
+                          styleClass="upload-card"
+                          alignment="CENTER" spacing="14">
+
+                        <!-- Estado IDLE -->
+                        <VBox fx:id="stateIdle" alignment="CENTER" spacing="14">
+                            <ImageView fx:id="uploadIcon"
+                                       fitWidth="72" fitHeight="72"
+                                       preserveRatio="true">
+                                <Image url="@/images/data/upload-icon.png"/>
+                            </ImageView>
+
+                            <VBox alignment="CENTER" spacing="4">
+                                <Label fx:id="lblDropTitle"
+                                       styleClass="upload-drop-title"/>
+                            </VBox>
+
+                            <!-- Divisor con texto "o" -->
+                            <HBox spacing="12" alignment="CENTER"
+                                  styleClass="upload-divider-row">
+                                <Region HBox.hgrow="ALWAYS"
+                                        styleClass="upload-divider-line"/>
+                                <Label fx:id="lblOr" styleClass="upload-divider-text"/>
+                                <Region HBox.hgrow="ALWAYS"
+                                        styleClass="upload-divider-line"/>
+                            </HBox>
+
+                            <Button fx:id="btnSelectFile"
+                                    styleClass="btn-select-file"
+                                    onAction="#onSelectFile"/>
+
+                            <Label fx:id="lblFormats"
+                                   styleClass="upload-formats-hint"/>
+
+                            <Label fx:id="lblMaxSize"
+                                   styleClass="upload-maxsize-hint"/>
+                        </VBox>
+
+                        <!-- Estado FILE_READY (oculto hasta que haya archivo) -->
+                        <VBox fx:id="stateFileReady" alignment="CENTER" spacing="16"
+                              visible="false" managed="false">
+                            <ImageView fitWidth="56" fitHeight="56"
+                                       preserveRatio="true">
+                                <Image url="@/images/data/file-ready-icon.png"/>
+                            </ImageView>
+
+                            <VBox alignment="CENTER" spacing="5">
+                                <Label fx:id="lblFileName"
+                                       styleClass="file-ready-name"/>
+                                <Label fx:id="lblFileSize"
+                                       styleClass="file-ready-size"/>
+                                <Label fx:id="lblFileType"
+                                       styleClass="file-ready-type"/>
+                            </VBox>
+
+                            <HBox spacing="12" alignment="CENTER">
+                                <Button fx:id="btnProcess"
+                                        styleClass="btn-process"
+                                        onAction="#onProcessFile"/>
+                                <Button fx:id="btnRemoveFile"
+                                        styleClass="btn-remove-file"
+                                        onAction="#onRemoveFile"/>
+                            </HBox>
+                        </VBox>
+
+                        <!-- Estado DRAG_OVER (overlay visual) -->
+                        <VBox fx:id="stateDragOver" alignment="CENTER" spacing="12"
+                              visible="false" managed="false">
+                            <ImageView fitWidth="80" fitHeight="80"
+                                       preserveRatio="true">
+                                <Image url="@/images/data/drop-here-icon.png"/>
+                            </ImageView>
+                            <Label fx:id="lblDropHere"
+                                   styleClass="drag-over-label"/>
+                        </VBox>
+
+                    </VBox>
+
+                    <!-- Cargas recientes -->
+                    <Label fx:id="lblRecentTitle" styleClass="section-subtitle"/>
+
+                    <VBox fx:id="recentUploadsList" spacing="8"/>
+
+                    <VBox fx:id="recentEmptyState" spacing="8"
+                          styleClass="empty-state-sm" alignment="CENTER"
+                          visible="false" managed="false">
+                        <Label fx:id="lblRecentEmpty"
+                               styleClass="empty-state-text-sm"/>
+                    </VBox>
+
+                </VBox>
+
+                <!-- ── Sidebar derecho ───────────────────────────────────── -->
+                <VBox spacing="14" styleClass="data-sidebar" prefWidth="260">
+
+                    <!-- Card: Cómo cargar mis datos -->
+                    <VBox styleClass="sidebar-card" spacing="12">
+                        <Label fx:id="lblHowTitle" styleClass="sidebar-card-title"/>
+                        <VBox fx:id="howToStepsList" spacing="10"/>
+                    </VBox>
+
+                    <!-- Card: Formato de archivo -->
+                    <VBox styleClass="sidebar-card" spacing="10">
+                        <Label fx:id="lblFormatTitle" styleClass="sidebar-card-title"/>
+                        <VBox fx:id="formatFieldsList" spacing="6"/>
+                    </VBox>
+
+                    <!-- Card: Descargar plantillas -->
+                    <VBox styleClass="sidebar-card" spacing="12">
+                        <Label fx:id="lblTemplateTitle" styleClass="sidebar-card-title"/>
+                        <Label fx:id="lblTemplateHint" styleClass="sidebar-card-hint"/>
+
+                        <HBox spacing="8" alignment="CENTER_LEFT">
+                            <ImageView fitWidth="22" fitHeight="22"
+                                       preserveRatio="true">
+                                <Image url="@/images/reports/format-excel.png"/>
+                            </ImageView>
+                            <Button fx:id="btnDownloadCompras"
+                                    styleClass="btn-template"
+                                    onAction="#onDownloadCompras"/>
+                        </HBox>
+
+                        <HBox spacing="8" alignment="CENTER_LEFT">
+                            <ImageView fitWidth="22" fitHeight="22"
+                                       preserveRatio="true">
+                                <Image url="@/images/reports/format-excel.png"/>
+                            </ImageView>
+                            <Button fx:id="btnDownloadVentas"
+                                    styleClass="btn-template"
+                                    onAction="#onDownloadVentas"/>
+                        </HBox>
+                    </VBox>
+
+                </VBox>
+            </HBox>
+        </VBox>
+    </ScrollPane>
+
+    <!-- ═══════════════════════════════════════════════════════════
+         SECCIÓN 1: CONSULTAR HISTÓRICOS
+    ═══════════════════════════════════════════════════════════ -->
+    <ScrollPane fx:id="sectionHistory" fitToWidth="true"
+                styleClass="data-scroll" VBox.vgrow="ALWAYS"
+                visible="false" managed="false">
+        <VBox styleClass="data-container" spacing="20">
+
+            <!-- Card de filtros -->
+            <VBox styleClass="data-card" spacing="14">
+                <Label fx:id="lblFiltersTitle" styleClass="data-card-title"/>
+
+                <HBox spacing="14" alignment="CENTER_LEFT">
+                    <!-- Tipo de datos -->
+                    <VBox spacing="5">
+                        <Label fx:id="lblFilterType" styleClass="form-label"/>
+                        <ComboBox fx:id="cmbDataType"
+                                  styleClass="data-combo" prefWidth="160"/>
+                    </VBox>
+
+                    <!-- Fecha desde -->
+                    <VBox spacing="5">
+                        <Label fx:id="lblFilterFrom" styleClass="form-label"/>
+                        <DatePicker fx:id="dpHistoryFrom"
+                                    styleClass="data-combo" prefWidth="155"/>
+                    </VBox>
+
+                    <!-- Fecha hasta -->
+                    <VBox spacing="5">
+                        <Label fx:id="lblFilterTo" styleClass="form-label"/>
+                        <DatePicker fx:id="dpHistoryTo"
+                                    styleClass="data-combo" prefWidth="155"/>
+                    </VBox>
+
+                    <!-- Buscador por producto -->
+                    <VBox spacing="5" HBox.hgrow="ALWAYS">
+                        <Label fx:id="lblFilterSearch" styleClass="form-label"/>
+                        <TextField fx:id="txtHistorySearch"
+                                   styleClass="data-search-input"/>
+                    </VBox>
+
+                    <!-- Botón aplicar -->
+                    <VBox spacing="5" alignment="BOTTOM_LEFT">
+                        <Button fx:id="btnApplyFilters"
+                                styleClass="btn-primary-data"
+                                onAction="#onApplyFilters"/>
+                    </VBox>
+                </HBox>
+            </VBox>
+
+            <!-- Tabla de resultados -->
+            <VBox styleClass="data-card" spacing="12" VBox.vgrow="ALWAYS">
+
+                <!-- Header con stats -->
+                <HBox alignment="CENTER_LEFT" spacing="16">
+                    <Label fx:id="lblTableTitle" styleClass="data-card-title"
+                           HBox.hgrow="ALWAYS"/>
+                    <Label fx:id="lblRecordCount" styleClass="record-count-badge"/>
+                    <Button fx:id="btnExport"
+                            styleClass="btn-secondary-data"
+                            onAction="#onExportData"/>
+                </HBox>
+
+                <!-- TableView -->
+                <TableView fx:id="dataTable"
+                           styleClass="data-table"
+                           VBox.vgrow="ALWAYS"
+                           minHeight="300">
+                    <columns>
+                        <TableColumn fx:id="colDate"    prefWidth="120"/>
+                        <TableColumn fx:id="colProduct" prefWidth="220"/>
+                        <TableColumn fx:id="colPrice"   prefWidth="130"/>
+                        <TableColumn fx:id="colQty"     prefWidth="100"/>
+                        <TableColumn fx:id="colTotal"   prefWidth="130"/>
+                        <TableColumn fx:id="colType"    prefWidth="100"/>
+                    </columns>
+                </TableView>
+
+                <!-- Footer con estadísticas -->
+                <HBox spacing="20" styleClass="table-footer">
+                    <Label fx:id="lblStatRange"  styleClass="table-stat"/>
+                    <Label fx:id="lblStatTotal"  styleClass="table-stat"/>
+                    <Label fx:id="lblStatAvg"    styleClass="table-stat"/>
+                </HBox>
+
+                <!-- Estado vacío -->
+                <VBox fx:id="historyEmptyState" spacing="10"
+                      styleClass="empty-state" alignment="CENTER"
+                      visible="false" managed="false">
+                    <Label fx:id="lblHistoryEmpty"
+                           styleClass="empty-state-text"/>
+                </VBox>
+            </VBox>
+        </VBox>
+    </ScrollPane>
+
+    <!-- ═══════════════════════════════════════════════════════════
+         SECCIÓN 2: VALIDACIÓN Y LIMPIEZA
+    ═══════════════════════════════════════════════════════════ -->
+    <ScrollPane fx:id="sectionValidation" fitToWidth="true"
+                styleClass="data-scroll" VBox.vgrow="ALWAYS"
+                visible="false" managed="false">
+        <VBox styleClass="data-container" spacing="20">
+
+            <!-- Sin datos cargados -->
+            <VBox fx:id="validationNoData" spacing="12"
+                  styleClass="empty-state" alignment="CENTER">
+                <Label fx:id="lblNoDataTitle"
+                       styleClass="empty-state-title"/>
+                <Label fx:id="lblNoDataHint"
+                       styleClass="empty-state-text"/>
+                <Button fx:id="btnGoUpload"
+                        styleClass="btn-primary-data"
+                        onAction="#onTabUpload"/>
+            </VBox>
+
+            <!-- Panel con datos listos para validar -->
+            <VBox fx:id="validationReady" spacing="20"
+                  visible="false" managed="false">
+
+                <!-- Info del archivo cargado -->
+                <HBox styleClass="data-card, validation-file-banner"
+                      alignment="CENTER_LEFT" spacing="16">
+                    <ImageView fitWidth="36" fitHeight="36" preserveRatio="true">
+                        <Image url="@/images/data/file-ready-icon.png"/>
+                    </ImageView>
+                    <VBox spacing="3" HBox.hgrow="ALWAYS">
+                        <Label fx:id="lblValidationFileName"
+                               styleClass="validation-file-name"/>
+                        <Label fx:id="lblValidationFileMeta"
+                               styleClass="validation-file-meta"/>
+                    </VBox>
+                    <Button fx:id="btnStartValidation"
+                            styleClass="btn-primary-data"
+                            onAction="#onStartValidation"/>
+                </HBox>
+
+                <!-- Checklist de validación -->
+                <HBox spacing="20">
+
+                    <VBox styleClass="data-card" spacing="14"
+                          HBox.hgrow="ALWAYS">
+                        <Label fx:id="lblValidationCheckTitle"
+                               styleClass="data-card-title"/>
+                        <VBox fx:id="validationRulesList" spacing="10"/>
+
+                        <!-- Barra de progreso (oculta al inicio) -->
+                        <ProgressBar fx:id="validationProgress"
+                                     styleClass="data-progress-bar"
+                                     progress="0" maxWidth="Infinity"
+                                     visible="false" managed="false"/>
+                        <Label fx:id="lblValidationStatus"
+                               styleClass="validation-status-label"
+                               visible="false" managed="false"/>
+                    </VBox>
+
+                    <!-- Resumen de limpieza -->
+                    <VBox styleClass="data-card" spacing="14"
+                          HBox.hgrow="ALWAYS">
+                        <Label fx:id="lblCleaningTitle"
+                               styleClass="data-card-title"/>
+                        <VBox fx:id="cleaningSummaryList" spacing="10"/>
+                    </VBox>
+
+                </HBox>
+
+                <!-- Panel resultado final (oculto hasta completar) -->
+                <VBox fx:id="validationResult" styleClass="data-card, result-card"
+                      spacing="16" visible="false" managed="false">
+
+                    <Label fx:id="lblResultTitle"
+                           styleClass="result-title"/>
+
+                    <!-- Métricas en cards inline -->
+                    <HBox spacing="14">
+                        <VBox fx:id="metricTotal"
+                              styleClass="metric-card" alignment="CENTER" spacing="4">
+                            <Label fx:id="lblMetricTotalVal"  styleClass="metric-value"/>
+                            <Label fx:id="lblMetricTotalLbl"  styleClass="metric-label"/>
+                        </VBox>
+                        <VBox fx:id="metricValid"
+                              styleClass="metric-card, metric-success" alignment="CENTER" spacing="4">
+                            <Label fx:id="lblMetricValidVal"  styleClass="metric-value"/>
+                            <Label fx:id="lblMetricValidLbl"  styleClass="metric-label"/>
+                        </VBox>
+                        <VBox fx:id="metricRemoved"
+                              styleClass="metric-card, metric-warning" alignment="CENTER" spacing="4">
+                            <Label fx:id="lblMetricRemovedVal" styleClass="metric-value"/>
+                            <Label fx:id="lblMetricRemovedLbl" styleClass="metric-label"/>
+                        </VBox>
+                        <VBox fx:id="metricRetention"
+                              styleClass="metric-card, metric-info" alignment="CENTER" spacing="4">
+                            <Label fx:id="lblMetricRetentionVal" styleClass="metric-value"/>
+                            <Label fx:id="lblMetricRetentionLbl" styleClass="metric-label"/>
+                        </VBox>
+                    </HBox>
+
+                    <!-- Advertencia umbral 70% -->
+                    <HBox fx:id="lowRetentionWarning" styleClass="warning-banner"
+                          spacing="10" alignment="CENTER_LEFT"
+                          visible="false" managed="false">
+                        <Label styleClass="warning-icon" text="⚠"/>
+                        <Label fx:id="lblLowRetentionMsg"
+                               styleClass="warning-text" HBox.hgrow="ALWAYS"/>
+                    </HBox>
+
+                    <!-- Acciones -->
+                    <HBox spacing="12" alignment="CENTER_RIGHT">
+                        <Button fx:id="btnCancelValidation"
+                                styleClass="btn-cancel-data"
+                                onAction="#onCancelValidation"/>
+                        <Button fx:id="btnConfirmValidation"
+                                styleClass="btn-primary-data"
+                                onAction="#onConfirmValidation"/>
+                    </HBox>
+                </VBox>
+
+            </VBox>
+        </VBox>
+    </ScrollPane>
+
+</VBox>

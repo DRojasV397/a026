@@ -17,6 +17,7 @@ import javafx.scene.layout.*;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
@@ -82,6 +83,7 @@ public class ReportsController {
     private int             activeTabIndex    = 0;
     private String          selectedFormat    = "PDF";     // PDF | EXCEL
     private ReportTypeDTO   selectedReportType = null;
+    private List<ReportTypeDTO> cachedReportTypes;
 
     // Lista observable para filtrado en tiempo real
     private ObservableList<ReportDTO>   allSavedReports;
@@ -98,11 +100,30 @@ public class ReportsController {
         allTabs     = List.of(tabGenerate, tabSaved, tabSchedule);
         allSections = List.of(sectionGenerate, sectionSaved, sectionSchedule);
 
-        // ── Textos de la UI (sin hardcodear en FXML) ──────────────────────────
+        setAllTexts(); // renombrar el bloque de textos a método propio
+
+        // Solo lo necesario para el primer frame
+        cachedReportTypes = getMockReportTypes();
+        loadReportTypes(getMockReportTypes());
+
+        dpTo.setValue(LocalDate.now());
+        dpFrom.setValue(LocalDate.now().minusMonths(1));
+
+        // El resto se difiere al siguiente pulso del hilo UI
+        javafx.application.Platform.runLater(() -> {
+            loadSavedReports(getMockSavedReports());
+            loadScheduledReports(getMockScheduledReports());
+            loadExecutionHistory(getMockExecutionHistory());
+        });
+    }
+
+    private void setAllTexts() {
+        // ── Tabs ──────────────────────────────────────────────────────────────────
         tabGenerate.setText("Generar Reporte");
         tabSaved.setText("Reportes Guardados");
         tabSchedule.setText("Programaci\u00F3n");
 
+        // ── Sección: Generar Reporte ──────────────────────────────────────────────
         lblTypesTitle.setText("Tipo de Reporte");
         lblSelectTypeHint.setText("Selecciona un tipo de reporte\npara configurar y generar");
         lblReportName.setText("Nombre del Reporte");
@@ -113,25 +134,17 @@ public class ReportsController {
         lblPdfFormat.setText("PDF");
         lblExcelFormat.setText("Excel");
         btnGenerate.setText("Generar Reporte");
+
+        // ── Sección: Reportes Guardados ───────────────────────────────────────────
+        txtSearch.setPromptText("\uD83D\uDD0D  Buscar reporte por nombre, tipo o usuario...");
         lblSavedEmpty.setText("No se encontraron reportes.\nGenera tu primer reporte en la pesta\u00F1a anterior.");
+
+        // ── Sección: Programación ─────────────────────────────────────────────────
         lblScheduleTitle.setText("Reportes Programados");
         btnNewSchedule.setText("+ Nueva Programaci\u00F3n");
         lblScheduleEmpty.setText("No hay reportes programados.\nCrea una programaci\u00F3n para automatizar la generaci\u00F3n.");
         lblHistoryTitle.setText("\u00DAltimas Ejecuciones");
         lblHistoryEmpty.setText("No hay ejecuciones recientes registradas.");
-
-        // Búsqueda
-        txtSearch.setPromptText("\uD83D\uDD0D  Buscar reporte por nombre, tipo o usuario...");
-
-        // ── Carga inicial de datos ────────────────────────────────────────────
-        loadReportTypes(getMockReportTypes());
-        loadSavedReports(getMockSavedReports());
-        loadScheduledReports(getMockScheduledReports());
-        loadExecutionHistory(getMockExecutionHistory());
-
-        // ── Fecha actual como valor por defecto del período ───────────────────
-        dpTo.setValue(LocalDate.now());
-        dpFrom.setValue(LocalDate.now().minusMonths(1));
     }
 
     // ═════════════════════════════════════════════════════════════════════════
@@ -139,12 +152,12 @@ public class ReportsController {
     // ═════════════════════════════════════════════════════════════════════════
 
     private void loadReportTypes(List<ReportTypeDTO> types) {
-        reportTypeList.getChildren().clear();
+        List<HBox> cards = new ArrayList<>();
+        for (ReportTypeDTO type : types)
+            cards.add(buildReportTypeCard(type));
 
-        for (ReportTypeDTO type : types) {
-            HBox card = buildReportTypeCard(type);
-            reportTypeList.getChildren().add(card);
-        }
+        reportTypeList.getChildren().clear();
+        reportTypeList.getChildren().addAll(cards);
     }
 
     private HBox buildReportTypeCard(ReportTypeDTO type) {
@@ -321,23 +334,20 @@ public class ReportsController {
     }
 
     private void renderSavedReports() {
-        savedReportsList.getChildren().clear();
-
         List<ReportDTO> visible = filteredReports.stream().toList();
 
         boolean isEmpty = visible.isEmpty();
         savedEmptyState.setVisible(isEmpty);
         savedEmptyState.setManaged(isEmpty);
+        lblResultCount.setText(isEmpty ? "Sin resultados"
+                : visible.size() + " reporte" + (visible.size() == 1 ? "" : "s"));
 
-        String countText = isEmpty
-                ? "Sin resultados"
-                : visible.size() + " reporte" + (visible.size() == 1 ? "" : "s");
-        lblResultCount.setText(countText);
+        List<HBox> rows = new ArrayList<>();
+        for (ReportDTO report : visible)
+            rows.add(buildSavedReportRow(report));
 
-        for (ReportDTO report : visible) {
-            HBox row = buildSavedReportRow(report);
-            savedReportsList.getChildren().add(row);
-        }
+        savedReportsList.getChildren().clear();
+        savedReportsList.getChildren().addAll(rows);
     }
 
     private HBox buildSavedReportRow(ReportDTO report) {
@@ -408,16 +418,16 @@ public class ReportsController {
     // ═════════════════════════════════════════════════════════════════════════
 
     private void loadScheduledReports(List<ScheduledReportDTO> schedules) {
-        scheduleCardsList.getChildren().clear();
-
         boolean isEmpty = schedules.isEmpty();
         scheduleEmptyState.setVisible(isEmpty);
         scheduleEmptyState.setManaged(isEmpty);
 
-        for (ScheduledReportDTO schedule : schedules) {
-            HBox card = buildScheduleCard(schedule);
-            scheduleCardsList.getChildren().add(card);
-        }
+        List<HBox> cards = new ArrayList<>();
+        for (ScheduledReportDTO schedule : schedules)
+            cards.add(buildScheduleCard(schedule));
+
+        scheduleCardsList.getChildren().clear();
+        scheduleCardsList.getChildren().addAll(cards);
     }
 
     private HBox buildScheduleCard(ScheduledReportDTO schedule) {
@@ -434,7 +444,7 @@ public class ReportsController {
         });
 
         // ── Icono del tipo ────────────────────────────────────────────────────
-        ReportTypeDTO type = getMockReportTypes().stream()
+        ReportTypeDTO type = cachedReportTypes.stream()
                 .filter(t -> t.id().equals(schedule.reportTypeId()))
                 .findFirst().orElse(null);
         ImageView typeIcon = loadIcon(
@@ -531,16 +541,16 @@ public class ReportsController {
     // ═════════════════════════════════════════════════════════════════════════
 
     private void loadExecutionHistory(List<ExecutionLogDTO> logs) {
-        executionHistoryList.getChildren().clear();
-
         boolean isEmpty = logs.isEmpty();
         historyEmptyState.setVisible(isEmpty);
         historyEmptyState.setManaged(isEmpty);
 
-        for (ExecutionLogDTO log : logs) {
-            HBox row = buildHistoryRow(log);
-            executionHistoryList.getChildren().add(row);
-        }
+        List<HBox> rows = new ArrayList<>();
+        for (ExecutionLogDTO log : logs)
+            rows.add(buildHistoryRow(log));
+
+        executionHistoryList.getChildren().clear();
+        executionHistoryList.getChildren().addAll(rows);
     }
 
     private HBox buildHistoryRow(ExecutionLogDTO log) {
@@ -681,7 +691,9 @@ public class ReportsController {
     @FXML private void onTabSchedule() { switchTab(2); }
 
     private void switchTab(int index) {
+        if (index == activeTabIndex) return;
         activeTabIndex = index;
+
         for (int i = 0; i < allTabs.size(); i++) {
             boolean active = (i == index);
             allTabs.get(i).getStyleClass().removeAll("tab-active");

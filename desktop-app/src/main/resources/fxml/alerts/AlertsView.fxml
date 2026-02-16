@@ -1,14 +1,349 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
-<?import javafx.scene.layout.BorderPane?>
-<?import javafx.scene.control.Label?>
-<BorderPane xmlns:fx="http://javafx.com/fxml"
-            fx:controller="com.app.ui.alerts.AlertsController"
-            stylesheets="@/styles/dashboard.css"
-            styleClass="dashboard-root">
+<?import javafx.scene.canvas.Canvas?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.image.*?>
+<?import javafx.scene.layout.*?>
+<?import javafx.scene.shape.Circle?>
 
-    <center>
-        <Label text="Bienvenido al módulo de Alertas"/>
-    </center>
+<?import com.app.ui.components.AnimatedToggleSwitch?>
+<VBox xmlns:fx="http://javafx.com/fxml"
+      fx:controller="com.app.ui.alerts.AlertsController"
+      stylesheets="@/styles/alerts_section.css"
+      styleClass="alrt-root"
+      spacing="0">
 
-</BorderPane>
+    <!-- ═══════════════════════════════════════════════════════════
+         TAB BAR
+    ═══════════════════════════════════════════════════════════ -->
+    <HBox styleClass="alrt-tab-bar" spacing="0">
+        <Button fx:id="tabActiveAlert"
+                styleClass="alrt-tab-btn, alrt-tab-active"
+                onAction="#onTabActiveAlert"/>
+        <Button fx:id="tabHistory"
+                styleClass="alrt-tab-btn"
+                onAction="#onTabHistory"/>
+        <Button fx:id="tabConfiguration"
+                styleClass="alrt-tab-btn"
+                onAction="#onTabConfiguration"/>
+    </HBox>
+
+    <!-- ═══════════════════════════════════════════════════════════
+         SECCIÓN 0: ALERTAS ACTIVAS
+    ═══════════════════════════════════════════════════════════ -->
+    <ScrollPane fx:id="sectionActiveAlerts" fitToWidth="true"
+                styleClass="alrt-scroll" VBox.vgrow="ALWAYS">
+        <VBox styleClass="alrt-container" spacing="20">
+            <HBox spacing="16" VBox.vgrow="ALWAYS">
+
+                <!-- ── Columna principal ────────────────────────────────── -->
+                <VBox spacing="14" HBox.hgrow="ALWAYS">
+
+                    <!-- Barra de herramientas: buscador + botones -->
+                    <HBox styleClass="alrt-toolbar" spacing="10" alignment="CENTER_LEFT">
+                        <TextField fx:id="txtActiveSearch"
+                                   styleClass="alrt-search-input"
+                                   HBox.hgrow="ALWAYS"/>
+                        <Button fx:id="btnMarkAllRead"
+                                styleClass="btn-alrt-secondary"
+                                onAction="#onMarkAllRead"/>
+                        <!-- Botón exportar con ícono -->
+                        <Button fx:id="btnExportActive"
+                                styleClass="btn-alrt-secondary"
+                                onAction="#onExportActive"
+                                contentDisplay="LEFT" graphicTextGap="6">
+                            <graphic>
+                                <StackPane>
+                                    <ImageView fitWidth="18" fitHeight="18" preserveRatio="true" smooth="true">
+                                        <Image url="@/images/reports/icon-download.png"/>
+                                    </ImageView>
+                                </StackPane>
+                            </graphic>
+                        </Button>
+                    </HBox>
+
+                    <!-- Lista de alertas -->
+                    <VBox fx:id="activeAlertsList" spacing="10"/>
+
+                    <!-- Estado vacío -->
+                    <VBox fx:id="activeEmptyState"
+                          styleClass="alrt-empty-state"
+                          alignment="CENTER" spacing="10"
+                          visible="false" managed="false">
+                        <Label text="🔔" styleClass="alrt-empty-icon"/>
+                        <Label fx:id="lblActiveEmpty" styleClass="alrt-empty-text"/>
+                    </VBox>
+
+                </VBox>
+
+                <!-- ── Sidebar derecho ──────────────────────────────────── -->
+                <VBox spacing="14" styleClass="alrt-sidebar" prefWidth="250">
+
+                    <!-- Card: Resumen de alertas -->
+                    <VBox styleClass="alrt-sidebar-card" spacing="12">
+                        <Label text="Resumen de alertas" styleClass="alrt-card-title"/>
+
+                        <!-- KPIs 2x2 -->
+                        <GridPane styleClass="alrt-kpi-grid" hgap="8" vgap="8">
+                            <VBox styleClass="alrt-kpi-cell" alignment="CENTER" spacing="3"
+                                  GridPane.columnIndex="0" GridPane.rowIndex="0">
+                                <Label fx:id="lblKpiActive" text="—" styleClass="alrt-kpi-value"/>
+                                <Label text="Activas" styleClass="alrt-kpi-label"/>
+                            </VBox>
+                            <VBox styleClass="alrt-kpi-cell" alignment="CENTER" spacing="3"
+                                  GridPane.columnIndex="1" GridPane.rowIndex="0">
+                                <Label fx:id="lblKpiAttended" text="—" styleClass="alrt-kpi-value"/>
+                                <Label text="Atendidas hoy" styleClass="alrt-kpi-label"/>
+                            </VBox>
+                            <VBox styleClass="alrt-kpi-cell" alignment="CENTER" spacing="3"
+                                  GridPane.columnIndex="0" GridPane.rowIndex="1">
+                                <Label fx:id="lblKpiResolved" text="—" styleClass="alrt-kpi-value"/>
+                                <Label text="Resueltas" styleClass="alrt-kpi-label"/>
+                            </VBox>
+                            <VBox styleClass="alrt-kpi-cell" alignment="CENTER" spacing="3"
+                                  GridPane.columnIndex="1" GridPane.rowIndex="1">
+                                <Label fx:id="lblKpiPending" text="—" styleClass="alrt-kpi-value"/>
+                                <Label text="Sin leer" styleClass="alrt-kpi-label"/>
+                            </VBox>
+                            <columnConstraints>
+                                <ColumnConstraints percentWidth="50"/>
+                                <ColumnConstraints percentWidth="50"/>
+                            </columnConstraints>
+                        </GridPane>
+
+                        <!-- Donut chart criticidad -->
+                        <Canvas fx:id="canvasDonut" width="230" height="290"/>
+                    </VBox>
+
+                    <!-- Card: Distribución por tipo -->
+                    <VBox styleClass="alrt-sidebar-card" spacing="12">
+                        <Label text="Por tipo" styleClass="alrt-card-title"/>
+                        <VBox fx:id="barChartContainer" spacing="10"/>
+                    </VBox>
+
+                    <!-- Card: Acciones rápidas -->
+                    <VBox styleClass="alrt-sidebar-card" spacing="10">
+                        <Label text="Acciones rápidas" styleClass="alrt-card-title"/>
+                        <VBox fx:id="quickActionsBox" spacing="8"/>
+                    </VBox>
+
+                </VBox>
+            </HBox>
+        </VBox>
+    </ScrollPane>
+
+    <!-- ═══════════════════════════════════════════════════════════
+         SECCIÓN 1: HISTORIAL DE ALERTAS
+    ═══════════════════════════════════════════════════════════ -->
+    <ScrollPane fx:id="sectionHistory" fitToWidth="true"
+                styleClass="alrt-scroll" VBox.vgrow="ALWAYS"
+                visible="false" managed="false">
+        <VBox styleClass="alrt-container" spacing="20">
+            <HBox spacing="16" VBox.vgrow="ALWAYS">
+
+                <!-- ── Columna principal ────────────────────────────────── -->
+                <VBox spacing="14" HBox.hgrow="ALWAYS">
+
+                    <HBox styleClass="alrt-toolbar" spacing="10" alignment="CENTER_LEFT">
+                        <TextField fx:id="txtHistorySearch"
+                                   styleClass="alrt-search-input"
+                                   HBox.hgrow="ALWAYS"/>
+                        <Button fx:id="btnExportHistory"
+                                styleClass="btn-alrt-secondary"
+                                onAction="#onExportHistory"
+                                contentDisplay="LEFT" graphicTextGap="6">
+                            <graphic>
+                                <ImageView fitWidth="18" fitHeight="18" preserveRatio="true">
+                                    <Image url="@/images/reports/icon-download.png"/>
+                                </ImageView>
+                            </graphic>
+                        </Button>
+                    </HBox>
+
+                    <VBox fx:id="historyAlertsList" spacing="10"/>
+
+                    <VBox fx:id="historyEmptyState"
+                          styleClass="alrt-empty-state"
+                          alignment="CENTER" spacing="10"
+                          visible="false" managed="false">
+                        <Label text="⁉" styleClass="alrt-empty-icon"/>
+                        <Label fx:id="lblHistoryEmpty" styleClass="alrt-empty-text"/>
+                    </VBox>
+
+                </VBox>
+
+                <!-- ── Sidebar — mismo layout, distintos fx:id ─────────── -->
+                <VBox spacing="14" styleClass="alrt-sidebar" prefWidth="250">
+
+                    <VBox styleClass="alrt-sidebar-card" spacing="12">
+                        <Label text="Resumen histórico" styleClass="alrt-card-title"/>
+
+                        <GridPane styleClass="alrt-kpi-grid" hgap="8" vgap="8">
+                            <VBox styleClass="alrt-kpi-cell" alignment="CENTER" spacing="3"
+                                  GridPane.columnIndex="0" GridPane.rowIndex="0">
+                                <Label fx:id="lblHistKpiActive" text="—" styleClass="alrt-kpi-value"/>
+                                <Label text="Total" styleClass="alrt-kpi-label"/>
+                            </VBox>
+                            <VBox styleClass="alrt-kpi-cell" alignment="CENTER" spacing="3"
+                                  GridPane.columnIndex="1" GridPane.rowIndex="0">
+                                <Label fx:id="lblHistKpiAttended" text="—" styleClass="alrt-kpi-value"/>
+                                <Label text="Leídas" styleClass="alrt-kpi-label"/>
+                            </VBox>
+                            <VBox styleClass="alrt-kpi-cell" alignment="CENTER" spacing="3"
+                                  GridPane.columnIndex="0" GridPane.rowIndex="1">
+                                <Label fx:id="lblHistKpiResolved" text="—" styleClass="alrt-kpi-value"/>
+                                <Label text="Resueltas" styleClass="alrt-kpi-label"/>
+                            </VBox>
+                            <VBox styleClass="alrt-kpi-cell" alignment="CENTER" spacing="3"
+                                  GridPane.columnIndex="1" GridPane.rowIndex="1">
+                                <Label fx:id="lblHistKpiPending" text="—" styleClass="alrt-kpi-value"/>
+                                <Label text="Sin leer" styleClass="alrt-kpi-label"/>
+                            </VBox>
+                            <columnConstraints>
+                                <ColumnConstraints percentWidth="50"/>
+                                <ColumnConstraints percentWidth="50"/>
+                            </columnConstraints>
+                        </GridPane>
+
+                        <Canvas fx:id="canvasDonutHist" width="230" height="290"/>
+                    </VBox>
+
+                    <VBox styleClass="alrt-sidebar-card" spacing="12">
+                        <Label text="Por tipo" styleClass="alrt-card-title"/>
+                        <VBox fx:id="barChartContainerHist" spacing="10"/>
+                    </VBox>
+
+                </VBox>
+            </HBox>
+        </VBox>
+    </ScrollPane>
+
+    <!-- ═══════════════════════════════════════════════════════════
+         SECCIÓN 2: CONFIGURACIÓN DE ALERTAS
+    ═══════════════════════════════════════════════════════════ -->
+    <ScrollPane fx:id="sectionConfiguration" fitToWidth="true"
+                styleClass="alrt-scroll" VBox.vgrow="ALWAYS"
+                visible="false" managed="false">
+        <VBox styleClass="alrt-container" spacing="20">
+            <HBox spacing="20">
+
+                <!-- ── Columna izquierda: Umbrales ──────────────────────── -->
+                <VBox spacing="16" HBox.hgrow="ALWAYS">
+
+                    <!-- Card: Parámetros generales -->
+                    <VBox styleClass="alrt-config-card" spacing="14">
+                        <Label text="Parámetros generales" styleClass="alrt-card-title"/>
+
+                        <HBox spacing="16">
+                            <VBox spacing="6" HBox.hgrow="ALWAYS">
+                                <Label text="Caída de ventas (%)" styleClass="alrt-form-label"/>
+                                <TextField fx:id="txtThresholdSalesDrop"
+                                           styleClass="alrt-form-input" promptText="15"/>
+                                <Label text="Genera alerta cuando las ventas caigan más de este porcentaje."
+                                       styleClass="alrt-form-hint"/>
+                            </VBox>
+                            <VBox spacing="6" HBox.hgrow="ALWAYS">
+                                <Label text="Anomalías detectadas (%)" styleClass="alrt-form-label"/>
+                                <TextField fx:id="txtThresholdAnomaly"
+                                           styleClass="alrt-form-input" promptText="5"/>
+                                <Label text="Porcentaje de registros atípicos que activa la alerta."
+                                       styleClass="alrt-form-hint"/>
+                            </VBox>
+                        </HBox>
+
+                        <HBox spacing="16">
+                            <VBox spacing="6" HBox.hgrow="ALWAYS">
+                                <Label text="Máx. alertas simultáneas" styleClass="alrt-form-label"/>
+                                <TextField fx:id="txtMaxAlerts"
+                                           styleClass="alrt-form-input" promptText="10"/>
+                                <Label text="Límite máximo de alertas activas (RN-04.05)."
+                                       styleClass="alrt-form-hint"/>
+                            </VBox>
+                            <VBox spacing="6" HBox.hgrow="ALWAYS">
+                                <Label text="Nivel de confianza mínimo" styleClass="alrt-form-label"/>
+                                <ComboBox fx:id="cmbConfidenceLevel"
+                                          styleClass="alrt-form-combo" maxWidth="Infinity"/>
+                                <Label text="Por debajo de este nivel, la alerta no se genera (RN-04.04)."
+                                       styleClass="alrt-form-hint"/>
+                            </VBox>
+                        </HBox>
+                    </VBox>
+
+                    <!-- Card: Reglas de umbral -->
+                    <VBox styleClass="alrt-config-card" spacing="14">
+                        <HBox alignment="CENTER_LEFT" HBox.hgrow="ALWAYS">
+                            <Label text="Reglas de umbral" styleClass="alrt-card-title"/>
+
+                            <Region HBox.hgrow="ALWAYS" />
+
+                            <Button text="+ Agregar regla"
+                                    styleClass="btn-alrt-secondary"
+                                    onAction="#onAddRule"/>
+                        </HBox>
+                        <VBox fx:id="thresholdRulesList" spacing="8"/>
+                    </VBox>
+
+                    <!-- Botones guardar / restablecer -->
+                    <HBox spacing="12" alignment="CENTER_RIGHT">
+                        <Button fx:id="btnResetConfig"
+                                text="Restablecer valores"
+                                styleClass="btn-alrt-secondary"
+                                onAction="#onResetConfig"/>
+                        <Button fx:id="btnSaveConfig"
+                                text="Guardar configuración"
+                                styleClass="btn-alrt-primary"
+                                onAction="#onSaveConfig"/>
+                    </HBox>
+
+                </VBox>
+
+                <!-- ── Columna derecha: Notificaciones y estado ─────────── -->
+                <VBox spacing="14" prefWidth="240">
+
+                    <!-- Card: Notificaciones -->
+                    <VBox styleClass="alrt-config-card" spacing="14">
+                        <Label text="Notificaciones" styleClass="alrt-card-title"/>
+
+                        <HBox alignment="CENTER_LEFT" spacing="12">
+                            <VBox HBox.hgrow="ALWAYS" spacing="3">
+                                <Label text="Correo electrónico" styleClass="alrt-form-label"/>
+                                <Label text="Enviar alerta al email del usuario."
+                                       styleClass="alrt-form-hint"/>
+                            </VBox>
+                            <AnimatedToggleSwitch  fx:id="tglEmailNotif"/>
+                        </HBox>
+
+                        <HBox alignment="CENTER_LEFT" spacing="12">
+                            <VBox HBox.hgrow="ALWAYS" spacing="3">
+                                <Label text="Dashboard" styleClass="alrt-form-label"/>
+                                <Label text="Mostrar alertas en el panel principal."
+                                       styleClass="alrt-form-hint"/>
+                            </VBox>
+                            <AnimatedToggleSwitch fx:id="tglDashNotif"/>
+                        </HBox>
+                    </VBox>
+
+                    <!-- Card: Estado del sistema -->
+                    <VBox styleClass="alrt-config-card" spacing="14">
+                        <Label text="Sistema de alertas" styleClass="alrt-card-title"/>
+
+                        <HBox alignment="CENTER_LEFT" spacing="12">
+                            <VBox HBox.hgrow="ALWAYS" spacing="3">
+                                <Label text="Alertas activas" styleClass="alrt-form-label"/>
+                                <Label text="Activar o pausar la generación de alertas."
+                                       styleClass="alrt-form-hint"/>
+                            </VBox>
+                            <AnimatedToggleSwitch  fx:id="tglAlertsActive"/>
+                        </HBox>
+
+                        <Label text="🛑  Al desactivar, el sistema deja de evaluar umbrales hasta reactivarse."
+                               styleClass="alrt-config-info"
+                               wrapText="true"/>
+                    </VBox>
+
+                </VBox>
+            </HBox>
+        </VBox>
+    </ScrollPane>
+
+</VBox>

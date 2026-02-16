@@ -10,6 +10,21 @@
             stylesheets="@/styles/reports.css"
             styleClass="reports-root">
 
+    <!-- Tab bar -->
+    <top>
+        <HBox styleClass="tab-container" spacing="0">
+            <Button fx:id="tabGenerate"
+                    styleClass="tab-btn, tab-active"
+                    onAction="#onTabGenerate"/>
+            <Button fx:id="tabSaved"
+                    styleClass="tab-btn"
+                    onAction="#onTabSaved"/>
+            <Button fx:id="tabSchedule"
+                    styleClass="tab-btn"
+                    onAction="#onTabSchedule"/>
+        </HBox>
+    </top>
+
     <center>
         <ScrollPane fitToWidth="true" styleClass="main-scroll">
             <VBox spacing="20" styleClass="reports-container">
@@ -18,21 +33,6 @@
                 <!--  CARD PRINCIPAL con tabs                        -->
                 <!-- ═══════════════════════════════════════════════ -->
                 <VBox styleClass="report-card" VBox.vgrow="ALWAYS" spacing="0">
-
-                    <!-- Tab bar -->
-                    <HBox styleClass="tab-container" spacing="0">
-                        <Button fx:id="tabGenerate"
-                                styleClass="tab-btn, tab-active"
-                                onAction="#onTabGenerate"/>
-                        <Button fx:id="tabSaved"
-                                styleClass="tab-btn"
-                                onAction="#onTabSaved"/>
-                        <Button fx:id="tabSchedule"
-                                styleClass="tab-btn"
-                                onAction="#onTabSchedule"/>
-                    </HBox>
-
-                    <Separator styleClass="tab-separator"/>
 
                     <!-- ─────────────────────────────────────────── -->
                     <!--  SECCIÓN 0: Generar Reporte                 -->
@@ -178,9 +178,12 @@
                           visible="false" managed="false">
 
                         <!-- Header con botón nueva programación -->
-                        <HBox alignment="CENTER_LEFT" spacing="12">
+                        <HBox alignment="CENTER_LEFT" spacing="12" HBox.hgrow="ALWAYS">
                             <Label fx:id="lblScheduleTitle" styleClass="panel-title"
                                    HBox.hgrow="ALWAYS"/>
+
+                            <Region HBox.hgrow="ALWAYS" />
+
                             <Button fx:id="btnNewSchedule"
                                     styleClass="btn-primary-report"
                                     onAction="#onNewSchedule"/>
