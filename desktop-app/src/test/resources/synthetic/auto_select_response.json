@@ -1,0 +1,18 @@
+{
+  "success": true,
+  "best_model": {
+    "model_type": "sarima",
+    "model_key": "sarima_20230101_20241231",
+    "r2": 0.95,
+    "mae": 320.15,
+    "rmse": 480.20
+  },
+  "meets_r2_threshold": true,
+  "all_models": {
+    "linear": {"r2": 0.78, "mae": 1200.50, "rmse": 1580.30},
+    "arima": {"r2": 0.82, "mae": 850.70, "rmse": 1120.45},
+    "sarima": {"r2": 0.95, "mae": 320.15, "rmse": 480.20},
+    "random_forest": {"r2": 0.89, "mae": 520.80, "rmse": 690.35}
+  },
+  "recommendation": "SARIMA es el mejor modelo para estos datos con R2 = 0.95. Captura bien los patrones estacionales."
+}

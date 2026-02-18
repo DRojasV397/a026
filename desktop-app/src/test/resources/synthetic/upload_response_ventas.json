@@ -1,0 +1,15 @@
+{
+  "upload_id": "synth-ventas-365",
+  "filename": "ventas_2024_sintetico.csv",
+  "file_type": "csv",
+  "total_rows": 365,
+  "status": "uploaded",
+  "message": "Archivo cargado exitosamente. 365 filas detectadas.",
+  "column_info": {
+    "fecha": {"type": "date", "nullable": false, "unique_count": 365},
+    "producto": {"type": "string", "nullable": false, "unique_count": 6},
+    "precio": {"type": "numeric", "nullable": false, "min": 500, "max": 3500},
+    "cantidad": {"type": "integer", "nullable": false, "min": 1, "max": 50},
+    "total": {"type": "numeric", "nullable": false, "min": 500, "max": 175000}
+  }
+}

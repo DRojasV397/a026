@@ -1,0 +1,53 @@
+{
+  "upload_id": "synth-ventas-365",
+  "overall_score": 94.2,
+  "total_rows": 365,
+  "valid_rows": 358,
+  "metrics": [
+    {
+      "column": "fecha",
+      "completeness": 100.0,
+      "uniqueness": 100.0,
+      "validity": 100.0,
+      "outliers_count": 0
+    },
+    {
+      "column": "producto",
+      "completeness": 100.0,
+      "uniqueness": 1.6,
+      "validity": 100.0,
+      "outliers_count": 0
+    },
+    {
+      "column": "precio",
+      "completeness": 99.7,
+      "uniqueness": 78.4,
+      "validity": 98.6,
+      "outliers_count": 3
+    },
+    {
+      "column": "cantidad",
+      "completeness": 100.0,
+      "uniqueness": 13.7,
+      "validity": 100.0,
+      "outliers_count": 1
+    },
+    {
+      "column": "total",
+      "completeness": 99.5,
+      "uniqueness": 89.3,
+      "validity": 97.8,
+      "outliers_count": 4
+    }
+  ],
+  "issues": [
+    "3 outliers detectados en columna precio (z-score > 3.0)",
+    "4 outliers detectados en columna total",
+    "2 registros con precio nulo"
+  ],
+  "recommendations": [
+    "Revisar valores atipicos en precio",
+    "Verificar registros con total excesivamente alto",
+    "Completar valores nulos en precio"
+  ]
+}

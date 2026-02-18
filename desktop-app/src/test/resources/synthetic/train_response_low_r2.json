@@ -1,0 +1,19 @@
+{
+  "success": true,
+  "model_id": 2,
+  "model_key": "arima_20240601_20241231",
+  "model_type": "arima",
+  "metrics": {
+    "r2": 0.42,
+    "mae": 2500.00,
+    "rmse": 3100.50
+  },
+  "meets_r2_threshold": false,
+  "recommendation": "R2 bajo (0.42). Considere usar mas datos historicos o un modelo diferente como SARIMA o Random Forest",
+  "training_samples": 150,
+  "test_samples": 65,
+  "issues": [
+    "R2 = 0.42 esta por debajo del umbral de 0.7",
+    "MAE alto indica predicciones imprecisas"
+  ]
+}

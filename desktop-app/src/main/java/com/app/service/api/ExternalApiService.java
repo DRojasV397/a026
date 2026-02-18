@@ -14,7 +14,6 @@ import java.net.http.HttpResponse;
 import java.time.Duration;
 
 public class ExternalApiService {
-
     private static final Logger logger = LoggerFactory.getLogger(ExternalApiService.class);
     private static final Gson gson = new Gson();
 

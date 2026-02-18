@@ -3,8 +3,10 @@ package com.app.ui.profile;
 import com.app.core.navigation.SceneManager;
 import com.app.core.session.UserSession;
 import com.app.model.UserDTO;
+import com.app.service.profile.ProfileApiService;
 import com.app.service.storage.AvatarStorageService;
 import com.app.ui.components.AnimatedToggleSwitch;
+import javafx.application.Platform;
 import javafx.fxml.FXML;
 import javafx.scene.control.*;
 import javafx.scene.image.Image;
@@ -15,7 +17,9 @@ import javafx.stage.FileChooser;
 import javafx.stage.Stage;
 
 import java.io.File;
-import java.io.FileInputStream;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Objects;
 
@@ -103,6 +107,10 @@ public class ProfileController {
     /** Snapshot de valores al entrar en modo edición, para detectar cambios */
     private String snapFullName, snapUsername, snapDepartment, snapEmail, snapPhone;
 
+    private final ProfileApiService profileApiService = new ProfileApiService();
+    /** Email original del usuario cargado desde el backend, para detectar cambios reales */
+    private String originalEmail;
+
     // Clave → nombre legible para el log / futura llamada a BD
     private enum ConfigKey {
         THEME, DATE_RANGE, PREDICTIONS_PANEL,
@@ -120,13 +128,13 @@ public class ProfileController {
         loadDefaultAvatar();
         populateCombos();
         createToggles();
-        displayUser(getMockUserInfo());
+
+        // Cargar datos reales del usuario desde UserSession + backend
+        loadUserProfile();
 
         configLoaded = false;
         applyMockConfig(getMockConfig());
         configLoaded = true;
-
-        applyMockConfig(getMockConfig());
     }
 
     private void createToggles() {
@@ -194,6 +202,82 @@ public class ProfileController {
             }
         } catch (Exception e) {
             System.err.println("No se pudo cargar el avatar por defecto: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Carga el perfil del usuario desde UserSession (datos de login)
+     * y complementa con GET /usuarios/{id} para obtener creadoEn.
+     */
+    private void loadUserProfile() {
+        // Datos inmediatos desde la sesión
+        String fullName = UserSession.getNombreCompleto();
+        String username = UserSession.getUser();
+        String email = UserSession.getEmail();
+        String role = UserSession.getRole();
+        originalEmail = email;
+
+        // Mostrar datos de sesión inmediatamente
+        UserDTO sessionUser = new UserDTO(
+                fullName != null ? fullName : "Usuario",
+                username != null ? username : "",
+                role != null ? role : "Usuario",
+                role != null ? role : "Usuario",
+                "",    // department - no disponible en backend
+                email != null ? email : "",
+                true,
+                "",    // phone - no disponible en backend
+                null,
+                LocalDate.now(), // placeholder hasta que llegue creadoEn del backend
+                LocalDateTime.now(),
+                new UserDTO.UserStats(0, 0, 0)
+        );
+        displayUser(sessionUser);
+
+        // Complementar con datos del backend (creadoEn, estado)
+        int userId = UserSession.getUserId();
+        if (userId > 0) {
+            profileApiService.getUserById(userId)
+                    .thenAccept(profileResponse -> Platform.runLater(() -> {
+                        if (profileResponse != null) {
+                            // Actualizar creadoEn si está disponible
+                            if (profileResponse.creadoEn != null && !profileResponse.creadoEn.isBlank()) {
+                                try {
+                                    LocalDateTime createdAt = LocalDateTime.parse(
+                                            profileResponse.creadoEn,
+                                            DateTimeFormatter.ISO_DATE_TIME);
+                                    lblMemberSince.setText("Miembro desde " +
+                                            createdAt.format(DateTimeFormatter.ofPattern("MMM yyyy",
+                                                    new java.util.Locale("es", "MX"))));
+                                } catch (Exception e) {
+                                    // Intentar solo fecha
+                                    try {
+                                        LocalDate createdDate = LocalDate.parse(
+                                                profileResponse.creadoEn.substring(0, 10));
+                                        lblMemberSince.setText("Miembro desde " +
+                                                createdDate.format(DateTimeFormatter.ofPattern("MMM yyyy",
+                                                        new java.util.Locale("es", "MX"))));
+                                    } catch (Exception ignored) {
+                                        // Mantener placeholder
+                                    }
+                                }
+                            }
+
+                            // Sincronizar campos que el backend pueda tener más actualizados
+                            if (profileResponse.nombreCompleto != null) {
+                                txtFullName.setText(profileResponse.nombreCompleto);
+                                lblHeaderName.setText(profileResponse.nombreCompleto);
+                            }
+                            if (profileResponse.email != null) {
+                                txtEmail.setText(profileResponse.email);
+                                lblHeaderEmail.setText(profileResponse.email);
+                                originalEmail = profileResponse.email;
+                            }
+                            if (profileResponse.nombreUsuario != null) {
+                                txtUsername.setText(profileResponse.nombreUsuario);
+                            }
+                        }
+                    }));
         }
     }
 
@@ -337,8 +421,8 @@ public class ProfileController {
         // Listener: si el email cambia, marcar como no verificado
         txtEmail.textProperty().addListener((obs, oldVal, newVal) -> {
             if (editMode) {
-                boolean sameAsOriginal = newVal.equals(snapEmail);
-                updateVerifiedBadge(sameAsOriginal && getMockUserInfo().isVerified());
+                boolean sameAsOriginal = newVal.equals(originalEmail);
+                updateVerifiedBadge(sameAsOriginal);
             }
         });
 
@@ -364,18 +448,49 @@ public class ProfileController {
 
     @FXML
     private void onSaveChanges() {
-        // TODO: persistir cambios en BD
-        // userService.update(buildUpdatedUser());
+        String newFullName = txtFullName.getText().trim();
+        String newEmail = txtEmail.getText().trim();
 
-        // Actualizar cabecera con los nuevos datos
-        lblHeaderName.setText(txtFullName.getText());
-        lblHeaderEmail.setText(txtEmail.getText());
+        if (newFullName.isBlank()) {
+            showError("El nombre completo no puede estar vacío.");
+            return;
+        }
+        if (newEmail.isBlank()) {
+            showError("El email no puede estar vacío.");
+            return;
+        }
 
-        // ── Propagar nombre a navbar y sidebar ────────────────────────────────
-        UserSession.setDisplayName(txtUsername.getText());
+        // Deshabilitar botones mientras se guarda
+        btnEditProfile.setDisable(true);
 
-        exitEditMode(false);
-        showInfo("Cambios guardados", "Tu perfil ha sido actualizado correctamente.");
+        int userId = UserSession.getUserId();
+        profileApiService.updateProfile(userId, newFullName, newEmail)
+                .thenAccept(response -> Platform.runLater(() -> {
+                    if (response != null) {
+                        // Actualizar cabecera con los datos confirmados del backend
+                        lblHeaderName.setText(response.nombreCompleto != null
+                                ? response.nombreCompleto : newFullName);
+                        lblHeaderEmail.setText(response.email != null
+                                ? response.email : newEmail);
+
+                        // Actualizar UserSession con los nuevos datos
+                        UserSession.setDisplayName(txtUsername.getText());
+                        originalEmail = response.email != null ? response.email : newEmail;
+
+                        exitEditMode(false);
+                        showInfo("Cambios guardados", "Tu perfil ha sido actualizado correctamente.");
+                    } else {
+                        showError("No se pudieron guardar los cambios. Verifica tu conexión e intenta de nuevo.");
+                        btnEditProfile.setDisable(false);
+                    }
+                }))
+                .exceptionally(ex -> {
+                    Platform.runLater(() -> {
+                        showError("Error de conexión: " + ex.getMessage());
+                        btnEditProfile.setDisable(false);
+                    });
+                    return null;
+                });
     }
 
     @FXML
@@ -409,17 +524,16 @@ public class ProfileController {
 
     private void setFieldsEditable(boolean editable) {
         txtFullName.setEditable(editable);
-        txtUsername.setEditable(editable);
+        txtUsername.setEditable(false); // username no se puede cambiar via PUT /usuarios
         // txtRole: NUNCA editable
-        txtDepartment.setEditable(editable);
+        txtDepartment.setEditable(false); // no soportado por el backend
         txtEmail.setEditable(editable);
-        txtPhone.setEditable(editable);
+        txtPhone.setEditable(false); // no soportado por el backend
     }
 
     private void applyEditStyle(boolean editing) {
-        List<TextField> editableFields = List.of(
-                txtFullName, txtUsername, txtDepartment, txtEmail, txtPhone
-        );
+        // Campos editables por el backend (nombreCompleto, email)
+        List<TextField> editableFields = List.of(txtFullName, txtEmail);
         for (TextField field : editableFields) {
             if (editing) {
                 field.getStyleClass().removeAll("input-view");
@@ -429,6 +543,7 @@ public class ProfileController {
                 field.getStyleClass().add("input-view");
             }
         }
+        // Campos no editables mantienen su estilo de solo lectura
     }
 
     // ═════════════════════════════════════════════════════════════════════════
@@ -517,10 +632,7 @@ public class ProfileController {
 
     private boolean hasUnsavedChanges() {
         return !txtFullName.getText().equals(snapFullName)
-                || !txtUsername.getText().equals(snapUsername)
-                || !txtDepartment.getText().equals(snapDepartment)
-                || !txtEmail.getText().equals(snapEmail)
-                || !txtPhone.getText().equals(snapPhone);
+                || !txtEmail.getText().equals(snapEmail);
     }
 
     // ═════════════════════════════════════════════════════════════════════════
@@ -663,11 +775,30 @@ public class ProfileController {
             return;
         }
 
-        // TODO: authService.changePassword(UserSession.getUserId(), current, newPwd);
-        System.out.println("[AUTH] Solicitud de cambio de contraseña enviada.");
+        // Deshabilitar botones mientras se procesa
+        btnChangePassword.setDisable(true);
 
-        cancelPasswordEdit();
-        showInfo("Contraseña actualizada", "Tu contraseña ha sido cambiada correctamente.");
+        profileApiService.changePassword(current, newPwd, confirm)
+                .thenAccept(response -> Platform.runLater(() -> {
+                    if (response != null && response.success) {
+                        cancelPasswordEdit();
+                        showInfo("Contraseña actualizada",
+                                "Tu contraseña ha sido cambiada correctamente.");
+                    } else {
+                        String errorMsg = response != null && response.message != null
+                                ? response.message
+                                : "No se pudo cambiar la contraseña.";
+                        showError(errorMsg);
+                        btnChangePassword.setDisable(false);
+                    }
+                }))
+                .exceptionally(ex -> {
+                    Platform.runLater(() -> {
+                        showError("Error de conexión: " + ex.getMessage());
+                        btnChangePassword.setDisable(false);
+                    });
+                    return null;
+                });
     }
 
     @FXML

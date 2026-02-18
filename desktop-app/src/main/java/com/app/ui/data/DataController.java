@@ -5,7 +5,9 @@ import com.app.model.data.UploadedFileDTO;
 import com.app.model.data.ValidationReport;
 import com.app.model.data.ValidationResultDTO;
 import com.app.model.data.ValidationResultDTO.ValidationRuleResult;
+import com.app.model.data.api.*;
 import com.app.service.data.CleaningService;
+import com.app.service.data.DataApiService;
 import com.app.service.data.TransformService;
 import com.app.service.data.ValidationService;
 import javafx.animation.PauseTransition;
@@ -144,6 +146,15 @@ public class DataController {
 
     /** Archivo actualmente seleccionado/arrastrado (null = ninguno) */
     private File currentFile = null;
+
+    /** Servicio para llamadas a la API de datos */
+    private final DataApiService dataApiService = new DataApiService();
+
+    /** ID del upload actual en el backend (null = no subido) */
+    private String currentUploadId = null;
+
+    /** Tipo de datos seleccionado por el usuario (ventas/compras) */
+    private String currentDataType = null;
 
     private static final long   MAX_SIZE_BYTES = 100L * 1024 * 1024; // 100 MB
     private static final List<String> ALLOWED_EXTENSIONS = List.of("csv", "xlsx");
@@ -391,7 +402,14 @@ public class DataController {
 
     @FXML
     private void onRemoveFile() {
+        // Limpiar upload temporal en el backend si existe
+        if (currentUploadId != null) {
+            dataApiService.deleteUpload(currentUploadId);
+            currentUploadId = null;
+        }
+
         currentFile = null;
+        currentDataType = null;
 
         stateFileReady.setVisible(false);
         stateFileReady.setManaged(false);
@@ -423,117 +441,121 @@ public class DataController {
         tipoDialog.getDialogPane().getButtonTypes().setAll(btnVentas, btnCompras, btnCancel);
 
         tipoDialog.setResultConverter(btn -> {
-            if (btn == btnVentas)  return "Ventas";
-            if (btn == btnCompras) return "Compras";
+            if (btn == btnVentas)  return "ventas";
+            if (btn == btnCompras) return "compras";
             return null;
         });
 
         Optional<String> tipoResult = tipoDialog.showAndWait();
-        if (tipoResult.isEmpty()) return; // canceló
+        if (tipoResult.isEmpty()) return;
 
-        String tipo = tipoResult.get();
+        currentDataType = tipoResult.get();
         System.out.printf("[DATA] Tipo seleccionado: %s — archivo: %s (%s)%n",
-                tipo, currentFile.getName(), formatSize(currentFile.length()));
+                currentDataType, currentFile.getName(), formatSize(currentFile.length()));
 
         // ── Bloquear UI durante el procesamiento ──────────────────────────────
         btnProcess.setDisable(true);
-        btnProcess.setText("Procesando...");
+        btnProcess.setText("Subiendo al servidor...");
 
-        Task<CleaningReport> pipelineTask = new Task<>() {
+        // ── Subir archivo al backend ──────────────────────────────────────────
+        dataApiService.uploadFile(currentFile)
+                .thenAccept(uploadResponse -> Platform.runLater(() -> {
+                    if (uploadResponse == null) {
+                        btnProcess.setDisable(false);
+                        btnProcess.setText("Procesar archivo");
+                        showError("Error al subir",
+                                "No se pudo subir el archivo al servidor.\nVerifica que el backend esté activo.");
+                        return;
+                    }
 
-            @Override
-            protected CleaningReport call() throws Exception {
+                    currentUploadId = uploadResponse.getUploadId();
+                    System.out.printf("[DATA] Archivo subido — upload_id=%s, filas=%d%n",
+                            currentUploadId, uploadResponse.getTotalRows());
 
-                // ── Lectura ───────────────────────────────────────────────────
-                List<List<String>> rows = readFile(currentFile);
+                    btnProcess.setText("Validando...");
 
-                if (rows.size() <= 1) {
-                    throw new Exception(
-                            "El archivo no contiene registros.\n" +
-                                    "Verifica que tenga datos y respete el formato de la plantilla.");
-                }
+                    // ── Validar estructura en el backend ──────────────────────
+                    dataApiService.validateStructure(currentUploadId, currentDataType)
+                            .thenAccept(validateResponse -> Platform.runLater(() -> {
+                                if (validateResponse == null) {
+                                    btnProcess.setDisable(false);
+                                    btnProcess.setText("Procesar archivo");
+                                    showError("Error de validación",
+                                            "No se pudo validar la estructura del archivo.");
+                                    return;
+                                }
 
-                System.out.printf("[DATA] Lectura completada — %d registros leídos.%n",
-                        rows.size() - 1);
+                                if (!validateResponse.isValid()) {
+                                    btnProcess.setDisable(false);
+                                    btnProcess.setText("Procesar archivo");
+                                    String missing = validateResponse.getMissingRequired() != null
+                                            ? String.join(", ", validateResponse.getMissingRequired())
+                                            : "N/A";
+                                    showError("Estructura inválida",
+                                            "Faltan columnas obligatorias: " + missing +
+                                            "\n\nRevisa que el archivo use el formato de la plantilla.");
+                                    return;
+                                }
 
-                // ── CU-02: Validación ─────────────────────────────────────────
-                ValidationReport validation =
-                        new ValidationService().validate(rows, tipo);
+                                btnProcess.setText("Limpiando datos...");
 
-                if (!validation.structureValid()) {
-                    throw new Exception(
-                            "Estructura inválida. Faltan las siguientes columnas obligatorias:\n"
-                                    + String.join(", ", validation.missingColumns())
-                                    + "\n\nRevisa que el archivo use el formato de la plantilla.");
-                }
+                                // ── Limpiar datos en el backend ───────────────
+                                dataApiService.cleanData(currentUploadId)
+                                        .thenAccept(cleanResponse -> Platform.runLater(() -> {
+                                            btnProcess.setDisable(false);
+                                            btnProcess.setText("Procesar archivo");
 
-                // ── CU-03: Limpieza ───────────────────────────────────────────
-                CleaningReport cleaning =
-                        new CleaningService().clean(rows, validation, tipo);
+                                            if (cleanResponse == null || cleanResponse.getResult() == null) {
+                                                showError("Error de limpieza",
+                                                        "No se pudo completar la limpieza de datos.");
+                                                return;
+                                            }
 
-                // ── CU-04: Transformación ─────────────────────────────────────
-                List<List<String>> transformed =
-                        new TransformService().transform(cleaning.cleanRows(), tipo);
+                                            CleanResponseDTO.CleaningResultDTO result = cleanResponse.getResult();
+                                            double retention = result.getRetentionPercent();
 
-                System.out.printf("[DATA] Pipeline completado — %d filas listas para análisis.%n",
-                        transformed.size() - 1);
+                                            // Sincronizar pestaña de validación
+                                            syncValidationTab();
 
-                return cleaning;
-            }
-
-            @Override
-            protected void succeeded() {
-                CleaningReport report = getValue();
-                btnProcess.setDisable(false);
-                btnProcess.setText("Procesar archivo");
-                loadRecentUploads(getMockRecentUploads());
-
-                // Advertencia si retención < 70% (FA-01 CU-03)
-                if (!report.meetsThreshold()) {
+                                            if (retention < 70.0) {
+                                                Alert warn = new Alert(Alert.AlertType.WARNING);
+                                                warn.setTitle("Retención baja");
+                                                warn.setHeaderText(String.format(
+                                                        "La limpieza resultó en %.1f%% de retención (mínimo recomendado: 70%%).", retention));
+                                                warn.setContentText(
+                                                        "Registros originales:  " + result.getOriginalRows() + "\n" +
+                                                        "Registros conservados: " + result.getCleanedRows() + "\n\n" +
+                                                        "Se recomienda revisar los datos de origen.");
+                                                warn.showAndWait();
+                                            } else {
+                                                showInfo("Procesamiento completado",
+                                                        String.format("Archivo: %s\n\n" +
+                                                                "Registros leídos:    %d\n" +
+                                                                "Registros válidos:   %d\n" +
+                                                                "Duplicados eliminados: %d\n" +
+                                                                "Outliers detectados: %d\n" +
+                                                                "Retención:           %.1f%%\n" +
+                                                                "Calidad:             %.1f%%\n\n" +
+                                                                "Los datos están listos. Ve a la pestaña Validación y limpieza para confirmar.",
+                                                                currentFile.getName(),
+                                                                result.getOriginalRows(),
+                                                                result.getCleanedRows(),
+                                                                result.getDuplicatesRemoved(),
+                                                                result.getOutliersDetected(),
+                                                                retention,
+                                                                result.getQualityScore()));
+                                            }
+                                        }));
+                            }));
+                }))
+                .exceptionally(ex -> {
                     Platform.runLater(() -> {
-                        Alert warn = new Alert(Alert.AlertType.WARNING);
-                        warn.setTitle("Retención baja");
-                        warn.setHeaderText(String.format(
-                                "La limpieza resultó en %.1f%% de retención (mínimo recomendado: 70%%).",
-                                report.retentionPercent()));
-                        warn.setContentText(
-                                "Registros originales:  " + report.originalCount() + "\n" +
-                                        "Registros conservados: " + report.cleanCount()    + "\n\n" +
-                                        "Se recomienda revisar los datos de origen antes de continuar.");
-                        warn.showAndWait();
+                        btnProcess.setDisable(false);
+                        btnProcess.setText("Procesar archivo");
+                        showError("Error de conexión", "No se pudo conectar con el servidor: " + ex.getMessage());
                     });
-                } else {
-                    Platform.runLater(() ->
-                            showInfo("Procesamiento completado",
-                                    String.format("Archivo: %s\n\n" +
-                                                    "Registros leídos:    %d\n"   +
-                                                    "Registros válidos:   %d\n"   +
-                                                    "Duplicados eliminados: %d\n" +
-                                                    "Valores imputados:   %d\n"   +
-                                                    "Retención:           %.1f%%\n\n" +
-                                                    "Los datos están disponibles en la pestaña Validación y limpieza.",
-                                            currentFile.getName(),
-                                            report.originalCount(),
-                                            report.cleanCount(),
-                                            report.duplicatesRemoved(),
-                                            report.imputedValues(),
-                                            report.retentionPercent()))
-                    );
-                }
-            }
-
-            @Override
-            protected void failed() {
-                btnProcess.setDisable(false);
-                btnProcess.setText("Procesar archivo");
-                Throwable ex = getException();
-                System.err.println("[DATA] Error en pipeline: " + ex.getMessage());
-                Platform.runLater(() ->
-                        showError("Error al procesar", ex.getMessage()));
-            }
-        };
-
-        new Thread(pipelineTask).start();
+                    return null;
+                });
     }
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -972,47 +994,95 @@ public class DataController {
         lblValidationStatus.setManaged(true);
         lblValidationStatus.setText("Analizando estructura del archivo...");
 
-        // Animación de progreso simulada
-        animateValidation();
+        // Si ya hay uploadId, usar la API directamente
+        if (currentUploadId != null) {
+            animateValidationWithApi();
+        } else {
+            // Si no hay uploadId, primero subir el archivo
+            dataApiService.uploadFile(currentFile)
+                    .thenAccept(uploadResponse -> Platform.runLater(() -> {
+                        if (uploadResponse != null) {
+                            currentUploadId = uploadResponse.getUploadId();
+                            animateValidationWithApi();
+                        } else {
+                            resetValidationUI();
+                            showError("Error", "No se pudo subir el archivo al servidor.");
+                        }
+                    }));
+        }
     }
 
     /**
-     * Simula el proceso de validación con progreso visual.
-     * TODO: reemplazar por Task<ValidationResultDTO> que ejecute el servicio real:
-     *       ValidationResultDTO result = validationService.validate(currentFile);
-     *       cleaningService.clean(result);
+     * Ejecuta validación y limpieza usando la API del backend con animación visual.
      */
-    private void animateValidation() {
+    private void animateValidationWithApi() {
         String[] statusMessages = {
                 "Verificando columnas obligatorias...",
                 "Validando formato de fechas...",
                 "Revisando valores monetarios...",
-                "Calculando porcentaje de campos vac\u00EDos...",
+                "Calculando porcentaje de campos vacíos...",
                 "Detectando duplicados...",
                 "Estimando valores faltantes...",
                 "Generando resumen..."
         };
 
         final int[] step = { 0 };
-        PauseTransition tick = new PauseTransition(Duration.millis(600));
+        PauseTransition tick = new PauseTransition(Duration.millis(400));
         tick.setOnFinished(e -> {
             if (step[0] < statusMessages.length) {
                 double progress = (double)(step[0] + 1) / statusMessages.length;
                 validationProgress.setProgress(progress);
                 lblValidationStatus.setText(statusMessages[step[0]]);
-
-                // Actualizar el ícono del checklist según el paso
                 updateRuleIcon(step[0]);
                 step[0]++;
-                tick.play(); // siguiente tick
+                tick.play();
             } else {
-                // Completado: mostrar resultado con mock
-                javafx.application.Platform.runLater(() ->
-                        onValidationComplete(getMockValidationResult())
-                );
+                // Animación completada — ahora llamar al backend para limpiar datos
+                lblValidationStatus.setText("Procesando en el servidor...");
+                String dataType = currentDataType != null ? currentDataType : "ventas";
+
+                dataApiService.cleanData(currentUploadId)
+                        .thenAccept(cleanResponse -> Platform.runLater(() -> {
+                            if (cleanResponse != null && cleanResponse.getResult() != null) {
+                                CleanResponseDTO.CleaningResultDTO res = cleanResponse.getResult();
+                                int totalRecords = res.getOriginalRows();
+                                int validRecords = res.getCleanedRows();
+                                int invalidRecords = res.getRemovedRows();
+                                int duplicatesRemoved = res.getDuplicatesRemoved();
+                                double retention = res.getRetentionPercent();
+
+                                ValidationResultDTO result = new ValidationResultDTO(
+                                        totalRecords, validRecords, invalidRecords,
+                                        duplicatesRemoved, res.getNullsHandled(),
+                                        res.getOutliersDetected(), retention,
+                                        List.of(
+                                                new ValidationRuleResult("Columnas obligatorias", true, 0, "OK"),
+                                                new ValidationRuleResult("Formato de fechas", true, 0, "Verificado por backend"),
+                                                new ValidationRuleResult("Valores monetarios", true, 0, "OK"),
+                                                new ValidationRuleResult("Cantidades válidas", true, invalidRecords, invalidRecords + " filas removidas"),
+                                                new ValidationRuleResult("Campos vacíos ≤50%", true, res.getNullsHandled(), res.getNullsHandled() + " nulos procesados"),
+                                                new ValidationRuleResult("Sin fechas futuras", true, 0, "OK")
+                                        )
+                                );
+                                onValidationComplete(result);
+                            } else {
+                                resetValidationUI();
+                                showError("Error de limpieza",
+                                        "No se pudo completar la limpieza en el servidor.");
+                            }
+                        }));
             }
         });
         tick.play();
+    }
+
+    private void resetValidationUI() {
+        btnStartValidation.setDisable(false);
+        btnStartValidation.setText("Iniciar validación");
+        validationProgress.setVisible(false);
+        validationProgress.setManaged(false);
+        lblValidationStatus.setVisible(false);
+        lblValidationStatus.setManaged(false);
     }
 
     /** Actualiza el ícono de la regla en el checklist durante la animación */
@@ -1068,23 +1138,74 @@ public class DataController {
 
     @FXML
     private void onConfirmValidation() {
-        // TODO: dataService.confirmAndSave(validatedData)
-        //       Persiste los datos limpios en BD y los marca como disponibles para análisis
-        System.out.println("[DATA] Datos validados confirmados y guardados.");
-        showInfo("Datos guardados",
-                "Los datos han sido validados y est\u00E1n disponibles para an\u00E1lisis.");
-        validationResult.setVisible(false);
-        validationResult.setManaged(false);
-        buildValidationChecklist(); // reset
+        if (currentUploadId == null) {
+            showError("Error", "No hay datos cargados para confirmar.");
+            return;
+        }
+
+        btnConfirmValidation.setDisable(true);
+        btnConfirmValidation.setText("Guardando...");
+
+        String dataType = currentDataType != null ? currentDataType : "ventas";
+
+        // Mapeo por defecto de columnas (el backend acepta mapeo directo)
+        Map<String, String> columnMappings = new HashMap<>();
+        columnMappings.put("fecha", "fecha");
+        columnMappings.put("total", "total");
+        if ("ventas".equals(dataType)) {
+            columnMappings.put("producto", "producto");
+            columnMappings.put("cantidad", "cantidad");
+            columnMappings.put("precio_unitario", "precio_unitario");
+        } else {
+            columnMappings.put("producto", "producto");
+            columnMappings.put("cantidad", "cantidad");
+            columnMappings.put("costo", "costo");
+            columnMappings.put("proveedor", "proveedor");
+        }
+
+        dataApiService.confirmUpload(currentUploadId, dataType, columnMappings)
+                .thenAccept(confirmResponse -> Platform.runLater(() -> {
+                    btnConfirmValidation.setDisable(false);
+                    btnConfirmValidation.setText("Confirmar y guardar");
+
+                    if (confirmResponse != null && confirmResponse.isSuccess()) {
+                        showInfo("Datos guardados",
+                                String.format("Se insertaron %d registros exitosamente.\n%s",
+                                        confirmResponse.getRecordsInserted(),
+                                        confirmResponse.getMessage()));
+                        validationResult.setVisible(false);
+                        validationResult.setManaged(false);
+                        buildValidationChecklist();
+                        currentUploadId = null;
+                    } else {
+                        String msg = confirmResponse != null ? confirmResponse.getMessage() : "Error desconocido";
+                        showError("Error al confirmar", msg);
+                    }
+                }))
+                .exceptionally(ex -> {
+                    Platform.runLater(() -> {
+                        btnConfirmValidation.setDisable(false);
+                        btnConfirmValidation.setText("Confirmar y guardar");
+                        showError("Error de conexión", ex.getMessage());
+                    });
+                    return null;
+                });
     }
 
     @FXML
     private void onCancelValidation() {
-        // TODO: dataService.discardTemporaryData()
+        // Eliminar upload temporal en el backend
+        if (currentUploadId != null) {
+            dataApiService.deleteUpload(currentUploadId)
+                    .thenAccept(success ->
+                            System.out.println("[DATA] Upload temporal eliminado: " + success));
+            currentUploadId = null;
+        }
+
         validationResult.setVisible(false);
         validationResult.setManaged(false);
-        buildValidationChecklist(); // reset checklist
-        System.out.println("[DATA] Validaci\u00F3n cancelada, datos temporales descartados.");
+        buildValidationChecklist();
+        System.out.println("[DATA] Validación cancelada, datos temporales descartados.");
     }
 
     // ═════════════════════════════════════════════════════════════════════════

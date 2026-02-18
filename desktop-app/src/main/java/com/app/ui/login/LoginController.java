@@ -29,7 +29,7 @@ public class LoginController {
 
     @FXML private HBox userWrapper;
     @FXML private HBox passwordWrapper;
-
+    
     private final AuthService authService = new AuthService();
 
     private boolean userTouched = false;
@@ -87,7 +87,6 @@ public class LoginController {
         if (emailValid && passRequired) {
             clearError();
         }
-
         loginButton.setDisable(!(emailValid && passRequired));
     }
 
@@ -122,23 +121,17 @@ public class LoginController {
         String pass = passwordField.getText();
 
         AppExecutor.runAsync(() -> {
-            //LoginResponseDTO response = authService.login(user, pass);
-
-            //Considerar este método para cuando se carge bien la info del backend
-//            Image avatar = AvatarStorageService.loadAvatar(authenticatedUser.getUsername());
-//            if (avatar != null) {
-//                UserSession.setAvatar(avatar);
-//            }
+            LoginResponseDTO response = authService.login(user, pass);
 
             Platform.runLater(() -> {
-                //if (response != null) {
-                    //UserSession.setFromLoginResponse(response);
+                if (response != null) {
+                    UserSession.setFromLoginResponse(response);
                     SceneManager.showHome();
-//                } else {
-//                    showError("Usuario o contraseña incorrectos");
-//                    loginButton.setDisable(false);
-//                    loginButton.setText("Iniciar sesión →");
-//                }
+                } else {
+                    showError("Usuario o contraseña incorrectos");
+                    loginButton.setDisable(false);
+                    loginButton.setText("Iniciar sesión →");
+                }
             });
         });
     }

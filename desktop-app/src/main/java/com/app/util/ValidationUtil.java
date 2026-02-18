@@ -37,5 +37,4 @@ public class ValidationUtil {
         String os = System.getProperty("os.name").toLowerCase();
         return os.contains("mac");
     }
-
 }

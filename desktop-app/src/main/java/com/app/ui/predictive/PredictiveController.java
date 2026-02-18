@@ -4,10 +4,16 @@ import com.app.model.Phase2ConfigDTO;
 import com.app.model.PredictiveModelDTO;
 import com.app.model.ResultKpiDTO;
 import com.app.model.TrainingResult;
+import com.app.model.predictions.ForecastRequestDTO;
+import com.app.model.predictions.ForecastResponseDTO;
+import com.app.model.predictions.TrainModelRequestDTO;
+import com.app.model.predictions.TrainModelResponseDTO;
 import com.app.service.alerts.WarningService;
+import com.app.service.predictions.PredictionService;
 import com.app.ui.components.cards.ResultKpiCard;
 import com.app.ui.components.charts.BarChartCardController;
 import com.app.ui.components.charts.LineChartCardController;
+import javafx.scene.chart.XYChart;
 import javafx.animation.Animation;
 import javafx.animation.RotateTransition;
 import javafx.application.Platform;
@@ -86,6 +92,10 @@ public class PredictiveController {
     private final List<VBox> modelCards = new ArrayList<>();
 
     private RotateTransition loadingRotation;
+
+    private final PredictionService predictionService = new PredictionService();
+    private TrainModelResponseDTO lastTrainResponse;
+    private ForecastResponseDTO lastForecastResponse;
 
     @FXML
     private void initialize() {
@@ -313,6 +323,19 @@ public class PredictiveController {
         detailDescriptionContainer.getChildren().add(placeholder);
     }
 
+
+    /**
+     * Convierte el nombre del modelo en la UI al model_type que espera la API.
+     */
+    private String getApiModelType(String modelTitle) {
+        return switch (modelTitle) {
+            case "Regresión Lineal" -> "linear";
+            case "Modelo ARIMA" -> "arima";
+            case "Modelo SARIMA" -> "sarima";
+            case "Random Forest" -> "random_forest";
+            default -> "linear";
+        };
+    }
 
     /* =========================
        FOOTER / FASES
@@ -1237,33 +1260,116 @@ public class PredictiveController {
         trainingIcon.setImage(new Image(
                 Objects.requireNonNull(getClass().getResourceAsStream("/images/icons/loading.png"))
         ));
-        trainingTitleTxt.setText("Entrenando el modelo, este proceso puede tardar unos minutos...");
+        trainingTitleTxt.setText("Validando datos antes de entrenar...");
         startLoadingAnimation();
 
-        Task<TrainingResult> task = new Task<>() {
-            @Override
-            protected TrainingResult call() throws Exception {
-                // 🔌 llamada real a backend
-                Thread.sleep(3000);
-                return new TrainingResult(
-                        "2m 15s",
-                        "Accuracy",
-                        true
-                );
-            }
-        };
+        String modelType = getApiModelType(selectedModel.title());
+        String fechaInicio = phase2Config.getStartDate() != null
+                ? phase2Config.getStartDate().toString() : null;
+        String fechaFin = phase2Config.getEndDate() != null
+                ? phase2Config.getEndDate().toString() : null;
 
-        task.setOnSucceeded(e -> {
-            stopLoadingAnimation();
-            showTrainingResult(task.getValue());
-        });
+        // Paso 1: Validar datos con el backend antes de entrenar
+        predictionService.validateData(fechaInicio, fechaFin, "D")
+                .thenAccept(validationResult -> Platform.runLater(() -> {
+                    boolean isValid = validationResult != null
+                            && Boolean.TRUE.equals(validationResult.get("valid"));
 
-        task.setOnFailed(e -> {
-            stopLoadingAnimation();
-            showTrainingError();
-        });
+                    if (!isValid) {
+                        // Mostrar errores de validación
+                        stopLoadingAnimation();
+                        @SuppressWarnings("unchecked")
+                        java.util.List<String> issues = validationResult != null
+                                ? (java.util.List<String>) validationResult.get("issues")
+                                : java.util.List.of("Error desconocido de validación");
+                        String issueMsg = issues != null && !issues.isEmpty()
+                                ? String.join("; ", issues)
+                                : "Los datos no cumplen los requisitos mínimos";
+                        showTrainingErrorWithMessage("Validación fallida: " + issueMsg);
+                        return;
+                    }
 
-        new Thread(task).start();
+                    // Paso 2: Datos válidos, proceder al entrenamiento
+                    trainingTitleTxt.setText("Entrenando el modelo, este proceso puede tardar unos minutos...");
+
+                    TrainModelRequestDTO request = new TrainModelRequestDTO(modelType, fechaInicio, fechaFin);
+
+                    predictionService.trainModel(request)
+                            .thenAccept(response -> Platform.runLater(() -> {
+                                stopLoadingAnimation();
+                                if (response != null && response.isSuccess()) {
+                                    lastTrainResponse = response;
+                                    showTrainingResultFromApi(response);
+                                } else {
+                                    String errorMsg = response != null && response.getError() != null
+                                            ? response.getError()
+                                            : "Error desconocido al entrenar el modelo";
+                                    showTrainingErrorWithMessage(errorMsg);
+                                }
+                            }))
+                            .exceptionally(ex -> {
+                                Platform.runLater(() -> {
+                                    stopLoadingAnimation();
+                                    showTrainingErrorWithMessage("Error de conexión: " + ex.getMessage());
+                                });
+                                return null;
+                            });
+                }))
+                .exceptionally(ex -> {
+                    Platform.runLater(() -> {
+                        stopLoadingAnimation();
+                        showTrainingErrorWithMessage("Error al validar datos: " + ex.getMessage());
+                    });
+                    return null;
+                });
+    }
+
+    /**
+     * Muestra resultado exitoso de entrenamiento con datos reales de la API.
+     */
+    private void showTrainingResultFromApi(TrainModelResponseDTO response) {
+        trainingIcon.setRotate(0);
+        trainingIcon.setImage(new Image(
+                Objects.requireNonNull(getClass().getResourceAsStream("/images/icons/check.png"))
+        ));
+
+        // Extraer métricas reales
+        Map<String, Double> metrics = response.getMetrics();
+        String r2 = metrics != null && metrics.containsKey("r2")
+                ? String.format("%.4f", metrics.get("r2")) : "N/A";
+        String mae = metrics != null && metrics.containsKey("mae")
+                ? String.format("%.2f", metrics.get("mae")) : "N/A";
+
+        lblTrainingTime.setText(response.getTrainingSamples() + " muestras");
+        lblMetric.setText("R² = " + r2);
+        lblResult.setText(Boolean.TRUE.equals(response.getMeetsR2Threshold()) ? "Aprobado" : "Bajo umbral");
+
+        loadMetricIcons();
+
+        trainingMetrics.setVisible(true);
+        trainingMetrics.setManaged(true);
+
+        String statusText = Boolean.TRUE.equals(response.getMeetsR2Threshold())
+                ? "Modelo entrenado exitosamente. Clave: " + response.getModelKey()
+                : "Modelo entrenado pero R² < 0.7. " +
+                  (response.getRecommendation() != null ? response.getRecommendation() : "");
+        trainingTitleTxt.setText(statusText);
+
+        validPhase3 = true;
+        updateFooterState();
+    }
+
+    /**
+     * Muestra error de entrenamiento con mensaje específico.
+     */
+    private void showTrainingErrorWithMessage(String message) {
+        trainingIcon.setRotate(0);
+        trainingIcon.setImage(new Image(
+                Objects.requireNonNull(getClass().getResourceAsStream("/images/icons/fail.png"))
+        ));
+        trainingTitleTxt.setText("Error: " + message);
+        btnTrain.setDisable(false);
+        btnPrevious.setDisable(false);
     }
 
     private void showTrainingResult(TrainingResult result) {
@@ -1335,15 +1441,276 @@ public class PredictiveController {
     }
 
     /**
-     * Muestra los resultados en la Fase 4
+     * Muestra los resultados en la Fase 4.
+     * Usa datos reales si hay un lastTrainResponse, sino usa mock.
      */
     private void showPhase4Results() {
-        loadResultsKpis();
+        if (lastTrainResponse != null) {
+            loadResultsKpisFromApi();
+            loadTrainingSummaryFromApi();
+            loadModelInfoFromApi();
+
+            // Solicitar forecast para alimentar los charts
+            requestForecastForCharts();
+        } else {
+            loadResultsKpis();
+            loadTrainingSummary();
+            loadModelInfo();
+        }
         loadResultsCharts();
-        loadTrainingSummary();
-        loadModelInfo();
-        predictiveFooter.setVisible(false); //Desactivo los botones para que no haya forma de regresar o seguir
+        predictiveFooter.setVisible(false);
         predictiveFooter.setManaged(false);
+    }
+
+    /**
+     * Carga KPIs reales desde la respuesta del entrenamiento.
+     */
+    private void loadResultsKpisFromApi() {
+        resultsKpiContainer.getChildren().clear();
+
+        Map<String, Double> metrics = lastTrainResponse.getMetrics();
+        String r2 = metrics != null && metrics.containsKey("r2")
+                ? String.format("%.1f%%", metrics.get("r2") * 100) : "N/A";
+        String mae = metrics != null && metrics.containsKey("mae")
+                ? String.format("$%.2f", metrics.get("mae")) : "N/A";
+        String rmse = metrics != null && metrics.containsKey("rmse")
+                ? String.format("$%.2f", metrics.get("rmse")) : "N/A";
+
+        boolean meetsThreshold = Boolean.TRUE.equals(lastTrainResponse.getMeetsR2Threshold());
+
+        List<ResultKpiDTO> kpis = List.of(
+                new ResultKpiDTO(
+                        "🎯", r2, "Precisión (R²)",
+                        meetsThreshold ? "Supera umbral 0.7" : "Bajo umbral 0.7",
+                        meetsThreshold ? "kpi-green" : "kpi-red",
+                        meetsThreshold ? ResultKpiDTO.TrendType.POSITIVE : ResultKpiDTO.TrendType.NEGATIVE
+                ),
+                new ResultKpiDTO(
+                        "📉", mae, "Error Absoluto Medio (MAE)",
+                        "Mean Absolute Error",
+                        "kpi-blue",
+                        ResultKpiDTO.TrendType.NEUTRAL
+                ),
+                new ResultKpiDTO(
+                        "📊", rmse, "Error Cuadrático (RMSE)",
+                        "Root Mean Squared Error",
+                        "kpi-purple",
+                        ResultKpiDTO.TrendType.NEUTRAL
+                ),
+                new ResultKpiDTO(
+                        "📦",
+                        lastTrainResponse.getTrainingSamples() != null
+                                ? lastTrainResponse.getTrainingSamples().toString() : "N/A",
+                        "Muestras Entrenamiento",
+                        lastTrainResponse.getTestSamples() != null
+                                ? lastTrainResponse.getTestSamples() + " muestras de prueba" : "",
+                        "kpi-green",
+                        ResultKpiDTO.TrendType.NEUTRAL
+                )
+        );
+
+        for (ResultKpiDTO kpi : kpis) {
+            resultsKpiContainer.getChildren().add(ResultKpiCard.createKpiCard(kpi));
+        }
+    }
+
+    /**
+     * Carga resumen de entrenamiento con datos reales.
+     */
+    private void loadTrainingSummaryFromApi() {
+        trainingSummaryContainer.getChildren().clear();
+
+        Map<String, Double> metrics = lastTrainResponse.getMetrics();
+
+        Map<String, String> summary = new LinkedHashMap<>();
+        summary.put("Modelo", lastTrainResponse.getModelType() != null
+                ? lastTrainResponse.getModelType() : "N/A");
+        summary.put("Clave", lastTrainResponse.getModelKey() != null
+                ? lastTrainResponse.getModelKey() : "N/A");
+        if (metrics != null) {
+            for (Map.Entry<String, Double> entry : metrics.entrySet()) {
+                summary.put(entry.getKey().toUpperCase(), String.format("%.4f", entry.getValue()));
+            }
+        }
+        summary.put("Muestras Entrenamiento", lastTrainResponse.getTrainingSamples() != null
+                ? lastTrainResponse.getTrainingSamples().toString() : "N/A");
+        summary.put("Muestras Prueba", lastTrainResponse.getTestSamples() != null
+                ? lastTrainResponse.getTestSamples().toString() : "N/A");
+        summary.put("Cumple R² >= 0.7", Boolean.TRUE.equals(lastTrainResponse.getMeetsR2Threshold())
+                ? "Sí" : "No");
+
+        for (Map.Entry<String, String> entry : summary.entrySet()) {
+            trainingSummaryContainer.getChildren().add(createSummaryItem(entry.getKey(), entry.getValue()));
+        }
+    }
+
+    /**
+     * Carga información del modelo con datos reales.
+     */
+    private void loadModelInfoFromApi() {
+        modelInfoContainer.getChildren().clear();
+
+        Map<String, String> info = new LinkedHashMap<>();
+        info.put("Modelo", selectedModel != null ? selectedModel.title() : "N/A");
+        info.put("Tipo API", lastTrainResponse.getModelType() != null
+                ? lastTrainResponse.getModelType() : "N/A");
+        info.put("Clave", lastTrainResponse.getModelKey() != null
+                ? lastTrainResponse.getModelKey() : "N/A");
+        info.put("Entrenado", java.time.LocalDateTime.now()
+                .format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")));
+        info.put("Estado", Boolean.TRUE.equals(lastTrainResponse.getMeetsR2Threshold())
+                ? "Activo" : "Bajo rendimiento");
+        if (lastTrainResponse.getRecommendation() != null) {
+            info.put("Recomendación", lastTrainResponse.getRecommendation());
+        }
+
+        for (Map.Entry<String, String> entry : info.entrySet()) {
+            modelInfoContainer.getChildren().add(createSummaryItem(entry.getKey(), entry.getValue()));
+        }
+    }
+
+    /**
+     * Solicita un forecast para alimentar los charts con datos reales.
+     * Cuando el forecast llega, actualiza los charts automáticamente.
+     */
+    private void requestForecastForCharts() {
+        if (lastTrainResponse == null || lastTrainResponse.getModelKey() == null) return;
+
+        int periods = phase2Config != null ? phase2Config.getPredictionHorizon() * 30 : 30;
+        // Limitar a 180 días (RN-03.03)
+        periods = Math.min(periods, 180);
+
+        ForecastRequestDTO forecastReq = new ForecastRequestDTO(
+                lastTrainResponse.getModelKey(), null, periods
+        );
+
+        predictionService.forecast(forecastReq)
+                .thenAccept(response -> Platform.runLater(() -> {
+                    if (response != null && response.isSuccess()) {
+                        lastForecastResponse = response;
+                        // Recargar charts con datos reales del forecast
+                        resultsChartsContainer.getChildren().clear();
+                        loadForecastCharts();
+                    }
+                }))
+                .exceptionally(ex -> {
+                    System.out.println("Forecast para charts no disponible: " + ex.getMessage());
+                    return null;
+                });
+    }
+
+    /**
+     * Carga los charts usando datos reales del forecast.
+     */
+    @SuppressWarnings("unchecked")
+    private void loadForecastCharts() {
+        Map<String, Object> predictions = lastForecastResponse.getPredictions();
+        if (predictions == null) return;
+
+        java.util.List<String> dates = (java.util.List<String>) predictions.get("dates");
+        java.util.List<Number> values = (java.util.List<Number>) predictions.get("values");
+
+        // Chart 1: Predicción de Ventas (LineChart con datos reales)
+        try {
+            FXMLLoader loader = new FXMLLoader(
+                    getClass().getResource("/fxml/components/charts/LineChartCard.fxml")
+            );
+            VBox chartNode = loader.load();
+            LineChartCardController controller = loader.getController();
+
+            controller.setTitle("Predicción de Ventas");
+            controller.setSubtitle("Forecast - " + lastForecastResponse.getPeriods() + " períodos");
+
+            if (dates != null && values != null) {
+                XYChart.Series<String, Number> forecastSeries = new XYChart.Series<>();
+                forecastSeries.setName("Predicción");
+
+                int step = Math.max(1, dates.size() / 30); // Limitar puntos para legibilidad
+                for (int i = 0; i < dates.size(); i += step) {
+                    String dateLabel = dates.get(i).length() > 10
+                            ? dates.get(i).substring(5, 10) : dates.get(i);
+                    forecastSeries.getData().add(new XYChart.Data<>(dateLabel, values.get(i)));
+                }
+
+                controller.loadCustomData(forecastSeries);
+            } else {
+                controller.loadData();
+            }
+
+            resultsChartsContainer.getChildren().add(chartNode);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+        // Chart 2: Intervalos de Confianza (BarChart con valores y CI)
+        try {
+            FXMLLoader loader = new FXMLLoader(
+                    getClass().getResource("/fxml/components/charts/BarChartCard.fxml")
+            );
+            VBox chartNode = loader.load();
+            BarChartCardController controller = loader.getController();
+
+            controller.setTitle("Predicción por Período");
+            controller.setSubtitle("Valores predichos agrupados");
+
+            if (dates != null && values != null) {
+                XYChart.Series<String, Number> valueSeries = new XYChart.Series<>();
+                valueSeries.setName("Valor Predicho");
+
+                // Agrupar por semanas/meses para el bar chart
+                int groupSize = Math.max(1, dates.size() / 12);
+                for (int i = 0; i < dates.size(); i += groupSize) {
+                    double sum = 0;
+                    int count = 0;
+                    for (int j = i; j < Math.min(i + groupSize, values.size()); j++) {
+                        sum += values.get(j).doubleValue();
+                        count++;
+                    }
+                    String label = dates.get(i).length() > 10
+                            ? dates.get(i).substring(5, 10) : dates.get(i);
+                    valueSeries.getData().add(new XYChart.Data<>(label, sum / count));
+                }
+
+                controller.loadCustomData(valueSeries);
+            } else {
+                controller.loadData();
+            }
+
+            resultsChartsContainer.getChildren().add(chartNode);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+        // Chart 3: Métricas del Modelo (BarChart)
+        try {
+            FXMLLoader loader = new FXMLLoader(
+                    getClass().getResource("/fxml/components/charts/BarChartCard.fxml")
+            );
+            VBox chartNode = loader.load();
+            BarChartCardController controller = loader.getController();
+
+            controller.setTitle("Métricas del Modelo");
+            controller.setSubtitle("Indicadores de rendimiento");
+
+            if (lastTrainResponse != null && lastTrainResponse.getMetrics() != null) {
+                XYChart.Series<String, Number> metricsSeries = new XYChart.Series<>();
+                metricsSeries.setName("Métricas");
+
+                for (Map.Entry<String, Double> entry : lastTrainResponse.getMetrics().entrySet()) {
+                    metricsSeries.getData().add(
+                            new XYChart.Data<>(entry.getKey().toUpperCase(), entry.getValue())
+                    );
+                }
+
+                controller.loadCustomData(metricsSeries);
+            } else {
+                controller.loadData();
+            }
+
+            resultsChartsContainer.getChildren().add(chartNode);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 
     /**

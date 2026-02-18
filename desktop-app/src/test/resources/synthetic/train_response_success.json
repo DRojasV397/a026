@@ -1,0 +1,16 @@
+{
+  "success": true,
+  "model_id": 1,
+  "model_key": "random_forest_20230101_20241231",
+  "model_type": "random_forest",
+  "metrics": {
+    "r2": 0.91,
+    "mae": 450.25,
+    "rmse": 620.80,
+    "mape": 3.2
+  },
+  "meets_r2_threshold": true,
+  "recommendation": "Modelo aceptado - R2 = 0.91, buen ajuste para predicciones",
+  "training_samples": 550,
+  "test_samples": 180
+}

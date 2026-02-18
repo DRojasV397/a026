@@ -86,13 +86,13 @@ public class Phase2ConfigDTO {
             hasNoErrors = true; // No hay error si falta alguna fecha
         }
 
-        // Validar que haya suficientes datos (eal menos 12 meses de registros)
+        // Validar que haya suficientes datos (al menos 6 meses - RN-01.01 del backend)
         if (startDate != null && endDate != null && hasNoErrors) {
             long months = java.time.temporal.ChronoUnit.MONTHS.between(startDate, endDate);
-            hasEnoughData = months >= 12;
+            hasEnoughData = months >= 6;
 
             if (!hasEnoughData && errorMessage.isEmpty()) {
-                errorMessage = "Se requieren al menos 12 meses de datos históricos";
+                errorMessage = "Se requieren al menos 6 meses de datos históricos (RN-01.01)";
             }
         } else {
             hasEnoughData = false;
