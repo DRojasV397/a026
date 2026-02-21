@@ -5,7 +5,7 @@ Maneja la carga de archivos CSV/Excel y su procesamiento.
 
 import pandas as pd
 import numpy as np
-from typing import Optional, Dict, Any, List
+from typing import Optional, Dict, Any, List, Tuple
 from datetime import datetime
 from sqlalchemy.orm import Session
 import uuid
@@ -20,8 +20,8 @@ from app.schemas.data_upload import (
     QualityReportResponse, QualityMetric,
     REQUIRED_COLUMNS, OPTIONAL_COLUMNS
 )
-from app.models import Venta, DetalleVenta, Compra, DetalleCompra, Producto
-from app.repositories import VentaRepository, CompraRepository, ProductoRepository
+from app.models import Venta, DetalleVenta, Compra, DetalleCompra, Producto, Categoria, HistorialCarga
+from app.repositories import VentaRepository, CompraRepository, ProductoRepository, CategoriaRepository
 
 logger = logging.getLogger(__name__)
 
@@ -42,6 +42,7 @@ class DataService:
         self,
         file_content: bytes,
         filename: str,
+        user_id: int,
         sheet_name: Optional[str] = None
     ) -> UploadResponse:
         """
@@ -78,7 +79,8 @@ class DataService:
                 "column_info": result.column_info,
                 "status": UploadStatus.PENDING,
                 "created_at": datetime.now(),
-                "file_type": result.file_type
+                "file_type": result.file_type,
+                "user_id": user_id
             }
 
             logger.info(f"Archivo cargado: {upload_id} - {filename} ({result.total_rows} filas)")
@@ -459,37 +461,52 @@ class DataService:
             return {"success": False, "message": "Upload no encontrado"}
 
         df = upload["data"]
+        user_id = upload.get("user_id")
+        filename = upload.get("filename")
 
         # Renombrar columnas segun mapeo
         df = df.rename(columns={v: k for k, v in column_mappings.items()})
 
         try:
             if data_type == DataType.VENTAS:
-                inserted = self._insert_ventas(df)
+                inserted = self._insert_ventas(df, user_id)
+                updated = 0
             elif data_type == DataType.COMPRAS:
-                inserted = self._insert_compras(df)
+                inserted = self._insert_compras(df, user_id)
+                updated = 0
             elif data_type == DataType.PRODUCTOS:
-                inserted = self._insert_productos(df)
+                inserted, updated = self._insert_productos(df, user_id)
             else:
                 return {"success": False, "message": f"Tipo de datos no soportado: {data_type}"}
 
             upload["status"] = UploadStatus.CONFIRMED
 
-            logger.info(f"Datos confirmados: {upload_id} - {inserted} registros")
+            # Registrar en historial
+            if user_id:
+                self._save_historial(upload_id, data_type.value, filename, inserted, updated, user_id)
+
+            logger.info(f"Datos confirmados: {upload_id} - {inserted} insertados, {updated} actualizados")
+
+            msg_parts = []
+            if inserted:
+                msg_parts.append(f"{inserted} registros nuevos insertados")
+            if updated:
+                msg_parts.append(f"{updated} registros existentes actualizados")
+            message = " y ".join(msg_parts) if msg_parts else "Sin cambios"
 
             return {
                 "success": True,
                 "records_inserted": inserted,
-                "records_updated": 0,
-                "message": f"Se insertaron {inserted} registros exitosamente"
+                "records_updated": updated,
+                "message": message
             }
 
         except Exception as e:
             logger.error(f"Error al confirmar upload: {str(e)}")
             return {"success": False, "message": str(e)}
 
-    def _insert_ventas(self, df: pd.DataFrame) -> int:
-        """Inserta datos de ventas en la BD."""
+    def _insert_ventas(self, df: pd.DataFrame, user_id: Optional[int] = None) -> int:
+        """Inserta datos de ventas en la BD asociados al usuario."""
         repo = VentaRepository(self.db)
         inserted = 0
 
@@ -497,7 +514,8 @@ class DataService:
             try:
                 venta = Venta(
                     fecha=pd.to_datetime(row.get('fecha')).date(),
-                    total=float(row.get('total', 0))
+                    total=float(row.get('total', 0)),
+                    creadoPor=user_id
                 )
                 created = repo.create(venta)
                 if created:
@@ -508,8 +526,8 @@ class DataService:
 
         return inserted
 
-    def _insert_compras(self, df: pd.DataFrame) -> int:
-        """Inserta datos de compras en la BD."""
+    def _insert_compras(self, df: pd.DataFrame, user_id: Optional[int] = None) -> int:
+        """Inserta datos de compras en la BD asociados al usuario."""
         repo = CompraRepository(self.db)
         inserted = 0
 
@@ -518,7 +536,8 @@ class DataService:
                 compra = Compra(
                     fecha=pd.to_datetime(row.get('fecha')).date(),
                     proveedor=str(row.get('proveedor', '')),
-                    total=float(row.get('total', 0))
+                    total=float(row.get('total', 0)),
+                    creadoPor=user_id
                 )
                 created = repo.create(compra)
                 if created:
@@ -529,26 +548,134 @@ class DataService:
 
         return inserted
 
-    def _insert_productos(self, df: pd.DataFrame) -> int:
-        """Inserta datos de productos en la BD."""
+    def _insert_productos(
+        self, df: pd.DataFrame, user_id: Optional[int] = None
+    ) -> tuple[int, int]:
+        """
+        Inserta o actualiza productos en la BD asociados al usuario.
+
+        - Si el SKU ya existe para ese usuario, actualiza precio y costo.
+        - Si no existe, lo crea asignando el usuario como propietario.
+
+        Returns:
+            Tuple (insertados, actualizados)
+        """
         repo = ProductoRepository(self.db)
+        cat_repo = CategoriaRepository(self.db)
+        categoria_cache: Dict[str, int] = {}
         inserted = 0
+        updated = 0
 
         for _, row in df.iterrows():
             try:
-                producto = Producto(
-                    sku=str(row.get('sku')),
-                    nombre=str(row.get('nombre')),
-                    precioUnitario=float(row.get('precio', 0))
-                )
-                created = repo.create(producto)
-                if created:
-                    inserted += 1
+                sku = str(row.get('sku', '')).strip()
+                nombre = str(row.get('nombre', '')).strip()
+                if not nombre:
+                    continue
+
+                # Resolver idCategoria desde nombre de categoría
+                cat_nombre = str(row.get('categoria', 'General')).strip() or 'General'
+                if cat_nombre not in categoria_cache:
+                    categoria = cat_repo.get_by_nombre(cat_nombre)
+                    if not categoria:
+                        categoria = cat_repo.create(Categoria(nombre=cat_nombre))
+                    categoria_cache[cat_nombre] = categoria.idCategoria
+
+                precio_raw = row.get('precio')
+                costo_raw = row.get('costo')
+                precio = float(precio_raw) if precio_raw is not None else None
+                costo = float(costo_raw) if costo_raw is not None else None
+
+                # Buscar producto existente del mismo usuario por SKU
+                existing = None
+                if sku and user_id:
+                    existing = repo.get_by_sku_y_usuario(sku, user_id)
+
+                if existing:
+                    # Actualizar precio y costo si vienen en el archivo
+                    updates: Dict[str, Any] = {}
+                    if precio is not None:
+                        updates['precioUnitario'] = precio
+                    if costo is not None:
+                        updates['costoUnitario'] = costo
+                    updates['nombre'] = nombre
+                    updates['idCategoria'] = categoria_cache[cat_nombre]
+                    repo.update(existing.idProducto, updates)
+                    updated += 1
+                else:
+                    producto = Producto(
+                        sku=sku,
+                        nombre=nombre,
+                        precioUnitario=precio,
+                        costoUnitario=costo,
+                        idCategoria=categoria_cache[cat_nombre],
+                        creadoPor=user_id
+                    )
+                    created = repo.create(producto)
+                    if created:
+                        inserted += 1
+
             except Exception as e:
-                logger.warning(f"Error al insertar producto: {str(e)}")
+                logger.warning(f"Error al procesar producto: {str(e)}")
                 continue
 
-        return inserted
+        return inserted, updated
+
+    def _save_historial(
+        self,
+        upload_id: str,
+        tipo_datos: str,
+        nombre_archivo: Optional[str],
+        insertados: int,
+        actualizados: int,
+        user_id: int
+    ) -> None:
+        """Guarda un registro en el historial de cargas."""
+        try:
+            # Usar SAVEPOINT para aislar este INSERT de la transacción principal.
+            # Si falla (ej. columna faltante), solo se revierte el historial;
+            # los datos reales (ventas/productos/etc.) ya insertados no se pierden.
+            with self.db.begin_nested():
+                historial = HistorialCarga(
+                    uploadId=upload_id,
+                    tipoDatos=tipo_datos,
+                    nombreArchivo=nombre_archivo,
+                    registrosInsertados=insertados,
+                    registrosActualizados=actualizados,
+                    cargadoPor=user_id,
+                    estado='exitoso'
+                )
+                self.db.add(historial)
+        except Exception as e:
+            logger.error(f"Error al guardar historial de carga: {str(e)}")
+
+    def get_historial_cargas(
+        self,
+        user_id: int,
+        tipo_datos: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """
+        Obtiene el historial de cargas de un usuario.
+
+        Args:
+            user_id: ID del usuario
+            tipo_datos: Filtrar por tipo (ventas/compras/productos)
+
+        Returns:
+            Dict con items y total
+        """
+        try:
+            query = self.db.query(HistorialCarga).filter(
+                HistorialCarga.cargadoPor == user_id
+            )
+            if tipo_datos:
+                query = query.filter(HistorialCarga.tipoDatos == tipo_datos)
+
+            items = query.order_by(HistorialCarga.cargadoEn.desc()).all()
+            return {"items": items, "total": len(items)}
+        except Exception as e:
+            logger.error(f"Error al obtener historial de cargas: {str(e)}")
+            return {"items": [], "total": 0}
 
     def delete_upload(self, upload_id: str) -> bool:
         """Elimina un upload temporal."""

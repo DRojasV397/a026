@@ -5,6 +5,7 @@ import com.app.core.session.UserSession;
 import com.app.model.data.api.*;
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
+import java.lang.reflect.Type;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -281,6 +282,71 @@ public class DataApiService {
                 .exceptionally(ex -> {
                     logger.error("Error al obtener hojas Excel: {}", ex.getMessage());
                     return List.of();
+                });
+    }
+
+    /**
+     * Obtiene el historial de cargas del usuario autenticado.
+     * GET /data/historial?tipo={tipo}
+     *
+     * @param tipo Filtro opcional: "ventas", "compras", "productos" o null/vacío para todos.
+     */
+    public CompletableFuture<HistorialCargaListDTO> getHistorial(String tipo) {
+        StringBuilder url = new StringBuilder(ApiConfig.getDataHistorialUrl());
+        if (tipo != null && !tipo.isBlank() && !tipo.equalsIgnoreCase("todos")) {
+            url.append("?tipo=").append(tipo.toLowerCase());
+        }
+
+        HttpRequest httpRequest = HttpRequest.newBuilder()
+                .uri(URI.create(url.toString()))
+                .header("Authorization", "Bearer " + UserSession.getAccessToken())
+                .timeout(Duration.ofSeconds(15))
+                .GET()
+                .build();
+
+        return httpClient.sendAsync(httpRequest, HttpResponse.BodyHandlers.ofString())
+                .thenApply(response -> {
+                    logger.info("Historial response HTTP {}", response.statusCode());
+                    if (response.statusCode() == 200) {
+                        return gson.fromJson(response.body(), HistorialCargaListDTO.class);
+                    }
+                    logger.warn("Historial failed - HTTP {}: {}", response.statusCode(), response.body());
+                    return null;
+                })
+                .exceptionally(ex -> {
+                    logger.error("Error al obtener historial de cargas: {}", ex.getMessage());
+                    return null;
+                });
+    }
+
+    /**
+     * Obtiene el catálogo de productos del usuario autenticado.
+     * GET /productos/?limit=1000
+     */
+    public CompletableFuture<List<ProductoCatalogDTO>> getProductos() {
+        String url = ApiConfig.getProductosUrl() + "?limit=1000";
+
+        HttpRequest httpRequest = HttpRequest.newBuilder()
+                .uri(URI.create(url))
+                .header("Authorization", "Bearer " + UserSession.getAccessToken())
+                .timeout(Duration.ofSeconds(15))
+                .GET()
+                .build();
+
+        Type listType = new TypeToken<List<ProductoCatalogDTO>>() {}.getType();
+
+        return httpClient.sendAsync(httpRequest, HttpResponse.BodyHandlers.ofString())
+                .thenApply(response -> {
+                    logger.info("Productos response HTTP {}", response.statusCode());
+                    if (response.statusCode() == 200) {
+                        return (List<ProductoCatalogDTO>) gson.fromJson(response.body(), listType);
+                    }
+                    logger.warn("Productos failed - HTTP {}: {}", response.statusCode(), response.body());
+                    return null;
+                })
+                .exceptionally(ex -> {
+                    logger.error("Error al obtener catálogo de productos: {}", ex.getMessage());
+                    return null;
                 });
     }
 

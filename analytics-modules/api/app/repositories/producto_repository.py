@@ -3,6 +3,7 @@ Repositorio para modelos de Producto y Categoría.
 """
 
 from typing import Optional, List
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 import logging
 
@@ -63,6 +64,89 @@ class ProductoRepository(BaseRepository[Producto]):
             return self.db.query(Producto).filter(Producto.activo == 1).all()
         except Exception as e:
             logger.error(f"Error al obtener productos activos: {str(e)}")
+            return []
+
+    def get_by_sku_y_usuario(self, sku: str, user_id: int) -> Optional[Producto]:
+        """
+        Obtiene un producto por SKU perteneciente a un usuario específico.
+
+        Args:
+            sku: SKU del producto
+            user_id: ID del usuario propietario
+
+        Returns:
+            Optional[Producto]: Producto encontrado o None
+        """
+        try:
+            return self.db.query(Producto).filter(
+                Producto.sku == sku,
+                Producto.creadoPor == user_id
+            ).first()
+        except Exception as e:
+            logger.error(f"Error al buscar producto por SKU y usuario: {str(e)}")
+            return None
+
+    def get_por_usuario(self, user_id: int, skip: int = 0, limit: int = 100) -> List[Producto]:
+        """
+        Obtiene todos los productos de un usuario con paginación.
+        Incluye productos sin propietario asignado (creadoPor IS NULL), que son
+        productos del catálogo compartido o cargados antes de implementar el campo.
+
+        Args:
+            user_id: ID del usuario
+            skip: Registros a saltar
+            limit: Máximo de registros
+
+        Returns:
+            List[Producto]: Lista de productos del usuario
+        """
+        try:
+            return self.db.query(Producto).filter(
+                or_(Producto.creadoPor == user_id, Producto.creadoPor.is_(None))
+            ).order_by(Producto.idProducto).offset(skip).limit(limit).all()
+        except Exception as e:
+            logger.error(f"Error al obtener productos por usuario: {str(e)}")
+            return []
+
+    def get_activos_por_usuario(self, user_id: int) -> List[Producto]:
+        """
+        Obtiene los productos activos de un usuario.
+        Incluye productos sin propietario asignado (creadoPor IS NULL).
+
+        Args:
+            user_id: ID del usuario
+
+        Returns:
+            List[Producto]: Lista de productos activos del usuario
+        """
+        try:
+            return self.db.query(Producto).filter(
+                Producto.activo == 1,
+                or_(Producto.creadoPor == user_id, Producto.creadoPor.is_(None))
+            ).all()
+        except Exception as e:
+            logger.error(f"Error al obtener productos activos por usuario: {str(e)}")
+            return []
+
+    def get_por_categoria_y_usuario(self, id_categoria: int, user_id: int) -> List[Producto]:
+        """
+        Obtiene productos de una categoría para un usuario.
+        Incluye productos sin propietario asignado (creadoPor IS NULL).
+
+        Args:
+            id_categoria: ID de la categoría
+            user_id: ID del usuario
+
+        Returns:
+            List[Producto]: Lista de productos
+        """
+        try:
+            return self.db.query(Producto).filter(
+                Producto.idCategoria == id_categoria,
+                or_(Producto.creadoPor == user_id, Producto.creadoPor.is_(None))
+            ).all()
+        except Exception as e:
+            logger.error(f"Error al obtener productos por categoría y usuario: {str(e)}")
             return []
 
 

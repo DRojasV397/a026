@@ -21,20 +21,28 @@ class ProductoService:
         self.producto_repo = ProductoRepository(db)
         self.categoria_repo = CategoriaRepository(db)
 
-    def create_producto(self, producto_data: ProductoCreate) -> Optional[Producto]:
+    def create_producto(
+        self, producto_data: ProductoCreate, user_id: int
+    ) -> Optional[Producto]:
         """
-        Crea un nuevo producto.
+        Crea un nuevo producto asociado al usuario.
+        Si el SKU ya existe para ese usuario, lanza ValueError.
 
         Args:
             producto_data: Datos del producto
+            user_id: ID del usuario propietario
 
         Returns:
             Optional[Producto]: Producto creado o None
         """
-        # Validar que el SKU no exista
-        existing_producto = self.producto_repo.get_by_sku(producto_data.sku)
-        if existing_producto:
-            raise ValueError(f"El SKU '{producto_data.sku}' ya existe")
+        # Validar que el SKU no exista ya para este usuario
+        if producto_data.sku:
+            existing = self.producto_repo.get_by_sku_y_usuario(producto_data.sku, user_id)
+            if existing:
+                raise ValueError(
+                    f"El SKU '{producto_data.sku}' ya existe en tu catálogo. "
+                    f"Usa la carga de archivo para actualizar sus valores."
+                )
 
         # Validar que la categoría exista si se proporciona
         if producto_data.idCategoria:
@@ -42,37 +50,69 @@ class ProductoService:
             if not categoria:
                 raise ValueError(f"La categoría {producto_data.idCategoria} no existe")
 
-        return self.producto_repo.create(producto_data.model_dump())
+        data = producto_data.model_dump()
+        data['creadoPor'] = user_id
+        return self.producto_repo.create(data)
 
-    def get_producto(self, producto_id: int) -> Optional[Producto]:
-        """Obtiene un producto por ID."""
-        return self.producto_repo.get_by_id(producto_id)
+    def get_producto(self, producto_id: int, user_id: int) -> Optional[Producto]:
+        """
+        Obtiene un producto por ID, verificando que pertenezca al usuario.
 
-    def get_producto_by_sku(self, sku: str) -> Optional[Producto]:
-        """Obtiene un producto por SKU."""
-        return self.producto_repo.get_by_sku(sku)
+        Args:
+            producto_id: ID del producto
+            user_id: ID del usuario
+
+        Returns:
+            Optional[Producto]: Producto si existe y pertenece al usuario, None si no
+        """
+        producto = self.producto_repo.get_by_id(producto_id)
+        if producto and producto.creadoPor == user_id:
+            return producto
+        return None
+
+    def get_producto_by_sku(self, sku: str, user_id: int) -> Optional[Producto]:
+        """Obtiene un producto por SKU perteneciente al usuario."""
+        return self.producto_repo.get_by_sku_y_usuario(sku, user_id)
 
     def get_productos(
         self,
+        user_id: int,
         skip: int = 0,
         limit: int = 100,
         activos_only: bool = False,
         categoria_id: Optional[int] = None
     ) -> List[Producto]:
-        """Obtiene productos con filtros opcionales."""
-        if categoria_id:
-            return self.producto_repo.get_by_categoria(categoria_id)
-        if activos_only:
-            return self.producto_repo.get_activos()
-        return self.producto_repo.get_all(skip=skip, limit=limit)
+        """
+        Obtiene los productos del usuario con filtros opcionales.
 
-    def update_producto(self, producto_id: int, producto_data: ProductoUpdate) -> Optional[Producto]:
-        """Actualiza un producto."""
+        Args:
+            user_id: ID del usuario (solo verá sus propios productos)
+            skip: Paginación
+            limit: Máximo de resultados
+            activos_only: Solo productos activos
+            categoria_id: Filtrar por categoría
+        """
+        if categoria_id:
+            return self.producto_repo.get_por_categoria_y_usuario(categoria_id, user_id)
+        if activos_only:
+            return self.producto_repo.get_activos_por_usuario(user_id)
+        return self.producto_repo.get_por_usuario(user_id, skip=skip, limit=limit)
+
+    def update_producto(
+        self, producto_id: int, producto_data: ProductoUpdate, user_id: int
+    ) -> Optional[Producto]:
+        """Actualiza un producto verificando que pertenezca al usuario."""
+        producto = self.get_producto(producto_id, user_id)
+        if not producto:
+            return None
         update_dict = producto_data.model_dump(exclude_unset=True)
         return self.producto_repo.update(producto_id, update_dict)
 
-    def delete_producto(self, producto_id: int) -> bool:
-        """Elimina un producto."""
+    def delete_producto(self, producto_id: int, user_id: int) -> bool:
+        """Elimina un producto verificando que pertenezca al usuario."""
+        producto = self.get_producto(producto_id, user_id)
+        if not producto:
+            return False
         return self.producto_repo.delete(producto_id)
 
 

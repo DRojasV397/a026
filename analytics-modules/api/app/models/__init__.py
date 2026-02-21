@@ -9,6 +9,7 @@ from .venta import Venta, DetalleVenta
 from .compra import Compra, DetalleCompra
 from .prediccion import Modelo, VersionModelo, Prediccion, Escenario, ParametroEscenario, ResultadoEscenario
 from .rentabilidad import Rentabilidad, ResultadoFinanciero, Reporte, Alerta
+from .historial_carga import HistorialCarga
 
 __all__ = [
     'Usuario', 'Rol', 'UsuarioRol', 'PreferenciaUsuario',
@@ -16,5 +17,6 @@ __all__ = [
     'Venta', 'DetalleVenta',
     'Compra', 'DetalleCompra',
     'Modelo', 'VersionModelo', 'Prediccion', 'Escenario', 'ParametroEscenario', 'ResultadoEscenario',
-    'Rentabilidad', 'ResultadoFinanciero', 'Reporte', 'Alerta'
+    'Rentabilidad', 'ResultadoFinanciero', 'Reporte', 'Alerta',
+    'HistorialCarga'
 ]

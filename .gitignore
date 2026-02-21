@@ -112,4 +112,10 @@ __pycache__/
 .env.local
 .env.*.local
 
+.claude
 .claude/
+/.claude/
+claude-agents/
+/claude-agents/
+
+*.ps1

@@ -1,7 +1,6 @@
 package com.app.ui.data;
 
 import com.app.model.data.CleaningReport;
-import com.app.model.data.UploadedFileDTO;
 import com.app.model.data.ValidationReport;
 import com.app.model.data.ValidationResultDTO;
 import com.app.model.data.ValidationResultDTO.ValidationRuleResult;
@@ -162,6 +161,9 @@ public class DataController {
     private static final DateTimeFormatter FMT_DISPLAY =
             DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm", new Locale("es", "MX"));
 
+    /** Catálogo de productos cargados en memoria para filtrado local */
+    private List<ProductoCatalogDTO> allProductos = new ArrayList<>();
+
     // ═════════════════════════════════════════════════════════════════════════
     //  INICIALIZACIÓN
     // ═════════════════════════════════════════════════════════════════════════
@@ -177,7 +179,7 @@ public class DataController {
         Platform.runLater(() -> {
             buildHowToSteps();
             buildFormatFields();
-            loadRecentUploads(getMockRecentUploads());
+            loadRecentUploadsFromApi();
         });
     }
 
@@ -435,14 +437,19 @@ public class DataController {
         tipoDialog.setHeaderText("¿Qué tipo de datos contiene este archivo?");
         tipoDialog.setContentText(currentFile.getName());
 
-        ButtonType btnVentas  = new ButtonType("Ventas",  ButtonBar.ButtonData.LEFT);
-        ButtonType btnCompras = new ButtonType("Compras", ButtonBar.ButtonData.RIGHT);
-        ButtonType btnCancel  = new ButtonType("Cancelar", ButtonBar.ButtonData.CANCEL_CLOSE);
-        tipoDialog.getDialogPane().getButtonTypes().setAll(btnVentas, btnCompras, btnCancel);
+        ButtonType btnVentas     = new ButtonType("Ventas",      ButtonBar.ButtonData.LEFT);
+        ButtonType btnCompras    = new ButtonType("Compras",     ButtonBar.ButtonData.LEFT);
+        ButtonType btnProductos  = new ButtonType("Productos",   ButtonBar.ButtonData.LEFT);
+        ButtonType btnInventario = new ButtonType("Inventario",  ButtonBar.ButtonData.LEFT);
+        ButtonType btnCancel     = new ButtonType("Cancelar",    ButtonBar.ButtonData.CANCEL_CLOSE);
+        tipoDialog.getDialogPane().getButtonTypes()
+                .setAll(btnVentas, btnCompras, btnProductos, btnInventario, btnCancel);
 
         tipoDialog.setResultConverter(btn -> {
-            if (btn == btnVentas)  return "ventas";
-            if (btn == btnCompras) return "compras";
+            if (btn == btnVentas)     return "ventas";
+            if (btn == btnCompras)    return "compras";
+            if (btn == btnProductos)  return "productos";
+            if (btn == btnInventario) return "inventario";
             return null;
         });
 
@@ -626,22 +633,36 @@ public class DataController {
 
 
     // ═════════════════════════════════════════════════════════════════════════
-    //  CARGAS RECIENTES
+    //  CARGAS RECIENTES — datos reales de GET /data/historial
     // ═════════════════════════════════════════════════════════════════════════
 
-    private void loadRecentUploads(List<UploadedFileDTO> uploads) {
+    /** Llama a la API y actualiza la lista de cargas recientes. */
+    private void loadRecentUploadsFromApi() {
+        dataApiService.getHistorial(null)
+                .thenAccept(historial -> Platform.runLater(() -> {
+                    List<HistorialCargaItemDTO> items =
+                            (historial != null) ? historial.getItems() : List.of();
+                    loadRecentUploads(items);
+                }))
+                .exceptionally(ex -> {
+                    Platform.runLater(() -> loadRecentUploads(List.of()));
+                    return null;
+                });
+    }
+
+    private void loadRecentUploads(List<HistorialCargaItemDTO> uploads) {
         recentUploadsList.getChildren().clear();
 
         boolean empty = uploads.isEmpty();
         recentEmptyState.setVisible(empty);
         recentEmptyState.setManaged(empty);
 
-        for (UploadedFileDTO upload : uploads) {
+        for (HistorialCargaItemDTO upload : uploads) {
             recentUploadsList.getChildren().add(buildRecentRow(upload));
         }
     }
 
-    private HBox buildRecentRow(UploadedFileDTO upload) {
+    private HBox buildRecentRow(HistorialCargaItemDTO upload) {
         HBox row = new HBox(0);
         row.getStyleClass().add("recent-row");
         row.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
@@ -654,54 +675,74 @@ public class DataController {
             return col;
         };
 
-        // Icono de tipo
-        String iconPath = upload.fileType().equals("XLSX")
+        // Icono de tipo (CSV / XLSX)
+        String ext = upload.getFileExtension();
+        String iconPath = ext.equals("XLSX")
                 ? "/images/reports/format-excel.png"
                 : "/images/data/csv-icon.png";
         ImageView icon = loadIcon(iconPath, 28, 28);
         HBox colIcon = fixedCol.apply(icon, 40.0);
 
         // Nombre del archivo (flexible con elipsis)
-        Label lblName = new Label(upload.fileName());
+        Label lblName = new Label(upload.getNombreArchivo());
         lblName.getStyleClass().add("recent-file-name");
         lblName.setTextOverrun(OverrunStyle.ELLIPSIS);
         lblName.setMaxWidth(Double.MAX_VALUE);
         HBox.setHgrow(lblName, javafx.scene.layout.Priority.ALWAYS);
 
-        // Fecha
-        Label lblDate = new Label(upload.uploadedAt().format(FMT_DISPLAY));
+        // Fecha (parseada desde ISO-8601)
+        String fechaStr = "--";
+        if (upload.getCargadoEn() != null && !upload.getCargadoEn().isBlank()) {
+            try {
+                LocalDateTime dt = LocalDateTime.parse(upload.getCargadoEn(),
+                        java.time.format.DateTimeFormatter.ISO_DATE_TIME);
+                fechaStr = dt.format(FMT_DISPLAY);
+            } catch (Exception ignored) {
+                fechaStr = upload.getCargadoEn();
+            }
+        }
+        Label lblDate = new Label(fechaStr);
         lblDate.getStyleClass().add("recent-meta");
         HBox colDate = fixedCol.apply(lblDate, 130.0);
 
         // Estado con color
-        Label lblStatus = new Label(upload.status());
-        lblStatus.getStyleClass().add("upload-status-" + upload.status().toLowerCase());
+        Label lblStatus = new Label(upload.getEstado());
+        lblStatus.getStyleClass().add("upload-status-" + upload.getEstado().toLowerCase());
         HBox colStatus = fixedCol.apply(lblStatus, 90.0);
 
-        // Peso
-        Label lblSize = new Label(upload.sizeKb() + " KB");
-        lblSize.getStyleClass().add("recent-meta");
-        HBox colSize = fixedCol.apply(lblSize, 70.0);
+        // Registros: muestra insertados y/o actualizados
+        int ins = upload.getRegistrosInsertados();
+        int upd = upload.getRegistrosActualizados();
+        String recsText;
+        if (ins > 0 && upd > 0) {
+            recsText = ins + " ins · " + upd + " act";
+        } else if (ins > 0) {
+            recsText = ins + " nuevos";
+        } else if (upd > 0) {
+            recsText = upd + " actualizados";
+        } else {
+            recsText = "0 registros";
+        }
+        Label lblRecs = new Label(recsText);
+        lblRecs.getStyleClass().add("recent-meta");
+        HBox colRecs = fixedCol.apply(lblRecs, 110.0);
 
-        // Botón ver datos
+        // Botón ver datos → navega al tab de históricos con el tipo de datos
         Button btnView = new Button("Ver datos");
         btnView.getStyleClass().add("btn-view-log");
-        btnView.setTooltip(new Tooltip("Ver datos"));
+        btnView.setTooltip(new Tooltip("Ver datos en Consultar históricos"));
         btnView.setOnAction(e -> onViewUploadedData(upload));
 
-        row.getChildren().addAll(colIcon, lblName, colDate, colStatus, colSize, btnView);
+        row.getChildren().addAll(colIcon, lblName, colDate, colStatus, colRecs, btnView);
         return row;
     }
 
-    /**
-     * Abre la vista de datos cargados para el archivo indicado.
-     * TODO: implementar vista previa de datos (CU-01 paso 6: primeras 10 filas)
-     */
-    private void onViewUploadedData(UploadedFileDTO upload) {
-        System.out.printf("[DATA] Ver datos de carga: id=%d, archivo=%s%n",
-                upload.id(), upload.fileName());
-        // TODO: dataPreviewService.showPreview(upload.id())
-        //       o navegar a históricos con filtro por esta carga
+    /** Navega al tab de históricos y carga los productos del usuario. */
+    private void onViewUploadedData(HistorialCargaItemDTO upload) {
+        System.out.printf("[DATA] Ver datos de carga: id=%d, tipo=%s, archivo=%s%n",
+                upload.getIdHistorial(), upload.getTipoDatos(), upload.getNombreArchivo());
+        // Navegar al tab de históricos
+        switchTab(1);
     }
 
     // ═════════════════════════════════════════════════════════════════════════
@@ -841,26 +882,42 @@ public class DataController {
     }
 
     // ═════════════════════════════════════════════════════════════════════════
-    //  HISTÓRICOS — tabla y filtros
+    //  HISTÓRICOS — catálogo de productos del usuario
     // ═════════════════════════════════════════════════════════════════════════
 
     private void populateHistoryFilters() {
-        cmbDataType.getItems().addAll("Todos", "Ventas", "Compras");
+        // Filtro de estado (productos activos / inactivos)
+        cmbDataType.getItems().addAll("Todos", "Activos", "Inactivos");
         cmbDataType.getSelectionModel().selectFirst();
-        dpHistoryFrom.setValue(LocalDate.now().minusMonths(3));
-        dpHistoryTo.setValue(LocalDate.now());
+
+        // Ocultar filtros de fecha (no aplican al catálogo de productos)
+        dpHistoryFrom.setVisible(false);
+        dpHistoryFrom.setManaged(false);
+        dpHistoryTo.setVisible(false);
+        dpHistoryTo.setManaged(false);
+        lblFilterFrom.setVisible(false);
+        lblFilterFrom.setManaged(false);
+        lblFilterTo.setVisible(false);
+        lblFilterTo.setManaged(false);
+
+        // Actualizar etiquetas del filtro
+        lblFiltersTitle.setText("Filtros");
+        lblFilterType.setText("Estado");
+        lblFilterSearch.setText("Buscar producto / SKU");
+        txtHistorySearch.setPromptText("Nombre o SKU...");
+        lblTableTitle.setText("Cat\u00E1logo de Productos");
     }
 
     @SuppressWarnings("unchecked")
     private void setupHistoryTable() {
-        colDate.setText("Fecha");
-        colProduct.setText("Producto / Servicio");
-        colPrice.setText("Precio Unitario");
-        colQty.setText("Cantidad");
-        colTotal.setText("Monto Final");
-        colType.setText("Tipo");
+        // Columnas reasignadas al catálogo de productos
+        colDate.setText("SKU");
+        colProduct.setText("Nombre");
+        colPrice.setText("Precio Unit.");
+        colQty.setText("Costo Unit.");
+        colTotal.setText("Margen");
+        colType.setText("Categor\u00EDa");
 
-        // Binding de columnas por índice de la lista observable
         colDate.setCellValueFactory(r    -> new SimpleStringProperty(r.getValue().get(0)));
         colProduct.setCellValueFactory(r -> new SimpleStringProperty(r.getValue().get(1)));
         colPrice.setCellValueFactory(r   -> new SimpleStringProperty(r.getValue().get(2)));
@@ -868,41 +925,121 @@ public class DataController {
         colTotal.setCellValueFactory(r   -> new SimpleStringProperty(r.getValue().get(4)));
         colType.setCellValueFactory(r    -> new SimpleStringProperty(r.getValue().get(5)));
 
-        dataTable.setPlaceholder(new Label("Aplica los filtros para ver los datos"));
+        dataTable.setPlaceholder(new Label("Cargando productos..."));
+    }
+
+    /** Carga los productos desde la API y los almacena en memoria. */
+    private void loadProductosFromApi() {
+        dataTable.setPlaceholder(new Label("Cargando productos..."));
+        historyEmptyState.setVisible(false);
+        historyEmptyState.setManaged(false);
+
+        dataApiService.getProductos()
+                .thenAccept(productos -> Platform.runLater(() -> {
+                    if (productos == null) {
+                        allProductos = new ArrayList<>();
+                        showHistoryEmpty(true);
+                        return;
+                    }
+                    allProductos = productos;
+                    applyAndRenderProductoFilters();
+                }))
+                .exceptionally(ex -> {
+                    Platform.runLater(() -> {
+                        allProductos = new ArrayList<>();
+                        showHistoryEmpty(true);
+                        dataTable.setPlaceholder(new Label("Error al conectar con el servidor."));
+                    });
+                    return null;
+                });
+    }
+
+    /** Aplica los filtros actuales sobre allProductos y actualiza la tabla. */
+    private void applyAndRenderProductoFilters() {
+        String estado  = cmbDataType.getValue();
+        String busqueda = txtHistorySearch.getText() != null
+                ? txtHistorySearch.getText().trim().toLowerCase() : "";
+
+        List<ProductoCatalogDTO> filtered = allProductos.stream()
+                .filter(p -> {
+                    if ("Activos".equals(estado)   && !p.isActivo())  return false;
+                    if ("Inactivos".equals(estado) &&  p.isActivo())  return false;
+                    if (!busqueda.isEmpty()) {
+                        boolean matchNombre = p.getNombre().toLowerCase().contains(busqueda);
+                        boolean matchSku    = p.getSku().toLowerCase().contains(busqueda);
+                        if (!matchNombre && !matchSku) return false;
+                    }
+                    return true;
+                })
+                .collect(java.util.stream.Collectors.toList());
+
+        updateProductosTable(filtered);
+    }
+
+    /** Renderiza la lista filtrada en la tabla de históricos. */
+    private void updateProductosTable(List<ProductoCatalogDTO> productos) {
+        boolean empty = productos.isEmpty();
+        showHistoryEmpty(empty);
+
+        if (!empty) {
+            List<ObservableList<String>> rows = new ArrayList<>();
+            for (ProductoCatalogDTO p : productos) {
+                rows.add(FXCollections.observableArrayList(
+                        p.getSku(),
+                        p.getNombre(),
+                        p.getPrecioFormateado(),
+                        p.getCostoFormateado(),
+                        p.getMargen(),
+                        p.getCategoriaNombre()
+                ));
+            }
+            dataTable.setItems(FXCollections.observableArrayList(rows));
+            dataTable.setVisible(true);
+        }
+
+        // Estadísticas del footer
+        long activos   = allProductos.stream().filter(ProductoCatalogDTO::isActivo).count();
+        long inactivos = allProductos.size() - activos;
+        long categorias = allProductos.stream()
+                .map(ProductoCatalogDTO::getCategoriaNombre)
+                .distinct().count();
+
+        lblRecordCount.setText(productos.size() + " producto" + (productos.size() != 1 ? "s" : ""));
+        lblStatRange.setText("\uD83D\uDCE6  Total cat\u00E1logo: " + allProductos.size());
+        lblStatTotal.setText("\u2705  Activos: " + activos + "  |  \u26D4  Inactivos: " + inactivos);
+        lblStatAvg.setText("\uD83C\uDFF7\uFE0F  Categor\u00EDas: " + categorias);
+    }
+
+    private void showHistoryEmpty(boolean empty) {
+        historyEmptyState.setVisible(empty);
+        historyEmptyState.setManaged(empty);
+        dataTable.setVisible(!empty);
+        if (empty) {
+            dataTable.setPlaceholder(new Label(
+                    "No hay productos cargados.\nSube un archivo de tipo \"Productos\" en la pesta\u00F1a Cargar datos."));
+        }
     }
 
     @FXML
     private void onApplyFilters() {
-        // TODO: reemplazar por dataService.query(tipo, desde, hasta, search)
-        //       retorna List<List<String>> o Page<DataRowDTO>
-        String tipo   = cmbDataType.getValue();
-        LocalDate from = dpHistoryFrom.getValue();
-        LocalDate to   = dpHistoryTo.getValue();
-        String search  = txtHistorySearch.getText();
+        // Si no hay productos en caché (primera vez o tras error), recargar desde API
+        // En cualquier otro caso, filtrar localmente para respuesta inmediata
+        if (allProductos.isEmpty()) {
+            loadProductosFromApi();
+        } else {
+            applyAndRenderProductoFilters();
+        }
+    }
 
-        System.out.printf("[DATA] Consulta histórica: tipo=%s, desde=%s, hasta=%s, buscar='%s'%n",
-                tipo, from, to, search);
-
-        // Mock: cargamos datos de ejemplo
-        List<ObservableList<String>> mockRows = getMockHistoryRows();
-
-        boolean empty = mockRows.isEmpty();
-        historyEmptyState.setVisible(empty);
-        historyEmptyState.setManaged(empty);
-        dataTable.setVisible(!empty);
-
-        dataTable.setItems(FXCollections.observableArrayList(mockRows));
-
-        lblRecordCount.setText(mockRows.size() + " registros");
-        lblStatRange.setText("\uD83D\uDCC5  Per\u00EDodo: " + from + " → " + to);
-        lblStatTotal.setText("\uD83D\uDCCB  Total: " + mockRows.size() + " filas");
-        lblStatAvg.setText("\uD83D\uDCCA  Tipo: " + tipo);
+    /** Fuerza la recarga completa del catálogo desde la API (limpia la caché local). */
+    private void refreshProductosFromApi() {
+        allProductos = new ArrayList<>();
+        loadProductosFromApi();
     }
 
     @FXML
     private void onExportData() {
-        // TODO: dataService.export(currentQueryResult, formato)
-        System.out.println("[DATA] Exportar datos históricos filtrados");
+        System.out.println("[DATA] Exportar catálogo de productos");
         showInfo("Exportar datos",
                 "La exportaci\u00F3n de datos estar\u00E1 disponible en la pr\u00F3xima versi\u00F3n.");
     }
@@ -1148,19 +1285,42 @@ public class DataController {
 
         String dataType = currentDataType != null ? currentDataType : "ventas";
 
-        // Mapeo por defecto de columnas (el backend acepta mapeo directo)
+        // Mapeo de columnas según el tipo de datos (source == target porque el CSV
+        // ya usa los nombres que espera el backend en su lógica de inserción).
         Map<String, String> columnMappings = new HashMap<>();
-        columnMappings.put("fecha", "fecha");
-        columnMappings.put("total", "total");
-        if ("ventas".equals(dataType)) {
-            columnMappings.put("producto", "producto");
-            columnMappings.put("cantidad", "cantidad");
-            columnMappings.put("precio_unitario", "precio_unitario");
-        } else {
-            columnMappings.put("producto", "producto");
-            columnMappings.put("cantidad", "cantidad");
-            columnMappings.put("costo", "costo");
-            columnMappings.put("proveedor", "proveedor");
+        switch (dataType) {
+            case "ventas" -> {
+                columnMappings.put("fecha",           "fecha");
+                columnMappings.put("total",           "total");
+                columnMappings.put("cantidad",        "cantidad");
+                columnMappings.put("precio_unitario", "precio_unitario");
+                columnMappings.put("cliente",         "cliente");
+            }
+            case "compras" -> {
+                columnMappings.put("fecha",     "fecha");
+                columnMappings.put("total",     "total");
+                columnMappings.put("proveedor", "proveedor");
+                columnMappings.put("cantidad",  "cantidad");
+                columnMappings.put("costo",     "costo");
+            }
+            case "productos" -> {
+                columnMappings.put("sku",        "sku");
+                columnMappings.put("nombre",     "nombre");
+                columnMappings.put("precio",     "precio");
+                columnMappings.put("categoria",  "categoria");
+                columnMappings.put("descripcion","descripcion");
+                columnMappings.put("costo",      "costo");
+            }
+            case "inventario" -> {
+                columnMappings.put("sku",       "sku");
+                columnMappings.put("cantidad",  "cantidad");
+                columnMappings.put("ubicacion", "ubicacion");
+                columnMappings.put("minimo",    "minimo");
+                columnMappings.put("maximo",    "maximo");
+            }
+            default -> {
+                // Fallback: enviar columnas vacías y dejar que el backend las detecte
+            }
         }
 
         dataApiService.confirmUpload(currentUploadId, dataType, columnMappings)
@@ -1169,14 +1329,30 @@ public class DataController {
                     btnConfirmValidation.setText("Confirmar y guardar");
 
                     if (confirmResponse != null && confirmResponse.isSuccess()) {
-                        showInfo("Datos guardados",
-                                String.format("Se insertaron %d registros exitosamente.\n%s",
-                                        confirmResponse.getRecordsInserted(),
-                                        confirmResponse.getMessage()));
+                        int inserted = confirmResponse.getRecordsInserted();
+                        int updated  = confirmResponse.getRecordsUpdated();
+                        String detail;
+                        if (inserted > 0 && updated > 0) {
+                            detail = String.format(
+                                "%d registros nuevos insertados\n%d registros existentes actualizados",
+                                inserted, updated);
+                        } else if (inserted > 0) {
+                            detail = String.format("%d registros insertados exitosamente", inserted);
+                        } else if (updated > 0) {
+                            detail = String.format("%d registros actualizados exitosamente", updated);
+                        } else {
+                            detail = confirmResponse.getMessage();
+                        }
+                        showInfo("Datos guardados", detail);
                         validationResult.setVisible(false);
                         validationResult.setManaged(false);
                         buildValidationChecklist();
                         currentUploadId = null;
+                        // Refrescar cargas recientes y catálogo de productos
+                        loadRecentUploadsFromApi();
+                        if (historyInitialized) {
+                            refreshProductosFromApi();
+                        }
                     } else {
                         String msg = confirmResponse != null ? confirmResponse.getMessage() : "Error desconocido";
                         showError("Error al confirmar", msg);
@@ -1239,6 +1415,7 @@ public class DataController {
         historyInitialized = true;
         setupHistoryTable();
         populateHistoryFilters();
+        loadProductosFromApi();
     }
 
     private void initValidationTabIfNeeded() {
@@ -1294,54 +1471,4 @@ public class DataController {
         a.showAndWait();
     }
 
-    // ═════════════════════════════════════════════════════════════════════════
-    //  MOCKS — sustituir por servicios reales
-    // ═════════════════════════════════════════════════════════════════════════
-
-    /**
-     * TODO: sustituir por uploadService.findRecent(userId, limit=10)
-     */
-    private List<UploadedFileDTO> getMockRecentUploads() {
-        return List.of(
-                new UploadedFileDTO(1L, "ventas_enero_2026.xlsx", "XLSX", "VENTAS",
-                        LocalDateTime.now().minusHours(3),
-                        "PROCESADO", 2048L, 1250, "Mateo Alexander"),
-                new UploadedFileDTO(2L, "compras_q1_2026.csv", "CSV", "COMPRAS",
-                        LocalDateTime.now().minusDays(2),
-                        "PROCESADO", 512L, 340, "Mateo Alexander"),
-                new UploadedFileDTO(3L, "ventas_diciembre_2025.xlsx", "XLSX", "VENTAS",
-                        LocalDateTime.now().minusDays(30),
-                        "ERROR", 1800L, -1, "Ana Mart\u00EDnez")
-        );
-    }
-
-    /**
-     * TODO: sustituir por dataService.query(filtros) → List<DataRowDTO>
-     */
-    private List<ObservableList<String>> getMockHistoryRows() {
-        return List.of(
-                FXCollections.observableArrayList("01/01/2026","Producto A","$150.00","10","$1,500.00","VENTA"),
-                FXCollections.observableArrayList("05/01/2026","Producto B","$80.50","5","$402.50","COMPRA"),
-                FXCollections.observableArrayList("10/01/2026","Servicio C","$2,000.00","1","$2,000.00","VENTA"),
-                FXCollections.observableArrayList("15/01/2026","Producto A","$150.00","20","$3,000.00","VENTA"),
-                FXCollections.observableArrayList("20/01/2026","Producto D","$45.00","100","$4,500.00","COMPRA")
-        );
-    }
-
-    /**
-     * TODO: sustituir por validationService.getLastResult(uploadId)
-     */
-    private ValidationResultDTO getMockValidationResult() {
-        return new ValidationResultDTO(
-                1250, 1198, 52, 18, 24, 7, 95.8,
-                List.of(
-                        new ValidationRuleResult("Columnas obligatorias", true, 0, "OK"),
-                        new ValidationRuleResult("Formato de fechas", true, 3, "3 fechas corregidas"),
-                        new ValidationRuleResult("Valores monetarios", true, 0, "OK"),
-                        new ValidationRuleResult("Cantidades v\u00E1lidas", false, 12, "12 filas con cantidad 0"),
-                        new ValidationRuleResult("Campos vac\u00EDos \u226550%", true, 0, "OK"),
-                        new ValidationRuleResult("Sin fechas futuras", true, 0, "OK")
-                )
-        );
-    }
 }

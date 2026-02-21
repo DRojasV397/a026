@@ -1,0 +1,21 @@
+sku,nombre,categoria,descripcion,precio,costo
+ELECT-001,Laptop ProBook X15,Electrónica,"Laptop 15.6"" Intel i7 16GB RAM 512GB SSD",18500.0,12000.0
+ELECT-002,Tablet Samsung Galaxy Tab A8,Electrónica,"Tablet 10.5"" 4GB RAM 64GB Android 12",5800.0,3500.0
+ELECT-003,Smartphone Redmi Note 13 Pro,Electrónica,"Smartphone 6.67"" 128GB AMOLED 200MP",4200.0,2800.0
+ELECT-004,"Monitor LED Full HD 27""",Electrónica,Monitor IPS 144Hz HDMI DisplayPort ajustable,4500.0,2900.0
+ACESS-001,Mouse Inalámbrico Logitech M310,Accesorios,Mouse ergonómico 2.4GHz 3 años batería,480.0,280.0
+ACESS-002,Teclado Mecánico Redragon K552,Accesorios,Teclado TKL RGB switches azules retroiluminado,950.0,550.0
+ACESS-003,Hub USB-C 7 en 1,Accesorios,Hub HDMI 4K USB3.0 lector SD PD100W,620.0,350.0
+ACESS-004,Cable HDMI 4K 2m,Accesorios,Cable HDMI 2.0 4K 60Hz trenzado 2 metros,180.0,80.0
+ACESS-005,"Mochila Laptop 15.6""",Accesorios,Mochila ejecutiva impermeable antirrobo USB,890.0,450.0
+COMP-001,SSD Samsung 870 EVO 1TB,Cómputo,SSD SATA III 560MB/s lectura MLC V-NAND,1450.0,900.0
+COMP-002,Memoria RAM DDR4 16GB 3200MHz,Cómputo,RAM Crucial Ballistix 3200MHz CL16 dual channel,750.0,420.0
+COMP-003,Tarjeta Gráfica RTX 3060 12GB,Cómputo,GPU NVIDIA 12GB GDDR6 192-bit DLSS 3,8900.0,5800.0
+COMP-004,Fuente de Poder 650W 80Plus,Cómputo,Fuente modular 80 Plus Bronze garantía 5 años,1200.0,700.0
+AUDIO-001,Audífonos Sony WH-1000XM5,Audio,Audífonos ANC premium 30h batería Bluetooth 5.2,6500.0,4000.0
+AUDIO-002,Bocina JBL Charge 5,Audio,Bocina portátil 40W IP67 20h batería PartyBoost,2200.0,1300.0
+AUDIO-003,Micrófono USB Blue Yeti,Audio,Micrófono condensador cardioide 48kHz estudio,2800.0,1700.0
+AUDIO-004,Audífonos Gamer HyperX Cloud II,Audio,Audífonos gaming surround 7.1 USB desmontable,1800.0,1100.0
+SMART-001,Foco Inteligente Philips Hue E27,Hogar Inteligente,Foco LED RGB WiFi 10W compatible Alexa Google,450.0,220.0
+SMART-002,Enchufe Inteligente WiFi 15A,Hogar Inteligente,Enchufe WiFi monitoreo energía control remoto,320.0,150.0
+SMART-003,Cámara IP Indoor 1080p WiFi,Hogar Inteligente,Cámara seguridad IA detección personas visión nocturna,780.0,420.0

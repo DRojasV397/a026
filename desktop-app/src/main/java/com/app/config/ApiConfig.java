@@ -119,4 +119,106 @@ public class ApiConfig {
     public static String getDataSheetsUrl(String uploadId) {
         return BASE_URL + "/data/sheets/" + uploadId;
     }
+
+    public static String getDataHistorialUrl() {
+        return BASE_URL + "/data/historial";
+    }
+
+    // ── Products Catalog ────────────────────────────────────────────────────
+
+    public static String getProductosUrl() {
+        return BASE_URL + "/productos/";
+    }
+
+    // ── Profitability Module ─────────────────────────────────────────────────
+
+    public static String getProfitabilityIndicatorsUrl() {
+        return BASE_URL + "/profitability/indicators";
+    }
+
+    public static String getProfitabilityProductsUrl() {
+        return BASE_URL + "/profitability/products";
+    }
+
+    public static String getProfitabilityNonProfitableUrl() {
+        return BASE_URL + "/profitability/products/non-profitable";
+    }
+
+    public static String getProfitabilityCategoriesUrl() {
+        return BASE_URL + "/profitability/categories";
+    }
+
+    public static String getProfitabilityTrendsUrl() {
+        return BASE_URL + "/profitability/trends";
+    }
+
+    public static String getProfitabilityRankingUrl() {
+        return BASE_URL + "/profitability/ranking";
+    }
+
+    public static String getProfitabilitySummaryUrl() {
+        return BASE_URL + "/profitability/summary";
+    }
+
+    // ── Alerts Module ────────────────────────────────────────────────────────
+
+    public static String getAlertsUrl() {
+        return BASE_URL + "/alerts";
+    }
+
+    public static String getAlertHistoryUrl() {
+        return BASE_URL + "/alerts/history";
+    }
+
+    public static String getAlertsSummaryUrl() {
+        return BASE_URL + "/alerts/summary";
+    }
+
+    public static String getAlertReadUrl(int idAlerta) {
+        return BASE_URL + "/alerts/" + idAlerta + "/read";
+    }
+
+    public static String getAlertStatusUrl(int idAlerta) {
+        return BASE_URL + "/alerts/" + idAlerta + "/status";
+    }
+
+    public static String getAlertsConfigUrl() {
+        return BASE_URL + "/alerts/config";
+    }
+
+    public static String getAlertsAnalyzeUrl() {
+        return BASE_URL + "/alerts/analyze";
+    }
+
+    // ── Dashboard Module ─────────────────────────────────────────────────────
+
+    public static String getDashboardExecutiveUrl() {
+        return BASE_URL + "/dashboard/executive";
+    }
+
+    public static String getDashboardKpiUrl(String kpiName) {
+        return BASE_URL + "/dashboard/kpi/" + kpiName;
+    }
+
+    public static String getDashboardPredictionsUrl() {
+        return BASE_URL + "/dashboard/predictions";
+    }
+
+    // ── Reports Module (via dashboard) ───────────────────────────────────────
+
+    public static String getReportTypesUrl() {
+        return BASE_URL + "/dashboard/reports/types";
+    }
+
+    public static String getGenerateReportUrl() {
+        return BASE_URL + "/dashboard/reports/generate";
+    }
+
+    public static String getReportsListUrl() {
+        return BASE_URL + "/dashboard/reports";
+    }
+
+    public static String getReportByIdUrl(int idReporte) {
+        return BASE_URL + "/dashboard/reports/" + idReporte;
+    }
 }

@@ -13,7 +13,8 @@ from app.services.data_service import DataService
 from app.schemas.data_upload import (
     DataType, UploadResponse, ValidateRequest, ValidateResponse,
     PreviewResponse, CleanRequest, CleanResponse,
-    ConfirmRequest, ConfirmResponse, QualityReportResponse
+    ConfirmRequest, ConfirmResponse, QualityReportResponse,
+    HistorialCargaResponse
 )
 from app.middleware.auth_middleware import get_current_user
 from app.schemas.auth import TokenData
@@ -60,7 +61,7 @@ async def upload_file(
         )
 
     service = DataService(db)
-    result = service.upload_file(content, file.filename, sheet_name)
+    result = service.upload_file(content, file.filename, current_user.idUsuario, sheet_name)
 
     logger.info(f"Usuario {current_user.nombreUsuario} subio archivo: {file.filename}")
 
@@ -201,6 +202,22 @@ async def get_quality_report(
         raise HTTPException(status_code=404, detail="Upload no encontrado")
 
     return service.get_quality_report(upload_id)
+
+
+@router.get("/historial", response_model=HistorialCargaResponse)
+async def get_historial_cargas(
+    tipo: Optional[str] = Query(None, description="Filtrar por tipo: ventas, compras, productos"),
+    db: Session = Depends(get_db),
+    current_user: TokenData = Depends(get_current_user)
+):
+    """
+    Obtiene el historial de cargas de datos del usuario autenticado.
+
+    - **tipo**: Filtro opcional por tipo de datos (ventas, compras, productos)
+    """
+    service = DataService(db)
+    result = service.get_historial_cargas(current_user.idUsuario, tipo)
+    return HistorialCargaResponse(items=result["items"], total=result["total"])
 
 
 @router.delete("/{upload_id}")

@@ -3,7 +3,9 @@ package com.app.ui.home;
 import com.app.model.Alert;
 import com.app.model.ListItem;
 import com.app.model.StatsDTO;
+import com.app.model.dashboard.ExecutiveDashboardDTO;
 import com.app.service.alerts.AlertService;
+import com.app.service.dashboard.DashboardService;
 import com.app.ui.components.alerts.AlertCardController;
 import com.app.ui.components.charts.*;
 import com.app.ui.components.lists.VerticalListCardController;
@@ -18,6 +20,7 @@ import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
@@ -60,8 +63,9 @@ public class HomeController {
 
     private boolean additionalChartsLoaded = false;
 
-    // Servicio de alertas
+    // Servicios
     private final AlertService alertService = new AlertService();
+    private final DashboardService dashboardService = new DashboardService();
 
     @FXML
     private void initialize() {
@@ -73,29 +77,23 @@ public class HomeController {
                 dashboardRoot.heightProperty()
         );
 
-        // Cargar charts iniciales en background
-        Task<Void> initTask = new Task<>() {
-            @Override
-            protected Void call() {
-                try {
-                    Thread.sleep(300);
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                }
-                return null;
-            }
-
-            @Override
-            protected void succeeded() {
+        // Cargar datos del dashboard ejecutivo desde la API
+        dashboardService.getExecutiveDashboard().thenAccept(dto -> Platform.runLater(() -> {
+            if (dto != null) {
+                loadStatsFromDashboard(dto);
+                loadTopProductsFromDashboard(dto);
+                loadAlertsFromDashboard(dto);
+            } else {
+                // Fallback a charts estáticos si la API no responde
                 loadStatsCards();
-                loadInitialCharts();
-                loadAlerts(); // Cargar alertas después de los charts
+                loadAlerts();
             }
-        };
-
-        Thread initThread = new Thread(initTask);
-        initThread.setDaemon(true);
-        initThread.start();
+            loadInitialCharts();
+        })).exceptionally(ex -> {
+            System.err.println("[HOME] Error al cargar dashboard ejecutivo: " + ex.getMessage());
+            Platform.runLater(() -> { loadStatsCards(); loadAlerts(); loadInitialCharts(); });
+            return null;
+        });
     }
 
     /**
@@ -137,79 +135,21 @@ public class HomeController {
     }
 
     /**
-     * Carga la lista de productos desde la BD
+     * Carga la lista de productos (usado solo si el dashboard ejecutivo no devuelve datos).
      */
     private void loadTopProductsList() {
-        Task<List<ListItem>> loadListTask = new Task<>() {
-            @Override
-            protected List<ListItem> call() {
-                // TODO: Conectar con tu BD
-                // return productService.getTopProducts();
-
-                // Datos de ejemplo
-                return getMockListItems();
-            }
-
-            @Override
-            protected void succeeded() {
-                List<ListItem> items = getValue();
-                Platform.runLater(() -> topProductsListController.loadItems(items));
-            }
-        };
-
-        new Thread(loadListTask).start();
+        if (topProductsListController != null) {
+            topProductsListController.setTitle("Top Productos");
+            topProductsListController.setSubtitle("M\u00E1s vendidos");
+        }
     }
 
     /**
-     * Obtiene datos de ejemplo para la lista
-     */
-    private List<ListItem> getMockListItems() {
-        List<ListItem> items = new java.util.ArrayList<>();
-
-        items.add(new ListItem(1, "Laptop HP Elite", "345 unidades vendidas",
-                "$45,230", "💻", ListItem.ItemType.SUCCESS));
-        items.add(new ListItem(2, "Mouse Logitech MX", "892 unidades vendidas",
-                "$12,150", "🖱️", ListItem.ItemType.SUCCESS));
-        items.add(new ListItem(3, "Teclado Mecánico", "567 unidades vendidas",
-                "$28,450", "⌨️", ListItem.ItemType.INFO));
-        items.add(new ListItem(4, "Monitor Samsung", "234 unidades vendidas",
-                "$65,800", "🖥️", ListItem.ItemType.SUCCESS));
-        items.add(new ListItem(5, "Webcam Logitech", "156 unidades vendidas",
-                "$8,450", "📷", ListItem.ItemType.WARNING));
-        items.add(new ListItem(6, "Audífonos Sony", "423 unidades vendidas",
-                "$15,680", "🎧", ListItem.ItemType.INFO));
-
-        return items;
-    }
-
-    /**
-     * Carga las alertas desde la base de datos
+     * Carga alertas usando datos mock como fallback cuando la API no está disponible.
      */
     private void loadAlerts() {
-        Task<List<Alert>> loadAlertsTask = new Task<>() {
-            @Override
-            protected List<Alert> call() {
-                // TODO: Reemplazar con conexión real a tu BD
-                // Connection conn = DatabaseConnection.getConnection();
-                // return alertService.getRecentAlerts(conn);
-
-                // Por ahora, usar datos de ejemplo
-                return alertService.getMockAlerts();
-            }
-
-            @Override
-            protected void succeeded() {
-                List<Alert> alerts = getValue();
-                Platform.runLater(() -> displayAlerts(alerts));
-            }
-
-            @Override
-            protected void failed() {
-                Platform.runLater(() -> showEmptyAlertsState());
-            }
-        };
-
-        new Thread(loadAlertsTask).start();
+        List<Alert> alerts = alertService.getMockAlerts();
+        displayAlerts(alerts);
     }
 
     /**
@@ -385,46 +325,118 @@ public class HomeController {
         }
     }
 
-    /* CARGA STATS CARDS */
-    private void loadStatsCards() {
-        Task<List<StatsDTO>> loadStatsTask = new Task<>() {
-            @Override
-            protected List<StatsDTO> call() {
-                // TODO: Reemplazar con BD real
-                return getMockStats();
-            }
+    // ── Carga desde API ───────────────────────────────────────────────────────
 
-            @Override
-            protected void succeeded() {
-                List<StatsDTO> stats = getValue();
+    /** Popula las stats cards con datos reales del dashboard ejecutivo. */
+    private void loadStatsFromDashboard(ExecutiveDashboardDTO dto) {
+        ExecutiveDashboardDTO.ResumenVentas ventas  = dto.getResumenVentas();
+        ExecutiveDashboardDTO.KpisFinancieros kpis  = dto.getKpisFinancieros();
 
-                Platform.runLater(() -> {
-                    statsCardsContainer.getChildren().clear();
+        double variacionVentas = ventas.getVariacion();
+        String signV   = variacionVentas >= 0 ? "↑" : "↓";
+        String colorV  = variacionVentas >= 0 ? "blue" : "orange";
 
-                    for (StatsDTO stat : stats) {
-                        HBox card = StatsCard.createStatsCard(
-                                stat.emoji(),
-                                stat.value(),
-                                stat.label(),
-                                stat.change(),
-                                stat.colorClass(),
-                                stat.positive()
-                        );
-                        statsCardsContainer.getChildren().add(card);
-                    }
-                });
-            }
-        };
+        double margen = kpis.getMargenBrutoPct();
+        String signM  = margen >= 0 ? "↑" : "↓";
+        String colorM = margen >= 20 ? "green" : margen >= 10 ? "blue" : "orange";
 
-        new Thread(loadStatsTask).start();
+        List<StatsDTO> stats = List.of(
+                new StatsDTO("📊",
+                        String.format("$%,.0f", ventas.getTotal()),
+                        "Ventas Totales",
+                        String.format("%s %.1f%%", signV, Math.abs(variacionVentas)),
+                        colorV,
+                        variacionVentas >= 0),
+                new StatsDTO("💰",
+                        String.format("$%,.0f", kpis.getUtilidadBruta()),
+                        "Utilidad Bruta",
+                        String.format("%s %.1f%%", signM, Math.abs(margen)),
+                        colorM,
+                        kpis.getUtilidadBruta() >= 0),
+                new StatsDTO("📦",
+                        String.valueOf(ventas.getCantidad()),
+                        "Ventas del Periodo",
+                        String.format("ROI: %.1f%%", kpis.getRoiPorcentaje()),
+                        "blue",
+                        kpis.getRoiPorcentaje() >= 0)
+        );
+
+        statsCardsContainer.getChildren().clear();
+        for (StatsDTO stat : stats) {
+            HBox card = StatsCard.createStatsCard(
+                    stat.emoji(), stat.value(), stat.label(),
+                    stat.change(), stat.colorClass(), stat.positive());
+            statsCardsContainer.getChildren().add(card);
+        }
     }
 
-    private List<StatsDTO> getMockStats() {
-        return List.of(
-                new StatsDTO("📊", "$124,500", "Ventas Totales", "↑ 12.5%", "blue", true),
-                new StatsDTO("👥", "1,428", "Clientes", "↑ 8.2%", "green", true),
-                new StatsDTO("📦", "342", "Pedidos", "↓ 3.1%", "orange", false)
+    /** Carga el top de productos desde el dashboard ejecutivo. */
+    private void loadTopProductsFromDashboard(ExecutiveDashboardDTO dto) {
+        if (topProductsListController == null) return;
+        topProductsListController.setTitle("Top Productos");
+        topProductsListController.setSubtitle("Más vendidos");
+
+        List<ExecutiveDashboardDTO.ProductoTop> tops = dto.getTopProductos().getPorCantidad();
+        List<ListItem> items = new ArrayList<>();
+        for (int i = 0; i < tops.size(); i++) {
+            ExecutiveDashboardDTO.ProductoTop p = tops.get(i);
+            items.add(new ListItem(
+                    p.getIdProducto(),
+                    p.getNombre(),
+                    p.getCantidadVendida() + " unidades vendidas",
+                    String.format("$%,.0f", p.getIngresosGenerados()),
+                    "📦",
+                    ListItem.ItemType.SUCCESS
+            ));
+        }
+        topProductsListController.loadItems(items);
+    }
+
+    /** Convierte alertas del dashboard ejecutivo al modelo Alert del HomeController. */
+    private void loadAlertsFromDashboard(ExecutiveDashboardDTO dto) {
+        List<ExecutiveDashboardDTO.AlertaResumen> apiAlertas = dto.getAlertasActivas().getAlertas();
+        List<Alert> alerts = new ArrayList<>();
+
+        for (ExecutiveDashboardDTO.AlertaResumen a : apiAlertas) {
+            Alert.AlertType tipo = switch (a.getTipo()) {
+                case "Riesgo"  -> Alert.AlertType.ERROR;
+                case "Oportunidad" -> Alert.AlertType.SUCCESS;
+                default        -> Alert.AlertType.WARNING;
+            };
+
+            String titulo = switch (a.getTipo()) {
+                case "Riesgo"      -> "Riesgo en " + a.getMetrica();
+                case "Oportunidad" -> "Oportunidad en " + a.getMetrica();
+                case "Anomalia"    -> "Anomal\u00EDa en " + a.getMetrica();
+                case "Tendencia"   -> "Tendencia en " + a.getMetrica();
+                default            -> "Alerta en " + a.getMetrica();
+            };
+
+            String mensaje = String.format("Valor actual: %.2f / Esperado: %.2f",
+                    a.getValorActual(), a.getValorEsperado());
+
+            alerts.add(new Alert(a.getId(), tipo, titulo, mensaje, null,
+                    a.getCreadaEn() != null ? a.getCreadaEn().substring(0, 10) : ""));
+        }
+
+        displayAlerts(alerts);
+    }
+
+    /* CARGA STATS CARDS (fallback mock) */
+    private void loadStatsCards() {
+        List<StatsDTO> stats = List.of(
+                new StatsDTO("\uD83D\uDCCA", "$124,500", "Ventas Totales", "\u2191 12.5%", "blue", true),
+                new StatsDTO("\uD83D\uDCB0", "$38,200", "Utilidad Bruta", "\u2191 8.2%", "green", true),
+                new StatsDTO("\uD83D\uDCE6", "342", "Ventas del Periodo", "ROI: 30.7%", "blue", true)
         );
+
+        statsCardsContainer.getChildren().clear();
+        for (StatsDTO stat : stats) {
+            HBox card = StatsCard.createStatsCard(
+                    stat.emoji(), stat.value(), stat.label(),
+                    stat.change(), stat.colorClass(), stat.positive());
+            statsCardsContainer.getChildren().add(card);
+        }
     }
 
 

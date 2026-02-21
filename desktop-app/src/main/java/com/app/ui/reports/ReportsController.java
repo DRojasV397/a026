@@ -4,7 +4,9 @@ import com.app.model.reports.ExecutionLogDTO;
 import com.app.model.reports.ReportDTO;
 import com.app.model.reports.ReportTypeDTO;
 import com.app.model.reports.ScheduledReportDTO;
+import com.app.service.reports.ReportsService;
 import com.app.ui.components.AnimatedToggleSwitch;
+import javafx.application.Platform;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.collections.transformation.FilteredList;
@@ -85,6 +87,9 @@ public class ReportsController {
     private ReportTypeDTO   selectedReportType = null;
     private List<ReportTypeDTO> cachedReportTypes;
 
+    // ── Servicio ──────────────────────────────────────────────────────────────
+    private final ReportsService reportsService = new ReportsService();
+
     // Lista observable para filtrado en tiempo real
     private ObservableList<ReportDTO>   allSavedReports;
     private FilteredList<ReportDTO>     filteredReports;
@@ -102,15 +107,23 @@ public class ReportsController {
 
         setAllTexts(); // renombrar el bloque de textos a método propio
 
-        // Solo lo necesario para el primer frame
-        cachedReportTypes = getMockReportTypes();
-        loadReportTypes(getMockReportTypes());
+        // Cargar tipos de reporte desde la API
+        cachedReportTypes = getMockReportTypes(); // fallback mientras carga
+        loadReportTypes(cachedReportTypes);
 
         dpTo.setValue(LocalDate.now());
         dpFrom.setValue(LocalDate.now().minusMonths(1));
 
+        // Cargar tipos reales desde la API
+        reportsService.getReportTypes().thenAccept(types -> Platform.runLater(() -> {
+            if (!types.isEmpty()) {
+                cachedReportTypes = types;
+                loadReportTypes(types);
+            }
+        }));
+
         // El resto se difiere al siguiente pulso del hilo UI
-        javafx.application.Platform.runLater(() -> {
+        Platform.runLater(() -> {
             loadSavedReports(getMockSavedReports());
             loadScheduledReports(getMockScheduledReports());
             loadExecutionHistory(getMockExecutionHistory());
@@ -220,16 +233,13 @@ public class ReportsController {
         cmbSubType.getItems().clear();
 
         List<String> subTypes = switch (typeId) {
-            case "PREDICTIVE" -> List.of(
-                    "Proyecci\u00F3n de ventas",
-                    "Predicci\u00F3n de demanda",
-                    "Tendencia por categor\u00EDa"
-            );
-            case "PROFIT" -> List.of(
-                    "Rentabilidad general",
-                    "Rentabilidad por producto",
-                    "Rentabilidad por categor\u00EDa"
-            );
+            case "ventas" -> List.of("Agrupado por d\u00EDa", "Agrupado por semana", "Agrupado por mes");
+            case "compras" -> List.of("Agrupado por d\u00EDa", "Agrupado por semana", "Agrupado por mes");
+            case "rentabilidad" -> List.of("Rentabilidad mensual");
+            case "productos" -> List.of("Top 10 productos", "Top 20 productos", "Top 50 productos");
+            // Compatibilidad con IDs legacy del mock
+            case "PREDICTIVE" -> List.of("Proyecci\u00F3n de ventas", "Predicci\u00F3n de demanda");
+            case "PROFIT" -> List.of("Rentabilidad general", "Rentabilidad por producto");
             default -> List.of("Reporte completo");
         };
 
@@ -279,25 +289,24 @@ public class ReportsController {
         btnGenerate.setDisable(true);
         showStatus("Generando reporte...", true);
 
-        // TODO: reemplazar por reportService.generate(params) de forma asíncrona
-        // Por ahora simulamos con un pequeño delay
-        System.out.printf("[REPORT] Generando: tipo=%s, subTipo=%s, nombre=%s, formato=%s, desde=%s, hasta=%s%n",
-                selectedReportType.id(),
-                cmbSubType.getValue(),
-                txtReportName.getText(),
-                selectedFormat,
-                dpFrom.getValue(),
-                dpTo.getValue()
-        );
+        String apiFormato = selectedFormat.equals("EXCEL") ? "excel" : "json";
+        String apiTipo    = selectedReportType.id(); // ya viene en formato API ("ventas", etc.)
 
-        // Simulación de éxito (quitar al integrar el servicio real)
-        javafx.animation.PauseTransition pause =
-                new javafx.animation.PauseTransition(javafx.util.Duration.seconds(1.5));
-        pause.setOnFinished(e -> {
+        reportsService.generateReport(
+                apiTipo,
+                dpFrom.getValue(),
+                dpTo.getValue(),
+                apiFormato,
+                "dia",
+                20
+        ).thenAccept(ok -> Platform.runLater(() -> {
             btnGenerate.setDisable(false);
-            showStatus("\u2714 Reporte generado exitosamente.", true);
-        });
-        pause.play();
+            if (ok) {
+                showStatus("\u2714 Reporte generado exitosamente.", true);
+            } else {
+                showStatus("\u2716 Error al generar el reporte. Intenta de nuevo.", false);
+            }
+        }));
     }
 
     private void showStatus(String message, boolean isSuccess) {

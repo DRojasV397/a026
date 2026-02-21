@@ -31,6 +31,7 @@ logger = logging.getLogger(__name__)
 # Almacenamiento global de modelos para persistir entre requests
 # Esto permite que los modelos cargados esten disponibles para todas las instancias del servicio
 _global_trained_models: Dict[str, BaseModel] = {}
+_global_model_ids: Dict[str, Optional[int]] = {}
 
 
 class PredictionService:
@@ -54,7 +55,7 @@ class PredictionService:
     MIN_HISTORICAL_DAYS = 180
 
     def __init__(self, db: Session, auto_load: bool = False):
-        global _global_trained_models
+        global _global_trained_models, _global_model_ids
 
         self.db = db
         self.venta_repo = VentaRepository(db)
@@ -64,6 +65,7 @@ class PredictionService:
 
         # Usar almacenamiento global para persistir modelos entre requests
         self._trained_models = _global_trained_models
+        self._trained_model_ids = _global_model_ids
 
         # Crear directorio de modelos si no existe
         os.makedirs(self.MODELS_DIR, exist_ok=True)
@@ -99,7 +101,8 @@ class PredictionService:
         self,
         fecha_inicio: Optional[datetime] = None,
         fecha_fin: Optional[datetime] = None,
-        aggregation: str = 'D'  # D=diario, W=semanal, M=mensual
+        aggregation: str = 'D',  # D=diario, W=semanal, M=mensual
+        user_id: Optional[int] = None
     ) -> pd.DataFrame:
         """
         Obtiene datos de ventas agregados.
@@ -118,7 +121,7 @@ class PredictionService:
         if fecha_inicio is None:
             fecha_inicio = fecha_fin - timedelta(days=730)
 
-        ventas = self.venta_repo.get_by_rango_fechas(fecha_inicio, fecha_fin)
+        ventas = self.venta_repo.get_by_rango_fechas(fecha_inicio, fecha_fin, user_id=user_id)
 
         if not ventas:
             return pd.DataFrame(columns=['fecha', 'total'])
@@ -159,11 +162,13 @@ class PredictionService:
             issues.append("No hay datos disponibles")
             return False, issues
 
-        # Verificar minimo de datos
-        if len(df) < self.MIN_HISTORICAL_DAYS:
+        # Verificar rango minimo de fechas (no cantidad de filas, ya que
+        # la agregacion semanal/mensual reduce el numero de registros)
+        date_span = (df['fecha'].max() - df['fecha'].min()).days
+        if date_span < self.MIN_HISTORICAL_DAYS:
             issues.append(
-                f"Datos insuficientes: {len(df)} registros. "
-                f"Minimo requerido: {self.MIN_HISTORICAL_DAYS} (6 meses)"
+                f"Rango de datos insuficiente: {date_span} días. "
+                f"Mínimo requerido: {self.MIN_HISTORICAL_DAYS} días (6 meses)"
             )
 
         # Verificar valores nulos
@@ -183,7 +188,8 @@ class PredictionService:
         model_type: str,
         fecha_inicio: Optional[datetime] = None,
         fecha_fin: Optional[datetime] = None,
-        hyperparameters: Optional[Dict[str, Any]] = None
+        hyperparameters: Optional[Dict[str, Any]] = None,
+        user_id: Optional[int] = None
     ) -> Dict[str, Any]:
         """
         Entrena un modelo predictivo.
@@ -193,12 +199,13 @@ class PredictionService:
             fecha_inicio: Fecha inicial de datos
             fecha_fin: Fecha final de datos
             hyperparameters: Hiperparametros del modelo
+            user_id: ID del usuario (filtra datos propios + legacy)
 
         Returns:
             Dict con resultados del entrenamiento
         """
-        # Obtener datos
-        df = self.get_sales_data(fecha_inicio, fecha_fin)
+        # Obtener datos del usuario
+        df = self.get_sales_data(fecha_inicio, fecha_fin, user_id=user_id)
 
         # Validar requisitos
         valid, issues = self.validate_data_requirements(df)
@@ -230,8 +237,9 @@ class PredictionService:
             model_key = f"{model_type}_{datetime.now().strftime('%Y%m%d%H%M%S')}"
             self._trained_models[model_key] = model
 
-            # Guardar en BD
+            # Guardar en BD y registrar su ID para usarlo al persistir predicciones
             modelo_db = self._save_model_to_db(model, model_key, metrics)
+            self._trained_model_ids[model_key] = modelo_db.idModelo if modelo_db else None
 
             # Guardar modelo en disco
             model_path = os.path.join(self.MODELS_DIR, f"{model_key}.pkl")
@@ -365,8 +373,14 @@ class PredictionService:
             # Generar predicciones
             result = model.forecast(periods=periods)
 
+            # Resolver el ID de BD del modelo para persistir predicciones correctamente
+            resolved_key = model_key or next(
+                (k for k, m in self._trained_models.items() if m is model), None
+            )
+            db_model_id = self._trained_model_ids.get(resolved_key) if resolved_key else None
+
             # Guardar predicciones en BD
-            self._save_predictions_to_db(result, model_key)
+            self._save_predictions_to_db(result, resolved_key or "", model_id=db_model_id)
 
             return {
                 "success": True,
@@ -407,7 +421,8 @@ class PredictionService:
     def _save_predictions_to_db(
         self,
         result: PredictionResult,
-        model_key: str
+        model_key: str,
+        model_id: Optional[int] = None
     ) -> None:
         """Guarda predicciones en la BD."""
         try:
@@ -418,7 +433,7 @@ class PredictionService:
                 result.confidence_upper or [None] * len(result.predictions)
             ):
                 prediccion = Prediccion(
-                    idModelo=result.model_id,
+                    idModelo=model_id,
                     fecha=date,
                     valorPredicho=pred,
                     intervaloInferior=lower,
@@ -432,7 +447,8 @@ class PredictionService:
     def auto_select_model(
         self,
         fecha_inicio: Optional[datetime] = None,
-        fecha_fin: Optional[datetime] = None
+        fecha_fin: Optional[datetime] = None,
+        user_id: Optional[int] = None
     ) -> Dict[str, Any]:
         """
         Selecciona automaticamente el mejor modelo.
@@ -443,8 +459,8 @@ class PredictionService:
         """
         logger.info("Iniciando seleccion automatica de modelo...")
 
-        # Obtener datos
-        df = self.get_sales_data(fecha_inicio, fecha_fin)
+        # Obtener datos del usuario
+        df = self.get_sales_data(fecha_inicio, fecha_fin, user_id=user_id)
 
         valid, issues = self.validate_data_requirements(df)
         if not valid:
@@ -458,7 +474,7 @@ class PredictionService:
         for model_type in model_types:
             try:
                 logger.info(f"Entrenando modelo {model_type}...")
-                result = self.train_model(model_type, fecha_inicio, fecha_fin)
+                result = self.train_model(model_type, fecha_inicio, fecha_fin, user_id=user_id)
 
                 if result.get("success"):
                     results[model_type] = result

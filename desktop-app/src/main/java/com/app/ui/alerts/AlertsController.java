@@ -1,6 +1,7 @@
 package com.app.ui.alerts;
 
 import com.app.model.alerts.AlertDTO;
+import com.app.service.alerts.AlertApiService;
 import com.app.ui.components.AnimatedToggleSwitch;
 import javafx.application.Platform;
 import javafx.collections.FXCollections;
@@ -105,6 +106,8 @@ public class AlertsController {
     private boolean historyInitialized = false;
     private boolean configInitialized  = false;
 
+    private final AlertApiService alertApiService = new AlertApiService();
+
     private static final DateTimeFormatter FMT =
             DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm", new Locale("es", "MX"));
 
@@ -131,27 +134,18 @@ public class AlertsController {
     }
 
     private void loadActiveSectionData() {
-        Task<List<AlertDTO>> task = new Task<>() {
-            @Override protected List<AlertDTO> call() {
-                return getMockActiveAlerts();
-            }
-            @Override protected void succeeded() {
-                allActiveAlerts = FXCollections.observableArrayList(getValue());
+        alertApiService.getActiveAlerts().thenAccept(alertas -> {
+            Platform.runLater(() -> {
+                allActiveAlerts = FXCollections.observableArrayList(alertas);
                 filteredActive  = new FilteredList<>(allActiveAlerts, p -> true);
                 renderActiveAlerts();
                 updateSidebarKpis(allActiveAlerts,
                         lblKpiActive, lblKpiAttended, lblKpiResolved, lblKpiPending);
-                Platform.runLater(() -> {
-                    drawDonutChart(canvasDonut, allActiveAlerts);
-                    buildBarChart(barChartContainer, allActiveAlerts);
-                    buildQuickActions();
-                });
-            }
-            @Override protected void failed() {
-                System.err.println("[ALERTS] Error cargando alertas activas: " + getException().getMessage());
-            }
-        };
-        new Thread(task).start();
+                drawDonutChart(canvasDonut, allActiveAlerts);
+                buildBarChart(barChartContainer, allActiveAlerts);
+                buildQuickActions();
+            });
+        });
     }
 
     // ═════════════════════════════════════════════════════════════════════════
@@ -595,17 +589,24 @@ public class AlertsController {
     }
 
     private void onResolveAlert(AlertDTO alert) {
-        System.out.printf("[ALERTS] Resolver alerta → id=%d, titulo='%s'%n",
-                alert.id(), alert.title());
-        // TODO: alertService.resolve(alert.id(), currentUser)
-        //       luego recargar la lista activa
+        alertApiService.changeStatus(alert.id(), "Resuelta").thenAccept(ok -> {
+            if (ok) {
+                Platform.runLater(() -> {
+                    allActiveAlerts.removeIf(a -> a.id() == alert.id());
+                    renderActiveAlerts();
+                    updateSidebarKpis(allActiveAlerts,
+                            lblKpiActive, lblKpiAttended, lblKpiResolved, lblKpiPending);
+                });
+            }
+        });
     }
 
     @FXML
     private void onMarkAllRead() {
-        System.out.println("[ALERTS] Marcar todas como le\u00EDdas");
-        // TODO: alertService.markAllRead(currentUser)
-        //       luego recargar allActiveAlerts con read=true
+        allActiveAlerts.stream()
+                .filter(a -> !a.read())
+                .forEach(a -> alertApiService.markAsRead(a.id()));
+        Platform.runLater(() -> loadActiveSectionData());
     }
 
     @FXML
@@ -641,25 +642,19 @@ public class AlertsController {
         if (historyInitialized) return;
         historyInitialized = true;
 
-        Task<List<AlertDTO>> task = new Task<>() {
-            @Override protected List<AlertDTO> call() { return getMockHistoryAlerts(); }
-            @Override protected void succeeded() {
-                allHistoryAlerts = FXCollections.observableArrayList(getValue());
-                filteredHistory  = new FilteredList<>(allHistoryAlerts, p -> true);
-                renderHistoryAlerts();
-                updateSidebarKpis(allHistoryAlerts,
-                        lblHistKpiActive, lblHistKpiAttended,
-                        lblHistKpiResolved, lblHistKpiPending);
-                Platform.runLater(() -> {
-                    drawDonutChart(canvasDonutHist, allHistoryAlerts);
-                    buildBarChart(barChartContainerHist, allHistoryAlerts);
-                });
-            }
-            @Override protected void failed() {
-                System.err.println("[ALERTS] Error cargando hist\u00F3rico: " + getException().getMessage());
-            }
-        };
-        new Thread(task).start();
+        alertApiService.getAlertHistory().thenAccept(alerts -> Platform.runLater(() -> {
+            allHistoryAlerts = FXCollections.observableArrayList(alerts);
+            filteredHistory  = new FilteredList<>(allHistoryAlerts, p -> true);
+            renderHistoryAlerts();
+            updateSidebarKpis(allHistoryAlerts,
+                    lblHistKpiActive, lblHistKpiAttended,
+                    lblHistKpiResolved, lblHistKpiPending);
+            drawDonutChart(canvasDonutHist, allHistoryAlerts);
+            buildBarChart(barChartContainerHist, allHistoryAlerts);
+        })).exceptionally(ex -> {
+            System.err.println("[ALERTS] Error cargando hist\u00F3rico: " + ex.getMessage());
+            return null;
+        });
     }
 
     // ═════════════════════════════════════════════════════════════════════════
@@ -757,12 +752,24 @@ public class AlertsController {
 
     @FXML
     private void onSaveConfig() {
-        System.out.printf("[CONFIG] Guardar configuraci\u00F3n → umbralVentas=%s, umbralAnomalia=%s, maxAlertas=%s, confianza=%s%n",
-                txtThresholdSalesDrop != null ? txtThresholdSalesDrop.getText() : "N/A",
-                txtThresholdAnomaly   != null ? txtThresholdAnomaly.getText()   : "N/A",
-                txtMaxAlerts          != null ? txtMaxAlerts.getText()           : "N/A",
-                cmbConfidenceLevel    != null ? cmbConfidenceLevel.getValue()   : "N/A");
-        // TODO: configService.save(AlertConfigDTO)
+        Double riskThreshold = null;
+        Double anomalyThreshold = null;
+
+        try {
+            if (txtThresholdSalesDrop != null && !txtThresholdSalesDrop.getText().isBlank())
+                riskThreshold = Double.parseDouble(txtThresholdSalesDrop.getText().trim()) / 100.0;
+        } catch (NumberFormatException ignored) {}
+
+        try {
+            if (txtThresholdAnomaly != null && !txtThresholdAnomaly.getText().isBlank())
+                anomalyThreshold = Double.parseDouble(txtThresholdAnomaly.getText().trim()) / 100.0;
+        } catch (NumberFormatException ignored) {}
+
+        alertApiService.saveConfig(riskThreshold, null, anomalyThreshold)
+                .thenAccept(ok -> Platform.runLater(() -> {
+                    if (ok) System.out.println("[CONFIG] Configuración guardada exitosamente");
+                    else    System.err.println("[CONFIG] Error al guardar configuración");
+                }));
     }
 
     @FXML

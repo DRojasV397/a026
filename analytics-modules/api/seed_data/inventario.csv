@@ -1,0 +1,21 @@
+sku,nombre,cantidad,ubicacion,minimo,maximo
+ELECT-001,Laptop ProBook X15,63,Almacén B,5,65
+ELECT-002,Tablet Samsung Galaxy Tab A8,40,Bodega Principal,10,150
+ELECT-003,Smartphone Redmi Note 13 Pro,86,Almacén B,6,48
+ELECT-004,"Monitor LED Full HD 27""",52,Almacén B,12,180
+ACESS-001,Mouse Inalámbrico Logitech M310,116,Almacén C,12,156
+ACESS-002,Teclado Mecánico Redragon K552,25,Almacén C,9,81
+ACESS-003,Hub USB-C 7 en 1,8,Almacén B,11,88
+ACESS-004,Cable HDMI 4K 2m,114,Almacén B,14,154
+ACESS-005,"Mochila Laptop 15.6""",87,Almacén C,8,88
+COMP-001,SSD Samsung 870 EVO 1TB,88,Almacén A,11,88
+COMP-002,Memoria RAM DDR4 16GB 3200MHz,65,Almacén A,7,70
+COMP-003,Tarjeta Gráfica RTX 3060 12GB,33,Almacén C,9,108
+COMP-004,Fuente de Poder 650W 80Plus,59,Bodega Principal,11,143
+AUDIO-001,Audífonos Sony WH-1000XM5,37,Almacén C,8,120
+AUDIO-002,Bocina JBL Charge 5,91,Almacén A,13,182
+AUDIO-003,Micrófono USB Blue Yeti,5,Almacén C,13,169
+AUDIO-004,Audífonos Gamer HyperX Cloud II,43,Bodega Principal,15,135
+SMART-001,Foco Inteligente Philips Hue E27,13,Almacén C,10,120
+SMART-002,Enchufe Inteligente WiFi 15A,115,Almacén C,9,108
+SMART-003,Cámara IP Indoor 1080p WiFi,29,Almacén A,7,77

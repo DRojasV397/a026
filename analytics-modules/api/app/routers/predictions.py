@@ -13,7 +13,7 @@ from pydantic import BaseModel, Field
 from app.database import get_db
 from app.services.prediction_service import PredictionService
 from app.middleware.auth_middleware import get_current_user
-from app.models import Usuario
+from app.schemas.auth import TokenData
 
 router = APIRouter(prefix="/predictions", tags=["Predicciones"])
 
@@ -181,7 +181,7 @@ class SalesDataRequest(BaseModel):
 async def train_model(
     request: TrainModelRequest,
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(get_current_user)
+    current_user: TokenData = Depends(get_current_user)
 ):
     """Entrena un modelo predictivo."""
     service = PredictionService(db)
@@ -194,7 +194,8 @@ async def train_model(
         model_type=request.model_type,
         fecha_inicio=fecha_inicio,
         fecha_fin=fecha_fin,
-        hyperparameters=request.hyperparameters
+        hyperparameters=request.hyperparameters,
+        user_id=current_user.idUsuario
     )
 
     return TrainModelResponse(**result)
@@ -215,7 +216,7 @@ async def train_model(
 async def forecast(
     request: ForecastRequest,
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(get_current_user)
+    current_user: TokenData = Depends(get_current_user)
 ):
     """Genera predicciones de ventas."""
     service = PredictionService(db)
@@ -243,7 +244,7 @@ async def forecast(
 async def auto_select_model(
     request: AutoSelectRequest,
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(get_current_user)
+    current_user: TokenData = Depends(get_current_user)
 ):
     """Selecciona automaticamente el mejor modelo."""
     service = PredictionService(db)
@@ -253,7 +254,8 @@ async def auto_select_model(
 
     result = service.auto_select_model(
         fecha_inicio=fecha_inicio,
-        fecha_fin=fecha_fin
+        fecha_fin=fecha_fin,
+        user_id=current_user.idUsuario
     )
 
     return AutoSelectResponse(**result)
@@ -267,7 +269,7 @@ async def auto_select_model(
 )
 async def list_models(
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(get_current_user)
+    current_user: TokenData = Depends(get_current_user)
 ):
     """Lista todos los modelos entrenados."""
     service = PredictionService(db)
@@ -284,7 +286,7 @@ async def list_models(
 async def get_prediction_history(
     limit: int = Query(100, ge=1, le=1000, description="Limite de registros"),
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(get_current_user)
+    current_user: TokenData = Depends(get_current_user)
 ):
     """Obtiene historial de predicciones."""
     service = PredictionService(db)
@@ -307,7 +309,7 @@ async def get_prediction_history(
 async def get_sales_data(
     request: SalesDataRequest,
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(get_current_user)
+    current_user: TokenData = Depends(get_current_user)
 ):
     """Obtiene datos de ventas agregados."""
     service = PredictionService(db)
@@ -318,7 +320,8 @@ async def get_sales_data(
     df = service.get_sales_data(
         fecha_inicio=fecha_inicio,
         fecha_fin=fecha_fin,
-        aggregation=request.aggregation
+        aggregation=request.aggregation,
+        user_id=current_user.idUsuario
     )
 
     # Convertir DataFrame a lista de diccionarios
@@ -349,7 +352,7 @@ async def get_sales_data(
 async def validate_data(
     request: SalesDataRequest,
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(get_current_user)
+    current_user: TokenData = Depends(get_current_user)
 ):
     """Valida datos para prediccion."""
     service = PredictionService(db)
@@ -360,7 +363,8 @@ async def validate_data(
     df = service.get_sales_data(
         fecha_inicio=fecha_inicio,
         fecha_fin=fecha_fin,
-        aggregation=request.aggregation
+        aggregation=request.aggregation,
+        user_id=current_user.idUsuario
     )
 
     valid, issues = service.validate_data_requirements(df)
@@ -383,7 +387,7 @@ async def validate_data(
     description="Lista los tipos de modelo predictivo disponibles."
 )
 async def get_model_types(
-    current_user: Usuario = Depends(get_current_user)
+    current_user: TokenData = Depends(get_current_user)
 ):
     """Lista tipos de modelo disponibles."""
     return {
@@ -478,7 +482,7 @@ class DeleteModelResponse(BaseModel):
 async def load_model(
     request: LoadModelRequest,
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(get_current_user)
+    current_user: TokenData = Depends(get_current_user)
 ):
     """Carga un modelo desde disco."""
     service = PredictionService(db)
@@ -497,7 +501,7 @@ async def load_model(
 )
 async def load_all_models(
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(get_current_user)
+    current_user: TokenData = Depends(get_current_user)
 ):
     """Carga todos los modelos desde disco."""
     service = PredictionService(db)
@@ -516,7 +520,7 @@ async def load_all_models(
 )
 async def list_saved_models(
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(get_current_user)
+    current_user: TokenData = Depends(get_current_user)
 ):
     """Lista modelos guardados en disco."""
     service = PredictionService(db)
@@ -535,7 +539,7 @@ async def list_saved_models(
 async def delete_model(
     model_key: str,
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(get_current_user)
+    current_user: TokenData = Depends(get_current_user)
 ):
     """Elimina un modelo."""
     service = PredictionService(db)

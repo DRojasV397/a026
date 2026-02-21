@@ -307,7 +307,8 @@
 }
 
 /* Estados de carga */
-.upload-status-procesado {
+.upload-status-procesado,
+.upload-status-exitoso {
     -fx-text-fill: #58BD8B;
     -fx-font-weight: bold;
     -fx-font-size: 11px;

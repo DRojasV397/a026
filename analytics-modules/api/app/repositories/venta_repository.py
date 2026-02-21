@@ -4,7 +4,7 @@ Repositorio para modelos de Venta y DetalleVenta.
 
 from typing import Optional, List
 from sqlalchemy.orm import Session
-from sqlalchemy import func
+from sqlalchemy import func, or_
 from datetime import date
 from decimal import Decimal
 import logging
@@ -37,22 +37,35 @@ class VentaRepository(BaseRepository[Venta]):
             logger.error(f"Error al buscar ventas por fecha: {str(e)}")
             return []
 
-    def get_by_rango_fechas(self, fecha_inicio: date, fecha_fin: date) -> List[Venta]:
+    def get_by_rango_fechas(
+        self,
+        fecha_inicio: date,
+        fecha_fin: date,
+        user_id: Optional[int] = None
+    ) -> List[Venta]:
         """
-        Obtiene ventas en un rango de fechas.
+        Obtiene ventas en un rango de fechas, opcionalmente filtradas por usuario.
+
+        Incluye ventas con creadoPor=NULL (datos legacy/seed compartidos).
 
         Args:
             fecha_inicio: Fecha inicial
             fecha_fin: Fecha final
+            user_id: ID del usuario; si se provee, filtra por creadoPor
 
         Returns:
             List[Venta]: Lista de ventas
         """
         try:
-            return self.db.query(Venta).filter(
+            query = self.db.query(Venta).filter(
                 Venta.fecha >= fecha_inicio,
                 Venta.fecha <= fecha_fin
-            ).order_by(Venta.fecha.desc()).all()
+            )
+            if user_id is not None:
+                query = query.filter(
+                    or_(Venta.creadoPor == user_id, Venta.creadoPor.is_(None))
+                )
+            return query.order_by(Venta.fecha.desc()).all()
         except Exception as e:
             logger.error(f"Error al buscar ventas por rango: {str(e)}")
             return []

@@ -71,18 +71,21 @@ class BaseRepository(Generic[ModelType]):
             logger.error(f"Error al obtener todos los registros: {str(e)}")
             return []
 
-    def create(self, obj_in: Dict[str, Any]) -> Optional[ModelType]:
+    def create(self, obj_in) -> Optional[ModelType]:
         """
         Crea un nuevo registro.
 
         Args:
-            obj_in: Diccionario con los datos del registro
+            obj_in: Instancia del modelo o diccionario con los datos del registro
 
         Returns:
             Optional[ModelType]: Registro creado o None si hay error
         """
         try:
-            db_obj = self.model(**obj_in)
+            if isinstance(obj_in, self.model):
+                db_obj = obj_in
+            else:
+                db_obj = self.model(**obj_in)
             self.db.add(db_obj)
             self.db.commit()
             self.db.refresh(db_obj)

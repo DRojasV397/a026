@@ -172,3 +172,25 @@ OPTIONAL_COLUMNS = {
     DataType.PRODUCTOS: ["categoria", "descripcion", "costo"],
     DataType.INVENTARIO: ["ubicacion", "minimo", "maximo"]
 }
+
+
+# Historial de cargas
+class HistorialCargaItem(BaseModel):
+    """Item del historial de cargas de datos."""
+    idHistorial: int
+    uploadId: str
+    tipoDatos: str
+    nombreArchivo: Optional[str] = None
+    registrosInsertados: int
+    registrosActualizados: int = 0
+    cargadoPor: int
+    cargadoEn: datetime
+    estado: str
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class HistorialCargaResponse(BaseModel):
+    """Respuesta del historial de cargas."""
+    items: List[HistorialCargaItem]
+    total: int

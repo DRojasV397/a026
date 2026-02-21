@@ -5,6 +5,7 @@ Punto de entrada de la API.
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from contextlib import asynccontextmanager
 import logging
 
@@ -130,10 +131,10 @@ app.include_router(dashboard_router, prefix=api_prefix)
 async def global_exception_handler(request, exc):
     """Manejador global de excepciones."""
     logger.error(f"Error no manejado: {str(exc)}")
-    return {
-        "detail": "Error interno del servidor",
-        "message": "Ha ocurrido un error"
-    }
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "Error interno del servidor", "message": "Ha ocurrido un error"}
+    )
 
 
 # Punto de entrada

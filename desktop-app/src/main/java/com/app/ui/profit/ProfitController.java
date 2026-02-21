@@ -1,10 +1,13 @@
 package com.app.ui.profit;
 
+import com.app.model.profitability.CategoryProfitDTO;
+import com.app.model.profitability.ProductProfitDTO;
+import com.app.service.profitability.ProfitabilityService;
+import javafx.application.Platform;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.collections.transformation.SortedList;
 import javafx.fxml.FXML;
-import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.control.*;
 import javafx.scene.control.cell.PropertyValueFactory;
@@ -14,6 +17,8 @@ import java.text.DecimalFormat;
 import java.util.*;
 
 public class ProfitController {
+
+    private final ProfitabilityService profitabilityService = new ProfitabilityService();
 
     // Vistas principales
     @FXML private VBox indicatorsView;
@@ -364,20 +369,91 @@ public class ProfitController {
         Label title = new Label("📦 Análisis de Rentabilidad por Producto");
         title.getStyleClass().add("section-title");
 
-        VBox tableCard = createProductTableCard();
+        Label loadingLabel = new Label("Cargando datos de rentabilidad...");
+        loadingLabel.getStyleClass().add("main-subtitle");
+        productView.getChildren().addAll(title, loadingLabel);
 
-        HBox summaryRow = new HBox(20);
-        summaryRow.setAlignment(Pos.TOP_LEFT);
+        // Cargar datos reales de la API de forma asíncrona
+        profitabilityService.getProductProfitability().thenAccept(response -> {
+            Platform.runLater(() -> {
+                productView.getChildren().clear();
+                productView.getChildren().add(title);
 
-        VBox topProducts = createTopProductsTable();
-        VBox attentionProducts = createAttentionProductsTable();
+                if (response == null || !response.isSuccess()) {
+                    Label errorLabel = new Label("⚠ No se pudieron cargar los datos. Verifique la conexión.");
+                    errorLabel.getStyleClass().add("main-subtitle");
+                    productView.getChildren().add(errorLabel);
+                    return;
+                }
 
-        HBox.setHgrow(topProducts, Priority.ALWAYS);
-        HBox.setHgrow(attentionProducts, Priority.ALWAYS);
+                List<ProductProfit> productList = mapProductDTOs(response.getProductos());
 
-        summaryRow.getChildren().addAll(topProducts, attentionProducts);
+                VBox tableCard = createProductTableCardWithData(productList);
 
-        productView.getChildren().addAll(title, tableCard, summaryRow);
+                HBox summaryRow = new HBox(20);
+                summaryRow.setAlignment(Pos.TOP_LEFT);
+
+                // Top 4 más rentables (mayor margen)
+                List<TopProduct> topList = response.getProductos().stream()
+                        .sorted((a, b) -> Double.compare(b.getMargen(), a.getMargen()))
+                        .limit(4)
+                        .map(p -> new TopProduct(p.getNombre(), p.getMargenFormateado()))
+                        .toList();
+
+                // Productos con pérdidas
+                List<TopProduct> lossList = response.getProductos().stream()
+                        .filter(p -> p.getUtilidad() < 0)
+                        .sorted(Comparator.comparingDouble(ProductProfitDTO::getUtilidad))
+                        .limit(4)
+                        .map(p -> new TopProduct(p.getNombre(), p.getUtilidadFormateada()))
+                        .toList();
+
+                VBox topProducts = createSummaryTable("🏆 Top 4 Productos Más Rentables",
+                        "Margen", topList);
+                VBox attentionProducts = createAttentionTable("⚠ Productos que Requieren Atención",
+                        "Pérdida", lossList);
+
+                HBox.setHgrow(topProducts, Priority.ALWAYS);
+                HBox.setHgrow(attentionProducts, Priority.ALWAYS);
+                summaryRow.getChildren().addAll(topProducts, attentionProducts);
+
+                productView.getChildren().addAll(tableCard, summaryRow);
+            });
+        });
+    }
+
+    /** Mapea ProductProfitDTO → ProductProfit (modelo para TableView) */
+    private List<ProductProfit> mapProductDTOs(List<com.app.model.profitability.ProductProfitDTO> dtos) {
+        List<ProductProfit> list = new ArrayList<>();
+        for (var dto : dtos) {
+            list.add(new ProductProfit(
+                    dto.getNombre(),
+                    dto.getIngresosFormateado(),
+                    dto.getMargenFormateado(),
+                    dto.getUtilidadFormateada(),
+                    dto.getEstado()
+            ));
+        }
+        return list;
+    }
+
+    /** Mapea CategoryProfitDTO → ProductProfit (reutilizando el mismo POJO) */
+    private List<ProductProfit> mapCategoryDTOs(List<com.app.model.profitability.CategoryProfitDTO> dtos) {
+        List<ProductProfit> list = new ArrayList<>();
+        for (var dto : dtos) {
+            list.add(new ProductProfit(
+                    dto.getNombre(),
+                    dto.getIngresosFormateado(),
+                    dto.getMargenFormateado(),
+                    dto.getUtilidadFormateada(),
+                    dto.getEstado()
+            ));
+        }
+        return list;
+    }
+
+    private VBox createProductTableCardWithData(List<ProductProfit> allProducts) {
+        return createTableCard("Detalle de Productos", allProducts);
     }
 
     private VBox createProductTableCard() {
@@ -522,20 +598,54 @@ public class ProfitController {
         Label title = new Label("🗂️ Análisis de Rentabilidad por Categoría");
         title.getStyleClass().add("section-title");
 
-        VBox tableCard = createCategoryTableCard();
+        Label loadingLabel = new Label("Cargando datos de categorías...");
+        loadingLabel.getStyleClass().add("main-subtitle");
+        categoryView.getChildren().addAll(title, loadingLabel);
 
-        HBox summaryRow = new HBox(20);
-        summaryRow.setAlignment(Pos.TOP_LEFT);
+        profitabilityService.getCategoryProfitability().thenAccept(response -> {
+            Platform.runLater(() -> {
+                categoryView.getChildren().clear();
+                categoryView.getChildren().add(title);
 
-        VBox topCategories = createTopCategoriesTable();
-        VBox attentionCategories = createAttentionCategoriesTable();
+                if (response == null || !response.isSuccess()) {
+                    Label errorLabel = new Label("⚠ No se pudieron cargar los datos. Verifique la conexión.");
+                    errorLabel.getStyleClass().add("main-subtitle");
+                    categoryView.getChildren().add(errorLabel);
+                    return;
+                }
 
-        HBox.setHgrow(topCategories, Priority.ALWAYS);
-        HBox.setHgrow(attentionCategories, Priority.ALWAYS);
+                List<ProductProfit> categoryList = mapCategoryDTOs(response.getCategorias());
 
-        summaryRow.getChildren().addAll(topCategories, attentionCategories);
+                VBox tableCard = createTableCard("Detalle de Categorías", categoryList);
 
-        categoryView.getChildren().addAll(title, tableCard, summaryRow);
+                HBox summaryRow = new HBox(20);
+                summaryRow.setAlignment(Pos.TOP_LEFT);
+
+                List<TopProduct> topList = response.getCategorias().stream()
+                        .sorted((a, b) -> Double.compare(b.getMargen(), a.getMargen()))
+                        .limit(4)
+                        .map(c -> new TopProduct(c.getNombre(), c.getMargenFormateado()))
+                        .toList();
+
+                List<TopProduct> lossList = response.getCategorias().stream()
+                        .filter(c -> c.getUtilidad() < 0)
+                        .sorted(Comparator.comparingDouble(CategoryProfitDTO::getUtilidad))
+                        .limit(4)
+                        .map(c -> new TopProduct(c.getNombre(), c.getUtilidadFormateada()))
+                        .toList();
+
+                VBox topCategories = createSummaryTable("🏆 Top 4 Categorías Más Rentables",
+                        "Margen", topList);
+                VBox attentionCategories = createAttentionTable("⚠ Categorías que Requieren Atención",
+                        "Pérdida", lossList);
+
+                HBox.setHgrow(topCategories, Priority.ALWAYS);
+                HBox.setHgrow(attentionCategories, Priority.ALWAYS);
+                summaryRow.getChildren().addAll(topCategories, attentionCategories);
+
+                categoryView.getChildren().addAll(tableCard, summaryRow);
+            });
+        });
     }
 
     private VBox createCategoryTableCard() {
@@ -853,6 +963,177 @@ public class ProfitController {
         } catch (NumberFormatException e) {
             return a.compareTo(b); // Fallback a comparación de strings
         }
+    }
+
+    /* =========================
+       TABLA GENÉRICA (datos reales)
+       ========================= */
+
+    /** Crea una TableView con datos ya cargados desde la API */
+    private VBox createTableCard(String cardTitle, List<ProductProfit> allData) {
+        VBox card = new VBox(12);
+        card.getStyleClass().add("table-card");
+
+        Label title = new Label(cardTitle);
+        title.getStyleClass().add("card-title");
+
+        TableView<ProductProfit> table = new TableView<>();
+        table.getStyleClass().add("profit-table");
+        table.setPrefHeight(620);
+
+        TableColumn<ProductProfit, String> nameCol = new TableColumn<>("Nombre");
+        nameCol.setCellValueFactory(new PropertyValueFactory<>("name"));
+        nameCol.prefWidthProperty().bind(table.widthProperty().multiply(0.30));
+        nameCol.setSortable(true);
+
+        TableColumn<ProductProfit, String> salesCol = new TableColumn<>("Ingresos");
+        salesCol.setCellValueFactory(new PropertyValueFactory<>("sales"));
+        salesCol.prefWidthProperty().bind(table.widthProperty().multiply(0.15));
+        salesCol.setStyle("-fx-alignment: CENTER-RIGHT;");
+        salesCol.setSortable(true);
+
+        TableColumn<ProductProfit, String> marginCol = new TableColumn<>("Margen (%)");
+        marginCol.setCellValueFactory(new PropertyValueFactory<>("margin"));
+        marginCol.prefWidthProperty().bind(table.widthProperty().multiply(0.15));
+        marginCol.setStyle("-fx-alignment: CENTER;");
+        marginCol.setSortable(true);
+        marginCol.setCellFactory(col -> new TableCell<>() {
+            @Override protected void updateItem(String item, boolean empty) {
+                super.updateItem(item, empty);
+                if (empty || item == null) { setText(null); setStyle(""); return; }
+                setText(item);
+                double v = Double.parseDouble(item.replace("%", ""));
+                if (v >= 20) setStyle("-fx-text-fill: #10B981; -fx-font-weight: bold;");
+                else if (v >= 10) setStyle("-fx-text-fill: #3B82F6; -fx-font-weight: bold;");
+                else if (v < 0) setStyle("-fx-text-fill: #EF4444; -fx-font-weight: bold;");
+                else setStyle("-fx-text-fill: #F59E0B;");
+            }
+        });
+
+        TableColumn<ProductProfit, String> profitCol = new TableColumn<>("Ganancia/Pérdida");
+        profitCol.setCellValueFactory(new PropertyValueFactory<>("profit"));
+        profitCol.prefWidthProperty().bind(table.widthProperty().multiply(0.20));
+        profitCol.setStyle("-fx-alignment: CENTER-RIGHT;");
+        profitCol.setSortable(true);
+        profitCol.setCellFactory(col -> new TableCell<>() {
+            @Override protected void updateItem(String item, boolean empty) {
+                super.updateItem(item, empty);
+                if (empty || item == null) { setText(null); setStyle(""); return; }
+                setText(item);
+                setStyle(item.startsWith("-")
+                        ? "-fx-text-fill: #EF4444; -fx-font-weight: bold;"
+                        : "-fx-text-fill: #10B981; -fx-font-weight: bold;");
+            }
+        });
+
+        TableColumn<ProductProfit, String> statusCol = new TableColumn<>("Estado");
+        statusCol.setCellValueFactory(new PropertyValueFactory<>("status"));
+        statusCol.prefWidthProperty().bind(table.widthProperty().multiply(0.20));
+        statusCol.setStyle("-fx-alignment: CENTER;");
+        statusCol.setCellFactory(col -> new TableCell<>() {
+            @Override protected void updateItem(String item, boolean empty) {
+                super.updateItem(item, empty);
+                if (empty || item == null) { setText(null); setGraphic(null); return; }
+                Label pill = new Label(item);
+                pill.getStyleClass().add("status-pill");
+                pill.getStyleClass().add(switch (item) {
+                    case "Excelente" -> "pill-excellent";
+                    case "Bueno"     -> "pill-good";
+                    case "Regular"   -> "pill-warning";
+                    default          -> "pill-negative";
+                });
+                setGraphic(pill);
+                setText(null);
+            }
+        });
+
+        table.getColumns().addAll(nameCol, salesCol, marginCol, profitCol, statusCol);
+
+        Label pageInfoLabel = new Label(String.format("Mostrando 1-%d de %d registros",
+                Math.min(ROWS_PER_PAGE, allData.size()), allData.size()));
+        pageInfoLabel.getStyleClass().add("page-info-label");
+
+        Pagination pagination = createDynamicPaginationWithSorting(allData, table, pageInfoLabel);
+
+        card.getChildren().addAll(title, table, pageInfoLabel, pagination);
+        return card;
+    }
+
+    /** Tabla de resumen genérica (top productos/categorías) */
+    private VBox createSummaryTable(String title, String valueColTitle, List<TopProduct> items) {
+        VBox card = new VBox(12);
+        card.getStyleClass().add("summary-card");
+
+        Label lblTitle = new Label(title);
+        lblTitle.getStyleClass().add("summary-card-title");
+
+        TableView<TopProduct> table = new TableView<>();
+        table.getStyleClass().add("summary-table");
+        table.setPrefHeight(200);
+        table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY_ALL_COLUMNS);
+
+        TableColumn<TopProduct, String> nameCol = new TableColumn<>("Nombre");
+        nameCol.setCellValueFactory(new PropertyValueFactory<>("name"));
+        nameCol.setSortable(false);
+
+        TableColumn<TopProduct, String> valueCol = new TableColumn<>(valueColTitle);
+        valueCol.setCellValueFactory(new PropertyValueFactory<>("value"));
+        valueCol.setStyle("-fx-alignment: CENTER;");
+        valueCol.setSortable(false);
+
+        table.getColumns().addAll(nameCol, valueCol);
+        table.getItems().addAll(items);
+
+        card.getChildren().addAll(lblTitle, table);
+        return card;
+    }
+
+    /** Tabla de atención genérica (pérdidas) — muestra mensaje vacío si no hay datos */
+    private VBox createAttentionTable(String title, String valueColTitle, List<TopProduct> items) {
+        VBox card = new VBox(12);
+        card.getStyleClass().add("summary-card");
+
+        Label lblTitle = new Label(title);
+        lblTitle.getStyleClass().add("summary-card-title");
+        card.getChildren().add(lblTitle);
+
+        if (items.isEmpty()) {
+            VBox messageBox = new VBox(16);
+            messageBox.setAlignment(Pos.CENTER);
+            messageBox.getStyleClass().add("no-loss-container");
+            messageBox.setPrefHeight(200);
+
+            Label icon = new Label("✅");
+            icon.setStyle("-fx-font-size: 48px;");
+            Label message = new Label("No hay registros con pérdidas actualmente");
+            message.getStyleClass().add("no-loss-message");
+            message.setWrapText(true);
+            message.setMaxWidth(300);
+            message.setAlignment(Pos.CENTER);
+
+            messageBox.getChildren().addAll(icon, message);
+            card.getChildren().add(messageBox);
+        } else {
+            TableView<TopProduct> table = new TableView<>();
+            table.getStyleClass().add("summary-table");
+            table.setPrefHeight(200);
+            table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY_ALL_COLUMNS);
+
+            TableColumn<TopProduct, String> nameCol = new TableColumn<>("Nombre");
+            nameCol.setCellValueFactory(new PropertyValueFactory<>("name"));
+            nameCol.setSortable(false);
+
+            TableColumn<TopProduct, String> valueCol = new TableColumn<>(valueColTitle);
+            valueCol.setCellValueFactory(new PropertyValueFactory<>("value"));
+            valueCol.setStyle("-fx-alignment: CENTER; -fx-text-fill: #EF4444; -fx-font-weight: bold;");
+            valueCol.setSortable(false);
+
+            table.getColumns().addAll(nameCol, valueCol);
+            table.getItems().addAll(items);
+            card.getChildren().add(table);
+        }
+
+        return card;
     }
 
     /* =========================

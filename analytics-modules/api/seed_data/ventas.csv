@@ -1,0 +1,381 @@
+fecha,producto_sku,producto_nombre,cantidad,precio_unitario,total,cliente
+2025-01-04,ELECT-003,Smartphone Redmi Note 13 Pro,4,4030.62,16122.48,Compras Empresariales SA
+2025-01-05,ACESS-002,Teclado Mecánico Redragon K552,4,959.16,3836.64,DigitalHub Puebla
+2025-01-06,COMP-003,Tarjeta Gráfica RTX 3060 12GB,3,8641.46,25924.38,Públicas individuales
+2025-01-06,AUDIO-002,Bocina JBL Charge 5,4,2149.39,8597.56,InfoSystems Guadalajara
+2025-01-08,ACESS-001,Mouse Inalámbrico Logitech M310,1,488.48,488.48,CyberStore CDMX
+2025-01-08,AUDIO-004,Audífonos Gamer HyperX Cloud II,5,1714.78,8573.9,InfoSystems Guadalajara
+2025-01-09,ACESS-001,Mouse Inalámbrico Logitech M310,2,501.95,1003.9,Compras Empresariales SA
+2025-01-13,ACESS-005,"Mochila Laptop 15.6""",4,902.08,3608.32,Compras Empresariales SA
+2025-01-13,AUDIO-002,Bocina JBL Charge 5,2,2148.27,4296.54,InfoSystems Guadalajara
+2025-01-13,SMART-003,Cámara IP Indoor 1080p WiFi,4,782.27,3129.08,TecnoFácil Monterrey
+2025-01-17,AUDIO-003,Micrófono USB Blue Yeti,1,2871.62,2871.62,CyberStore CDMX
+2025-01-19,AUDIO-001,Audífonos Sony WH-1000XM5,1,6194.37,6194.37,InfoSystems Guadalajara
+2025-01-19,ACESS-003,Hub USB-C 7 en 1,1,591.84,591.84,InfoSystems Guadalajara
+2025-01-20,ACESS-005,"Mochila Laptop 15.6""",1,910.45,910.45,CyberStore CDMX
+2025-01-21,ELECT-004,"Monitor LED Full HD 27""",1,4608.7,4608.7,InfoSystems Guadalajara
+2025-01-22,COMP-002,Memoria RAM DDR4 16GB 3200MHz,1,729.68,729.68,TecnoFácil Monterrey
+2025-01-23,SMART-001,Foco Inteligente Philips Hue E27,4,437.42,1749.68,Públicas individuales
+2025-01-23,ELECT-003,Smartphone Redmi Note 13 Pro,5,4256.69,21283.45,InfoSystems Guadalajara
+2025-01-24,SMART-001,Foco Inteligente Philips Hue E27,5,439.32,2196.6,DigitalHub Puebla
+2025-01-25,COMP-001,SSD Samsung 870 EVO 1TB,1,1501.52,1501.52,CyberStore CDMX
+2025-01-26,ELECT-001,Laptop ProBook X15,2,18866.56,37733.12,Compras Empresariales SA
+2025-01-26,COMP-002,Memoria RAM DDR4 16GB 3200MHz,4,732.58,2930.32,InfoSystems Guadalajara
+2025-01-29,SMART-002,Enchufe Inteligente WiFi 15A,4,315.58,1262.32,Grupo Imagen Digital
+2025-01-30,COMP-004,Fuente de Poder 650W 80Plus,1,1206.24,1206.24,Compras Empresariales SA
+2025-01-30,SMART-002,Enchufe Inteligente WiFi 15A,3,310.8,932.4,NetZone Querétaro
+2025-02-03,AUDIO-003,Micrófono USB Blue Yeti,1,2933.84,2933.84,Grupo Imagen Digital
+2025-02-03,ELECT-002,Tablet Samsung Galaxy Tab A8,2,5549.09,11098.18,TecnoFácil Monterrey
+2025-02-04,COMP-001,SSD Samsung 870 EVO 1TB,4,1400.43,5601.72,TecnoFácil Monterrey
+2025-02-04,ACESS-004,Cable HDMI 4K 2m,2,172.15,344.3,TecnoFácil Monterrey
+2025-02-05,AUDIO-003,Micrófono USB Blue Yeti,5,2706.24,13531.2,DigitalHub Puebla
+2025-02-05,AUDIO-001,Audífonos Sony WH-1000XM5,2,6356.05,12712.1,InfoSystems Guadalajara
+2025-02-07,SMART-001,Foco Inteligente Philips Hue E27,2,459.58,919.16,DigitalHub Puebla
+2025-02-08,AUDIO-003,Micrófono USB Blue Yeti,4,2713.31,10853.24,CyberStore CDMX
+2025-02-12,ACESS-002,Teclado Mecánico Redragon K552,5,993.08,4965.4,TecnoFácil Monterrey
+2025-02-19,SMART-001,Foco Inteligente Philips Hue E27,2,453.98,907.96,TecnoFácil Monterrey
+2025-02-20,COMP-002,Memoria RAM DDR4 16GB 3200MHz,4,713.96,2855.84,Compras Empresariales SA
+2025-02-22,ELECT-004,"Monitor LED Full HD 27""",5,4612.9,23064.5,Compras Empresariales SA
+2025-02-22,COMP-003,Tarjeta Gráfica RTX 3060 12GB,4,9255.66,37022.64,NetZone Querétaro
+2025-02-22,AUDIO-003,Micrófono USB Blue Yeti,2,2810.99,5621.98,NetZone Querétaro
+2025-02-22,AUDIO-001,Audífonos Sony WH-1000XM5,3,6450.33,19350.99,NetZone Querétaro
+2025-02-24,ACESS-005,"Mochila Laptop 15.6""",5,913.31,4566.55,CyberStore CDMX
+2025-02-26,ELECT-004,"Monitor LED Full HD 27""",2,4361.22,8722.44,NetZone Querétaro
+2025-02-27,COMP-001,SSD Samsung 870 EVO 1TB,2,1385.9,2771.8,CyberStore CDMX
+2025-02-28,COMP-001,SSD Samsung 870 EVO 1TB,5,1465.8,7329.0,Grupo Imagen Digital
+2025-02-28,COMP-002,Memoria RAM DDR4 16GB 3200MHz,1,751.06,751.06,Públicas individuales
+2025-02-28,ELECT-002,Tablet Samsung Galaxy Tab A8,1,5545.16,5545.16,Compras Empresariales SA
+2025-02-28,ELECT-003,Smartphone Redmi Note 13 Pro,4,4329.37,17317.48,CyberStore CDMX
+2025-03-01,AUDIO-002,Bocina JBL Charge 5,5,2309.66,11548.3,CyberStore CDMX
+2025-03-02,SMART-001,Foco Inteligente Philips Hue E27,1,471.1,471.1,InfoSystems Guadalajara
+2025-03-02,SMART-002,Enchufe Inteligente WiFi 15A,4,320.09,1280.36,Grupo Imagen Digital
+2025-03-02,AUDIO-004,Audífonos Gamer HyperX Cloud II,1,1863.24,1863.24,CyberStore CDMX
+2025-03-03,SMART-001,Foco Inteligente Philips Hue E27,2,450.26,900.52,Grupo Imagen Digital
+2025-03-03,AUDIO-001,Audífonos Sony WH-1000XM5,3,6203.66,18610.98,Compras Empresariales SA
+2025-03-05,ACESS-003,Hub USB-C 7 en 1,3,602.5,1807.5,TecnoFácil Monterrey
+2025-03-06,AUDIO-001,Audífonos Sony WH-1000XM5,4,6487.88,25951.52,DigitalHub Puebla
+2025-03-07,COMP-002,Memoria RAM DDR4 16GB 3200MHz,2,732.42,1464.84,Grupo Imagen Digital
+2025-03-09,AUDIO-002,Bocina JBL Charge 5,3,2183.06,6549.18,NetZone Querétaro
+2025-03-10,ACESS-002,Teclado Mecánico Redragon K552,4,981.71,3926.84,Públicas individuales
+2025-03-17,AUDIO-003,Micrófono USB Blue Yeti,3,2913.49,8740.47,TecnoFácil Monterrey
+2025-03-18,AUDIO-001,Audífonos Sony WH-1000XM5,5,6181.29,30906.45,CyberStore CDMX
+2025-03-19,SMART-001,Foco Inteligente Philips Hue E27,1,461.16,461.16,TecnoFácil Monterrey
+2025-03-19,SMART-003,Cámara IP Indoor 1080p WiFi,1,789.31,789.31,DigitalHub Puebla
+2025-03-19,SMART-001,Foco Inteligente Philips Hue E27,2,446.84,893.68,TecnoFácil Monterrey
+2025-03-20,ELECT-003,Smartphone Redmi Note 13 Pro,2,4159.59,8319.18,InfoSystems Guadalajara
+2025-03-20,AUDIO-004,Audífonos Gamer HyperX Cloud II,1,1830.22,1830.22,Públicas individuales
+2025-03-22,SMART-002,Enchufe Inteligente WiFi 15A,5,320.73,1603.65,Públicas individuales
+2025-03-22,COMP-001,SSD Samsung 870 EVO 1TB,4,1423.35,5693.4,CyberStore CDMX
+2025-03-23,COMP-002,Memoria RAM DDR4 16GB 3200MHz,2,764.06,1528.12,Públicas individuales
+2025-03-24,SMART-001,Foco Inteligente Philips Hue E27,2,439.76,879.52,InfoSystems Guadalajara
+2025-03-25,ACESS-001,Mouse Inalámbrico Logitech M310,3,463.76,1391.28,NetZone Querétaro
+2025-03-29,ELECT-002,Tablet Samsung Galaxy Tab A8,2,5729.8,11459.6,DigitalHub Puebla
+2025-03-30,COMP-003,Tarjeta Gráfica RTX 3060 12GB,1,9237.55,9237.55,Compras Empresariales SA
+2025-03-30,ELECT-004,"Monitor LED Full HD 27""",2,4394.01,8788.02,CyberStore CDMX
+2025-03-31,ACESS-001,Mouse Inalámbrico Logitech M310,5,457.73,2288.65,Compras Empresariales SA
+2025-04-01,ELECT-004,"Monitor LED Full HD 27""",3,4355.36,13066.08,Públicas individuales
+2025-04-02,ELECT-004,"Monitor LED Full HD 27""",5,4470.55,22352.75,Compras Empresariales SA
+2025-04-03,ACESS-004,Cable HDMI 4K 2m,3,175.04,525.12,InfoSystems Guadalajara
+2025-04-05,ELECT-001,Laptop ProBook X15,1,18027.96,18027.96,NetZone Querétaro
+2025-04-09,ELECT-002,Tablet Samsung Galaxy Tab A8,4,5510.98,22043.92,InfoSystems Guadalajara
+2025-04-10,COMP-003,Tarjeta Gráfica RTX 3060 12GB,1,9255.04,9255.04,InfoSystems Guadalajara
+2025-04-12,COMP-001,SSD Samsung 870 EVO 1TB,2,1409.82,2819.64,InfoSystems Guadalajara
+2025-04-12,AUDIO-004,Audífonos Gamer HyperX Cloud II,4,1832.31,7329.24,Compras Empresariales SA
+2025-04-12,AUDIO-001,Audífonos Sony WH-1000XM5,1,6791.77,6791.77,Compras Empresariales SA
+2025-04-13,ELECT-002,Tablet Samsung Galaxy Tab A8,4,5639.01,22556.04,NetZone Querétaro
+2025-04-13,COMP-002,Memoria RAM DDR4 16GB 3200MHz,3,777.33,2331.99,Públicas individuales
+2025-04-14,SMART-003,Cámara IP Indoor 1080p WiFi,5,750.02,3750.1,InfoSystems Guadalajara
+2025-04-15,AUDIO-002,Bocina JBL Charge 5,2,2202.46,4404.92,Grupo Imagen Digital
+2025-04-17,COMP-001,SSD Samsung 870 EVO 1TB,4,1424.8,5699.2,Públicas individuales
+2025-04-18,ACESS-001,Mouse Inalámbrico Logitech M310,2,476.18,952.36,DigitalHub Puebla
+2025-04-18,ELECT-001,Laptop ProBook X15,3,18105.79,54317.37,DigitalHub Puebla
+2025-04-20,ACESS-001,Mouse Inalámbrico Logitech M310,2,497.5,995.0,Grupo Imagen Digital
+2025-04-20,COMP-002,Memoria RAM DDR4 16GB 3200MHz,1,766.48,766.48,Públicas individuales
+2025-04-20,ELECT-003,Smartphone Redmi Note 13 Pro,4,4164.07,16656.28,InfoSystems Guadalajara
+2025-04-21,ELECT-001,Laptop ProBook X15,1,19015.08,19015.08,InfoSystems Guadalajara
+2025-04-22,ACESS-004,Cable HDMI 4K 2m,1,177.37,177.37,DigitalHub Puebla
+2025-04-22,ACESS-002,Teclado Mecánico Redragon K552,5,956.56,4782.8,DigitalHub Puebla
+2025-04-22,ELECT-003,Smartphone Redmi Note 13 Pro,3,4206.49,12619.47,Compras Empresariales SA
+2025-04-23,COMP-004,Fuente de Poder 650W 80Plus,4,1187.96,4751.84,Grupo Imagen Digital
+2025-04-26,AUDIO-001,Audífonos Sony WH-1000XM5,2,6348.42,12696.84,CyberStore CDMX
+2025-04-26,SMART-002,Enchufe Inteligente WiFi 15A,5,324.95,1624.75,NetZone Querétaro
+2025-04-29,AUDIO-001,Audífonos Sony WH-1000XM5,1,6291.58,6291.58,Compras Empresariales SA
+2025-05-01,SMART-001,Foco Inteligente Philips Hue E27,1,472.5,472.5,Compras Empresariales SA
+2025-05-04,COMP-001,SSD Samsung 870 EVO 1TB,5,1494.3,7471.5,TecnoFácil Monterrey
+2025-05-05,ACESS-001,Mouse Inalámbrico Logitech M310,2,474.39,948.78,Grupo Imagen Digital
+2025-05-05,AUDIO-002,Bocina JBL Charge 5,2,2101.06,4202.12,DigitalHub Puebla
+2025-05-06,AUDIO-004,Audífonos Gamer HyperX Cloud II,4,1719.04,6876.16,InfoSystems Guadalajara
+2025-05-07,ELECT-001,Laptop ProBook X15,5,17856.91,89284.55,Grupo Imagen Digital
+2025-05-08,ELECT-003,Smartphone Redmi Note 13 Pro,1,4306.78,4306.78,InfoSystems Guadalajara
+2025-05-09,AUDIO-002,Bocina JBL Charge 5,1,2246.98,2246.98,InfoSystems Guadalajara
+2025-05-09,COMP-002,Memoria RAM DDR4 16GB 3200MHz,3,779.48,2338.44,CyberStore CDMX
+2025-05-09,AUDIO-001,Audífonos Sony WH-1000XM5,3,6717.69,20153.07,NetZone Querétaro
+2025-05-11,ACESS-003,Hub USB-C 7 en 1,4,609.26,2437.04,DigitalHub Puebla
+2025-05-13,SMART-002,Enchufe Inteligente WiFi 15A,1,331.42,331.42,DigitalHub Puebla
+2025-05-13,COMP-002,Memoria RAM DDR4 16GB 3200MHz,4,766.81,3067.24,NetZone Querétaro
+2025-05-13,ACESS-003,Hub USB-C 7 en 1,1,625.71,625.71,InfoSystems Guadalajara
+2025-05-16,ELECT-001,Laptop ProBook X15,3,18127.43,54382.29,DigitalHub Puebla
+2025-05-16,ACESS-004,Cable HDMI 4K 2m,3,178.85,536.55,TecnoFácil Monterrey
+2025-05-16,ELECT-004,"Monitor LED Full HD 27""",5,4701.49,23507.45,NetZone Querétaro
+2025-05-18,AUDIO-002,Bocina JBL Charge 5,4,2103.7,8414.8,DigitalHub Puebla
+2025-05-19,SMART-002,Enchufe Inteligente WiFi 15A,1,306.69,306.69,DigitalHub Puebla
+2025-05-20,AUDIO-004,Audífonos Gamer HyperX Cloud II,4,1859.5,7438.0,NetZone Querétaro
+2025-05-22,AUDIO-004,Audífonos Gamer HyperX Cloud II,5,1817.18,9085.9,NetZone Querétaro
+2025-05-23,ACESS-003,Hub USB-C 7 en 1,1,614.72,614.72,Compras Empresariales SA
+2025-05-23,ACESS-005,"Mochila Laptop 15.6""",3,860.43,2581.29,CyberStore CDMX
+2025-05-25,ACESS-002,Teclado Mecánico Redragon K552,3,912.77,2738.31,TecnoFácil Monterrey
+2025-05-27,ACESS-005,"Mochila Laptop 15.6""",5,888.63,4443.15,InfoSystems Guadalajara
+2025-05-28,AUDIO-001,Audífonos Sony WH-1000XM5,5,6660.89,33304.45,InfoSystems Guadalajara
+2025-05-29,ACESS-002,Teclado Mecánico Redragon K552,4,945.26,3781.04,InfoSystems Guadalajara
+2025-05-30,ELECT-004,"Monitor LED Full HD 27""",4,4335.0,17340.0,NetZone Querétaro
+2025-05-30,ACESS-001,Mouse Inalámbrico Logitech M310,5,481.64,2408.2,DigitalHub Puebla
+2025-05-30,COMP-001,SSD Samsung 870 EVO 1TB,5,1475.72,7378.6,DigitalHub Puebla
+2025-06-02,SMART-001,Foco Inteligente Philips Hue E27,3,458.88,1376.64,Grupo Imagen Digital
+2025-06-03,ACESS-004,Cable HDMI 4K 2m,4,179.79,719.16,InfoSystems Guadalajara
+2025-06-03,COMP-001,SSD Samsung 870 EVO 1TB,2,1436.14,2872.28,InfoSystems Guadalajara
+2025-06-04,AUDIO-001,Audífonos Sony WH-1000XM5,3,6588.13,19764.39,NetZone Querétaro
+2025-06-04,ACESS-003,Hub USB-C 7 en 1,3,603.1,1809.3,Grupo Imagen Digital
+2025-06-07,ACESS-003,Hub USB-C 7 en 1,4,606.14,2424.56,Públicas individuales
+2025-06-08,AUDIO-002,Bocina JBL Charge 5,5,2224.27,11121.35,DigitalHub Puebla
+2025-06-09,SMART-003,Cámara IP Indoor 1080p WiFi,3,784.35,2353.05,InfoSystems Guadalajara
+2025-06-09,COMP-001,SSD Samsung 870 EVO 1TB,3,1410.93,4232.79,InfoSystems Guadalajara
+2025-06-09,AUDIO-003,Micrófono USB Blue Yeti,1,2890.19,2890.19,DigitalHub Puebla
+2025-06-10,SMART-002,Enchufe Inteligente WiFi 15A,3,319.14,957.42,Compras Empresariales SA
+2025-06-10,ELECT-001,Laptop ProBook X15,5,17809.18,89045.9,TecnoFácil Monterrey
+2025-06-11,ACESS-004,Cable HDMI 4K 2m,1,176.02,176.02,NetZone Querétaro
+2025-06-11,ELECT-001,Laptop ProBook X15,4,19149.26,76597.04,Grupo Imagen Digital
+2025-06-11,ELECT-004,"Monitor LED Full HD 27""",5,4702.89,23514.45,Grupo Imagen Digital
+2025-06-12,SMART-001,Foco Inteligente Philips Hue E27,4,457.27,1829.08,CyberStore CDMX
+2025-06-14,SMART-001,Foco Inteligente Philips Hue E27,3,443.33,1329.99,NetZone Querétaro
+2025-06-16,ACESS-003,Hub USB-C 7 en 1,3,638.47,1915.41,Compras Empresariales SA
+2025-06-16,AUDIO-003,Micrófono USB Blue Yeti,4,2755.4,11021.6,TecnoFácil Monterrey
+2025-06-16,ELECT-003,Smartphone Redmi Note 13 Pro,5,4254.37,21271.85,TecnoFácil Monterrey
+2025-06-17,COMP-002,Memoria RAM DDR4 16GB 3200MHz,1,776.22,776.22,NetZone Querétaro
+2025-06-20,SMART-001,Foco Inteligente Philips Hue E27,4,448.42,1793.68,Públicas individuales
+2025-06-21,AUDIO-003,Micrófono USB Blue Yeti,1,2904.36,2904.36,Públicas individuales
+2025-06-23,ACESS-001,Mouse Inalámbrico Logitech M310,4,464.45,1857.8,Públicas individuales
+2025-06-23,AUDIO-003,Micrófono USB Blue Yeti,4,2785.49,11141.96,TecnoFácil Monterrey
+2025-07-02,ACESS-002,Teclado Mecánico Redragon K552,3,959.03,2877.09,Públicas individuales
+2025-07-03,SMART-003,Cámara IP Indoor 1080p WiFi,1,810.37,810.37,Compras Empresariales SA
+2025-07-04,ELECT-001,Laptop ProBook X15,5,19053.73,95268.65,Grupo Imagen Digital
+2025-07-05,ACESS-001,Mouse Inalámbrico Logitech M310,5,501.56,2507.8,CyberStore CDMX
+2025-07-06,ELECT-001,Laptop ProBook X15,4,18408.43,73633.72,NetZone Querétaro
+2025-07-08,ELECT-004,"Monitor LED Full HD 27""",5,4619.0,23095.0,InfoSystems Guadalajara
+2025-07-08,ELECT-004,"Monitor LED Full HD 27""",4,4701.18,18804.72,Grupo Imagen Digital
+2025-07-10,SMART-002,Enchufe Inteligente WiFi 15A,4,313.77,1255.08,TecnoFácil Monterrey
+2025-07-10,ELECT-002,Tablet Samsung Galaxy Tab A8,2,5677.1,11354.2,Públicas individuales
+2025-07-10,COMP-004,Fuente de Poder 650W 80Plus,5,1144.4,5722.0,CyberStore CDMX
+2025-07-10,SMART-001,Foco Inteligente Philips Hue E27,1,452.35,452.35,CyberStore CDMX
+2025-07-11,ACESS-005,"Mochila Laptop 15.6""",3,855.82,2567.46,DigitalHub Puebla
+2025-07-12,AUDIO-001,Audífonos Sony WH-1000XM5,3,6383.69,19151.07,CyberStore CDMX
+2025-07-14,ELECT-002,Tablet Samsung Galaxy Tab A8,2,5810.69,11621.38,NetZone Querétaro
+2025-07-15,ELECT-004,"Monitor LED Full HD 27""",4,4584.91,18339.64,DigitalHub Puebla
+2025-07-16,AUDIO-004,Audífonos Gamer HyperX Cloud II,4,1874.89,7499.56,Grupo Imagen Digital
+2025-07-19,AUDIO-001,Audífonos Sony WH-1000XM5,4,6804.89,27219.56,NetZone Querétaro
+2025-07-20,ELECT-004,"Monitor LED Full HD 27""",2,4556.48,9112.96,Públicas individuales
+2025-07-20,ACESS-005,"Mochila Laptop 15.6""",1,853.63,853.63,TecnoFácil Monterrey
+2025-07-21,ACESS-001,Mouse Inalámbrico Logitech M310,3,495.68,1487.04,CyberStore CDMX
+2025-07-21,AUDIO-002,Bocina JBL Charge 5,1,2134.78,2134.78,Grupo Imagen Digital
+2025-07-22,ELECT-003,Smartphone Redmi Note 13 Pro,2,4090.74,8181.48,CyberStore CDMX
+2025-07-23,AUDIO-002,Bocina JBL Charge 5,1,2241.22,2241.22,Públicas individuales
+2025-07-25,AUDIO-004,Audífonos Gamer HyperX Cloud II,4,1791.09,7164.36,NetZone Querétaro
+2025-07-25,ACESS-005,"Mochila Laptop 15.6""",5,849.08,4245.4,Grupo Imagen Digital
+2025-07-26,SMART-002,Enchufe Inteligente WiFi 15A,2,317.6,635.2,InfoSystems Guadalajara
+2025-07-28,ACESS-002,Teclado Mecánico Redragon K552,3,941.61,2824.83,NetZone Querétaro
+2025-07-28,AUDIO-004,Audífonos Gamer HyperX Cloud II,1,1828.38,1828.38,NetZone Querétaro
+2025-07-30,COMP-001,SSD Samsung 870 EVO 1TB,4,1505.22,6020.88,NetZone Querétaro
+2025-07-31,ACESS-005,"Mochila Laptop 15.6""",5,893.56,4467.8,NetZone Querétaro
+2025-08-01,ACESS-001,Mouse Inalámbrico Logitech M310,4,497.8,1991.2,Grupo Imagen Digital
+2025-08-01,COMP-004,Fuente de Poder 650W 80Plus,3,1140.97,3422.91,TecnoFácil Monterrey
+2025-08-03,AUDIO-003,Micrófono USB Blue Yeti,3,2754.8,8264.4,DigitalHub Puebla
+2025-08-03,AUDIO-002,Bocina JBL Charge 5,3,2307.28,6921.84,Públicas individuales
+2025-08-05,ACESS-004,Cable HDMI 4K 2m,5,178.42,892.1,Grupo Imagen Digital
+2025-08-06,ACESS-002,Teclado Mecánico Redragon K552,1,960.4,960.4,DigitalHub Puebla
+2025-08-07,COMP-004,Fuente de Poder 650W 80Plus,4,1152.8,4611.2,DigitalHub Puebla
+2025-08-08,ELECT-003,Smartphone Redmi Note 13 Pro,4,4400.9,17603.6,CyberStore CDMX
+2025-08-08,AUDIO-002,Bocina JBL Charge 5,3,2191.11,6573.33,TecnoFácil Monterrey
+2025-08-11,AUDIO-004,Audífonos Gamer HyperX Cloud II,3,1857.7,5573.1,Públicas individuales
+2025-08-11,SMART-001,Foco Inteligente Philips Hue E27,5,444.47,2222.35,Compras Empresariales SA
+2025-08-11,ELECT-002,Tablet Samsung Galaxy Tab A8,3,5717.91,17153.73,DigitalHub Puebla
+2025-08-13,ACESS-003,Hub USB-C 7 en 1,5,620.51,3102.55,Grupo Imagen Digital
+2025-08-15,ACESS-002,Teclado Mecánico Redragon K552,3,988.33,2964.99,TecnoFácil Monterrey
+2025-08-16,COMP-001,SSD Samsung 870 EVO 1TB,5,1479.78,7398.9,DigitalHub Puebla
+2025-08-16,ELECT-002,Tablet Samsung Galaxy Tab A8,2,5801.33,11602.66,Compras Empresariales SA
+2025-08-19,COMP-003,Tarjeta Gráfica RTX 3060 12GB,5,8718.33,43591.65,Públicas individuales
+2025-08-20,ELECT-003,Smartphone Redmi Note 13 Pro,2,4255.09,8510.18,Públicas individuales
+2025-08-20,ACESS-004,Cable HDMI 4K 2m,4,187.43,749.72,Grupo Imagen Digital
+2025-08-21,ELECT-003,Smartphone Redmi Note 13 Pro,3,4347.98,13043.94,DigitalHub Puebla
+2025-08-21,AUDIO-001,Audífonos Sony WH-1000XM5,3,6471.94,19415.82,Públicas individuales
+2025-08-23,COMP-004,Fuente de Poder 650W 80Plus,4,1258.61,5034.44,Grupo Imagen Digital
+2025-08-24,COMP-001,SSD Samsung 870 EVO 1TB,5,1461.59,7307.95,NetZone Querétaro
+2025-08-27,AUDIO-003,Micrófono USB Blue Yeti,4,2728.24,10912.96,Grupo Imagen Digital
+2025-08-28,ELECT-003,Smartphone Redmi Note 13 Pro,3,4314.52,12943.56,DigitalHub Puebla
+2025-08-28,ACESS-001,Mouse Inalámbrico Logitech M310,4,481.85,1927.4,Compras Empresariales SA
+2025-08-28,ACESS-003,Hub USB-C 7 en 1,2,624.45,1248.9,InfoSystems Guadalajara
+2025-08-28,AUDIO-001,Audífonos Sony WH-1000XM5,1,6381.81,6381.81,NetZone Querétaro
+2025-08-28,ELECT-004,"Monitor LED Full HD 27""",4,4319.87,17279.48,NetZone Querétaro
+2025-08-29,AUDIO-002,Bocina JBL Charge 5,3,2239.07,6717.21,Grupo Imagen Digital
+2025-08-30,SMART-003,Cámara IP Indoor 1080p WiFi,4,805.96,3223.84,Públicas individuales
+2025-08-31,COMP-002,Memoria RAM DDR4 16GB 3200MHz,4,777.93,3111.72,TecnoFácil Monterrey
+2025-09-02,SMART-002,Enchufe Inteligente WiFi 15A,3,327.44,982.32,CyberStore CDMX
+2025-09-02,COMP-001,SSD Samsung 870 EVO 1TB,4,1394.34,5577.36,InfoSystems Guadalajara
+2025-09-02,COMP-002,Memoria RAM DDR4 16GB 3200MHz,2,786.66,1573.32,InfoSystems Guadalajara
+2025-09-03,COMP-004,Fuente de Poder 650W 80Plus,1,1171.74,1171.74,CyberStore CDMX
+2025-09-03,SMART-001,Foco Inteligente Philips Hue E27,2,453.89,907.78,InfoSystems Guadalajara
+2025-09-04,ACESS-004,Cable HDMI 4K 2m,4,171.45,685.8,Compras Empresariales SA
+2025-09-04,AUDIO-002,Bocina JBL Charge 5,1,2235.81,2235.81,TecnoFácil Monterrey
+2025-09-05,SMART-001,Foco Inteligente Philips Hue E27,3,463.43,1390.29,CyberStore CDMX
+2025-09-05,AUDIO-001,Audífonos Sony WH-1000XM5,5,6248.87,31244.35,CyberStore CDMX
+2025-09-07,ACESS-001,Mouse Inalámbrico Logitech M310,5,498.07,2490.35,Compras Empresariales SA
+2025-09-08,COMP-003,Tarjeta Gráfica RTX 3060 12GB,1,9328.03,9328.03,Compras Empresariales SA
+2025-09-09,ELECT-002,Tablet Samsung Galaxy Tab A8,3,5636.02,16908.06,NetZone Querétaro
+2025-09-11,ACESS-001,Mouse Inalámbrico Logitech M310,5,456.14,2280.7,Grupo Imagen Digital
+2025-09-15,COMP-003,Tarjeta Gráfica RTX 3060 12GB,3,8975.26,26925.78,Compras Empresariales SA
+2025-09-17,AUDIO-004,Audífonos Gamer HyperX Cloud II,3,1859.49,5578.47,Públicas individuales
+2025-09-18,COMP-003,Tarjeta Gráfica RTX 3060 12GB,1,8809.34,8809.34,InfoSystems Guadalajara
+2025-09-19,COMP-002,Memoria RAM DDR4 16GB 3200MHz,1,725.57,725.57,TecnoFácil Monterrey
+2025-09-21,ACESS-003,Hub USB-C 7 en 1,5,604.54,3022.7,Grupo Imagen Digital
+2025-09-21,ELECT-004,"Monitor LED Full HD 27""",1,4414.02,4414.02,NetZone Querétaro
+2025-09-22,SMART-001,Foco Inteligente Philips Hue E27,4,453.93,1815.72,Grupo Imagen Digital
+2025-09-22,ELECT-001,Laptop ProBook X15,2,17602.49,35204.98,InfoSystems Guadalajara
+2025-09-25,ACESS-004,Cable HDMI 4K 2m,5,185.43,927.15,InfoSystems Guadalajara
+2025-09-25,ACESS-004,Cable HDMI 4K 2m,4,188.41,753.64,Compras Empresariales SA
+2025-09-26,ELECT-004,"Monitor LED Full HD 27""",4,4708.3,18833.2,Grupo Imagen Digital
+2025-09-29,SMART-001,Foco Inteligente Philips Hue E27,2,444.99,889.98,Compras Empresariales SA
+2025-09-29,AUDIO-001,Audífonos Sony WH-1000XM5,1,6716.9,6716.9,DigitalHub Puebla
+2025-09-30,COMP-001,SSD Samsung 870 EVO 1TB,3,1485.88,4457.64,Grupo Imagen Digital
+2025-09-30,AUDIO-003,Micrófono USB Blue Yeti,3,2869.04,8607.12,Compras Empresariales SA
+2025-09-30,SMART-003,Cámara IP Indoor 1080p WiFi,2,791.52,1583.04,NetZone Querétaro
+2025-09-30,COMP-001,SSD Samsung 870 EVO 1TB,4,1394.42,5577.68,TecnoFácil Monterrey
+2025-10-01,ACESS-003,Hub USB-C 7 en 1,3,647.61,1942.83,Grupo Imagen Digital
+2025-10-02,AUDIO-003,Micrófono USB Blue Yeti,4,2779.36,11117.44,CyberStore CDMX
+2025-10-03,ELECT-003,Smartphone Redmi Note 13 Pro,1,4029.16,4029.16,CyberStore CDMX
+2025-10-03,AUDIO-004,Audífonos Gamer HyperX Cloud II,2,1777.71,3555.42,NetZone Querétaro
+2025-10-04,ELECT-004,"Monitor LED Full HD 27""",5,4599.38,22996.9,InfoSystems Guadalajara
+2025-10-04,SMART-002,Enchufe Inteligente WiFi 15A,5,310.81,1554.05,NetZone Querétaro
+2025-10-04,ACESS-005,"Mochila Laptop 15.6""",5,865.63,4328.15,DigitalHub Puebla
+2025-10-05,ACESS-002,Teclado Mecánico Redragon K552,5,907.23,4536.15,CyberStore CDMX
+2025-10-08,ELECT-004,"Monitor LED Full HD 27""",3,4655.42,13966.26,Compras Empresariales SA
+2025-10-09,AUDIO-002,Bocina JBL Charge 5,4,2196.85,8787.4,NetZone Querétaro
+2025-10-11,ACESS-002,Teclado Mecánico Redragon K552,3,932.11,2796.33,Compras Empresariales SA
+2025-10-12,AUDIO-001,Audífonos Sony WH-1000XM5,1,6359.11,6359.11,NetZone Querétaro
+2025-10-13,SMART-003,Cámara IP Indoor 1080p WiFi,5,764.0,3820.0,DigitalHub Puebla
+2025-10-13,AUDIO-001,Audífonos Sony WH-1000XM5,1,6378.16,6378.16,Compras Empresariales SA
+2025-10-14,AUDIO-002,Bocina JBL Charge 5,2,2181.04,4362.08,NetZone Querétaro
+2025-10-14,ACESS-005,"Mochila Laptop 15.6""",2,912.69,1825.38,CyberStore CDMX
+2025-10-15,AUDIO-004,Audífonos Gamer HyperX Cloud II,2,1880.17,3760.34,TecnoFácil Monterrey
+2025-10-16,AUDIO-002,Bocina JBL Charge 5,3,2202.91,6608.73,CyberStore CDMX
+2025-10-16,AUDIO-002,Bocina JBL Charge 5,1,2287.84,2287.84,Compras Empresariales SA
+2025-10-17,COMP-001,SSD Samsung 870 EVO 1TB,1,1409.48,1409.48,TecnoFácil Monterrey
+2025-10-19,COMP-004,Fuente de Poder 650W 80Plus,1,1157.02,1157.02,TecnoFácil Monterrey
+2025-10-20,ACESS-001,Mouse Inalámbrico Logitech M310,1,462.06,462.06,Compras Empresariales SA
+2025-10-20,ACESS-005,"Mochila Laptop 15.6""",1,861.56,861.56,Públicas individuales
+2025-10-22,ACESS-005,"Mochila Laptop 15.6""",3,930.37,2791.11,NetZone Querétaro
+2025-10-22,ELECT-004,"Monitor LED Full HD 27""",4,4434.12,17736.48,DigitalHub Puebla
+2025-10-24,AUDIO-004,Audífonos Gamer HyperX Cloud II,3,1792.45,5377.35,TecnoFácil Monterrey
+2025-10-24,COMP-003,Tarjeta Gráfica RTX 3060 12GB,2,8950.17,17900.34,Compras Empresariales SA
+2025-10-25,SMART-002,Enchufe Inteligente WiFi 15A,5,306.72,1533.6,TecnoFácil Monterrey
+2025-10-25,ACESS-005,"Mochila Laptop 15.6""",3,874.7,2624.1,TecnoFácil Monterrey
+2025-10-28,ELECT-002,Tablet Samsung Galaxy Tab A8,3,5858.24,17574.72,Compras Empresariales SA
+2025-10-28,SMART-001,Foco Inteligente Philips Hue E27,5,455.11,2275.55,TecnoFácil Monterrey
+2025-10-30,COMP-002,Memoria RAM DDR4 16GB 3200MHz,3,712.96,2138.88,Grupo Imagen Digital
+2025-11-02,AUDIO-003,Micrófono USB Blue Yeti,3,2815.27,8445.81,CyberStore CDMX
+2025-11-03,AUDIO-001,Audífonos Sony WH-1000XM5,1,6333.16,6333.16,DigitalHub Puebla
+2025-11-03,COMP-002,Memoria RAM DDR4 16GB 3200MHz,1,754.35,754.35,DigitalHub Puebla
+2025-11-03,SMART-002,Enchufe Inteligente WiFi 15A,2,333.34,666.68,Públicas individuales
+2025-11-05,AUDIO-002,Bocina JBL Charge 5,1,2193.16,2193.16,Públicas individuales
+2025-11-05,ELECT-003,Smartphone Redmi Note 13 Pro,3,4344.66,13033.98,CyberStore CDMX
+2025-11-06,SMART-003,Cámara IP Indoor 1080p WiFi,4,805.9,3223.6,Compras Empresariales SA
+2025-11-06,AUDIO-003,Micrófono USB Blue Yeti,4,2871.24,11484.96,NetZone Querétaro
+2025-11-06,ACESS-002,Teclado Mecánico Redragon K552,5,979.36,4896.8,Grupo Imagen Digital
+2025-11-06,ACESS-003,Hub USB-C 7 en 1,5,597.58,2987.9,Públicas individuales
+2025-11-07,ACESS-002,Teclado Mecánico Redragon K552,5,917.02,4585.1,CyberStore CDMX
+2025-11-07,COMP-002,Memoria RAM DDR4 16GB 3200MHz,4,726.9,2907.6,Grupo Imagen Digital
+2025-11-08,COMP-002,Memoria RAM DDR4 16GB 3200MHz,2,718.23,1436.46,CyberStore CDMX
+2025-11-08,AUDIO-002,Bocina JBL Charge 5,4,2205.3,8821.2,Grupo Imagen Digital
+2025-11-08,SMART-001,Foco Inteligente Philips Hue E27,2,441.43,882.86,NetZone Querétaro
+2025-11-10,ELECT-004,"Monitor LED Full HD 27""",4,4284.39,17137.56,Compras Empresariales SA
+2025-11-10,AUDIO-002,Bocina JBL Charge 5,4,2098.27,8393.08,Compras Empresariales SA
+2025-11-10,ACESS-005,"Mochila Laptop 15.6""",5,923.22,4616.1,Compras Empresariales SA
+2025-11-10,SMART-001,Foco Inteligente Philips Hue E27,4,456.46,1825.84,Compras Empresariales SA
+2025-11-12,ACESS-001,Mouse Inalámbrico Logitech M310,2,460.93,921.86,Públicas individuales
+2025-11-12,COMP-003,Tarjeta Gráfica RTX 3060 12GB,3,8799.8,26399.4,Compras Empresariales SA
+2025-11-14,ELECT-001,Laptop ProBook X15,4,19279.15,77116.6,Compras Empresariales SA
+2025-11-15,SMART-002,Enchufe Inteligente WiFi 15A,2,314.29,628.58,NetZone Querétaro
+2025-11-15,SMART-003,Cámara IP Indoor 1080p WiFi,3,799.69,2399.07,NetZone Querétaro
+2025-11-15,COMP-001,SSD Samsung 870 EVO 1TB,4,1450.42,5801.68,DigitalHub Puebla
+2025-11-16,AUDIO-001,Audífonos Sony WH-1000XM5,2,6258.97,12517.94,InfoSystems Guadalajara
+2025-11-17,SMART-001,Foco Inteligente Philips Hue E27,3,430.74,1292.22,TecnoFácil Monterrey
+2025-11-17,ELECT-003,Smartphone Redmi Note 13 Pro,4,4355.62,17422.48,Compras Empresariales SA
+2025-11-17,AUDIO-004,Audífonos Gamer HyperX Cloud II,2,1873.07,3746.14,Compras Empresariales SA
+2025-11-17,ACESS-001,Mouse Inalámbrico Logitech M310,1,477.63,477.63,Compras Empresariales SA
+2025-11-17,COMP-003,Tarjeta Gráfica RTX 3060 12GB,1,8777.71,8777.71,Grupo Imagen Digital
+2025-11-17,SMART-001,Foco Inteligente Philips Hue E27,5,429.2,2146.0,Compras Empresariales SA
+2025-11-19,AUDIO-001,Audífonos Sony WH-1000XM5,5,6437.87,32189.35,DigitalHub Puebla
+2025-11-20,SMART-003,Cámara IP Indoor 1080p WiFi,5,770.99,3854.95,TecnoFácil Monterrey
+2025-11-21,COMP-004,Fuente de Poder 650W 80Plus,2,1211.4,2422.8,CyberStore CDMX
+2025-11-22,SMART-002,Enchufe Inteligente WiFi 15A,5,314.34,1571.7,Compras Empresariales SA
+2025-11-22,SMART-003,Cámara IP Indoor 1080p WiFi,1,802.56,802.56,Compras Empresariales SA
+2025-11-23,ELECT-003,Smartphone Redmi Note 13 Pro,5,4261.37,21306.85,TecnoFácil Monterrey
+2025-11-23,AUDIO-004,Audífonos Gamer HyperX Cloud II,1,1761.31,1761.31,Grupo Imagen Digital
+2025-11-24,AUDIO-002,Bocina JBL Charge 5,1,2180.39,2180.39,InfoSystems Guadalajara
+2025-11-26,ACESS-005,"Mochila Laptop 15.6""",5,850.5,4252.5,CyberStore CDMX
+2025-11-27,COMP-001,SSD Samsung 870 EVO 1TB,1,1470.98,1470.98,CyberStore CDMX
+2025-11-27,ACESS-001,Mouse Inalámbrico Logitech M310,5,460.49,2302.45,DigitalHub Puebla
+2025-11-29,SMART-003,Cámara IP Indoor 1080p WiFi,2,787.59,1575.18,Grupo Imagen Digital
+2025-11-29,ACESS-003,Hub USB-C 7 en 1,3,631.06,1893.18,NetZone Querétaro
+2025-12-01,ACESS-005,"Mochila Laptop 15.6""",2,919.81,1839.62,DigitalHub Puebla
+2025-12-02,COMP-001,SSD Samsung 870 EVO 1TB,4,1478.43,5913.72,Grupo Imagen Digital
+2025-12-02,ACESS-001,Mouse Inalámbrico Logitech M310,1,467.33,467.33,Compras Empresariales SA
+2025-12-03,ACESS-004,Cable HDMI 4K 2m,4,186.92,747.68,TecnoFácil Monterrey
+2025-12-03,AUDIO-002,Bocina JBL Charge 5,1,2154.56,2154.56,TecnoFácil Monterrey
+2025-12-03,AUDIO-001,Audífonos Sony WH-1000XM5,5,6821.81,34109.05,Grupo Imagen Digital
+2025-12-03,COMP-004,Fuente de Poder 650W 80Plus,3,1201.57,3604.71,Grupo Imagen Digital
+2025-12-04,COMP-001,SSD Samsung 870 EVO 1TB,2,1421.17,2842.34,TecnoFácil Monterrey
+2025-12-05,ELECT-002,Tablet Samsung Galaxy Tab A8,3,5826.69,17480.07,Grupo Imagen Digital
+2025-12-05,COMP-002,Memoria RAM DDR4 16GB 3200MHz,1,746.25,746.25,Compras Empresariales SA
+2025-12-05,SMART-001,Foco Inteligente Philips Hue E27,5,435.69,2178.45,Grupo Imagen Digital
+2025-12-06,AUDIO-002,Bocina JBL Charge 5,3,2188.37,6565.11,Compras Empresariales SA
+2025-12-08,AUDIO-001,Audífonos Sony WH-1000XM5,5,6472.12,32360.6,CyberStore CDMX
+2025-12-08,SMART-002,Enchufe Inteligente WiFi 15A,4,309.99,1239.96,CyberStore CDMX
+2025-12-08,ELECT-004,"Monitor LED Full HD 27""",5,4605.83,23029.15,Compras Empresariales SA
+2025-12-09,AUDIO-002,Bocina JBL Charge 5,5,2122.42,10612.1,DigitalHub Puebla
+2025-12-09,ELECT-001,Laptop ProBook X15,3,19033.76,57101.28,Compras Empresariales SA
+2025-12-09,ACESS-005,"Mochila Laptop 15.6""",4,864.6,3458.4,Públicas individuales
+2025-12-10,ACESS-002,Teclado Mecánico Redragon K552,2,933.15,1866.3,InfoSystems Guadalajara
+2025-12-11,ACESS-002,Teclado Mecánico Redragon K552,4,968.25,3873.0,Compras Empresariales SA
+2025-12-12,COMP-004,Fuente de Poder 650W 80Plus,5,1143.89,5719.45,Grupo Imagen Digital
+2025-12-12,SMART-001,Foco Inteligente Philips Hue E27,5,444.1,2220.5,Grupo Imagen Digital
+2025-12-12,AUDIO-004,Audífonos Gamer HyperX Cloud II,3,1862.27,5586.81,Públicas individuales
+2025-12-13,ELECT-003,Smartphone Redmi Note 13 Pro,3,4084.31,12252.93,Compras Empresariales SA
+2025-12-13,AUDIO-003,Micrófono USB Blue Yeti,1,2837.99,2837.99,Compras Empresariales SA
+2025-12-14,ELECT-002,Tablet Samsung Galaxy Tab A8,4,5801.16,23204.64,InfoSystems Guadalajara
+2025-12-14,COMP-004,Fuente de Poder 650W 80Plus,4,1247.36,4989.44,DigitalHub Puebla
+2025-12-14,AUDIO-004,Audífonos Gamer HyperX Cloud II,1,1859.65,1859.65,Grupo Imagen Digital
+2025-12-15,ACESS-002,Teclado Mecánico Redragon K552,4,997.24,3988.96,Compras Empresariales SA
+2025-12-17,COMP-003,Tarjeta Gráfica RTX 3060 12GB,1,9303.53,9303.53,TecnoFácil Monterrey
+2025-12-17,COMP-004,Fuente de Poder 650W 80Plus,5,1196.81,5984.05,TecnoFácil Monterrey
+2025-12-17,AUDIO-001,Audífonos Sony WH-1000XM5,4,6710.17,26840.68,CyberStore CDMX
+2025-12-18,COMP-001,SSD Samsung 870 EVO 1TB,3,1392.38,4177.14,Compras Empresariales SA
+2025-12-19,ACESS-001,Mouse Inalámbrico Logitech M310,5,473.61,2368.05,Compras Empresariales SA
+2025-12-20,AUDIO-001,Audífonos Sony WH-1000XM5,3,6590.66,19771.98,TecnoFácil Monterrey
+2025-12-20,ELECT-003,Smartphone Redmi Note 13 Pro,1,4119.9,4119.9,NetZone Querétaro
+2025-12-21,ACESS-005,"Mochila Laptop 15.6""",2,930.99,1861.98,TecnoFácil Monterrey
+2025-12-22,COMP-001,SSD Samsung 870 EVO 1TB,3,1442.16,4326.48,DigitalHub Puebla
+2025-12-22,AUDIO-002,Bocina JBL Charge 5,3,2171.84,6515.52,CyberStore CDMX
+2025-12-22,COMP-003,Tarjeta Gráfica RTX 3060 12GB,1,8944.5,8944.5,Públicas individuales
+2025-12-23,ACESS-001,Mouse Inalámbrico Logitech M310,3,476.6,1429.8,Compras Empresariales SA
+2025-12-23,AUDIO-003,Micrófono USB Blue Yeti,2,2694.34,5388.68,CyberStore CDMX
+2025-12-24,ACESS-002,Teclado Mecánico Redragon K552,4,951.69,3806.76,CyberStore CDMX
+2025-12-25,AUDIO-003,Micrófono USB Blue Yeti,4,2832.3,11329.2,CyberStore CDMX
+2025-12-25,ACESS-003,Hub USB-C 7 en 1,3,611.13,1833.39,TecnoFácil Monterrey
+2025-12-26,ACESS-003,Hub USB-C 7 en 1,1,608.57,608.57,Públicas individuales
+2025-12-26,COMP-003,Tarjeta Gráfica RTX 3060 12GB,5,8654.58,43272.9,InfoSystems Guadalajara
+2025-12-26,ACESS-001,Mouse Inalámbrico Logitech M310,2,493.94,987.88,TecnoFácil Monterrey
+2025-12-27,AUDIO-003,Micrófono USB Blue Yeti,5,2810.1,14050.5,InfoSystems Guadalajara
+2025-12-27,AUDIO-002,Bocina JBL Charge 5,4,2228.98,8915.92,Grupo Imagen Digital
+2025-12-28,COMP-002,Memoria RAM DDR4 16GB 3200MHz,3,721.84,2165.52,Compras Empresariales SA
+2025-12-29,COMP-001,SSD Samsung 870 EVO 1TB,2,1480.71,2961.42,Grupo Imagen Digital
+2025-12-30,ELECT-004,"Monitor LED Full HD 27""",3,4631.12,13893.36,Grupo Imagen Digital
+2025-12-30,AUDIO-004,Audífonos Gamer HyperX Cloud II,3,1854.21,5562.63,DigitalHub Puebla
+2025-12-31,ELECT-001,Laptop ProBook X15,2,19145.04,38290.08,NetZone Querétaro

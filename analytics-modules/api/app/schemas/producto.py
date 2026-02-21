@@ -67,5 +67,7 @@ class ProductoUpdate(BaseModel):
 class ProductoResponse(ProductoBase):
     """Esquema de respuesta de Producto."""
     idProducto: int
+    costoUnitario: Optional[Decimal] = None
+    categoriaNombre: Optional[str] = None
 
     model_config = ConfigDict(from_attributes=True)
