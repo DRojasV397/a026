@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?import javafx.scene.layout.*?>
+<?import javafx.scene.control.*?>
+<?import javafx.geometry.Insets?>
+
+<VBox xmlns="http://javafx.com/javafx/21"
+      xmlns:fx="http://javafx.com/fxml/1"
+      fx:controller="com.app.ui.admin.UserFormController"
+      fx:id="formRoot"
+      styleClass="modal-root"
+      stylesheets="@/styles/admin.css"
+      spacing="0"
+      prefWidth="660"
+      minWidth="660"
+      maxWidth="660">
+
+    <VBox spacing="4">
+        <Label fx:id="formTitle"    text="Nuevo usuario"   styleClass="modal-title"/>
+        <Label fx:id="formSubtitle" text="Completa los campos para registrar al usuario"
+               styleClass="modal-subtitle"/>
+    </VBox>
+
+    <Region minHeight="22"/>
+
+    <!-- Fila 1: Nombre completo | Nombre de usuario -->
+    <HBox spacing="20">
+        <VBox spacing="6" prefWidth="300" minWidth="300" maxWidth="300">
+            <Label text="Nombre completo *" styleClass="form-label"/>
+            <TextField fx:id="txtFullName"
+                       promptText="Juan García López"
+                       styleClass="form-input"
+                       prefWidth="300" maxWidth="300"/>
+        </VBox>
+        <VBox spacing="6" prefWidth="300" minWidth="300" maxWidth="300">
+            <Label text="Nombre de usuario *" styleClass="form-label"/>
+            <TextField fx:id="txtUsername"
+                       promptText="jgarcia"
+                       styleClass="form-input"
+                       prefWidth="300" maxWidth="300"/>
+        </VBox>
+    </HBox>
+
+    <Region minHeight="16"/>
+
+    <!-- Fila 2: Email | Rol -->
+    <HBox spacing="20">
+        <VBox spacing="6" prefWidth="300" minWidth="300" maxWidth="300">
+            <Label text="Correo electrónico *" styleClass="form-label"/>
+            <TextField fx:id="txtEmail"
+                       promptText="usuario@empresa.com"
+                       styleClass="form-input"
+                       prefWidth="300" maxWidth="300"/>
+            <Label fx:id="emailError" text="" styleClass="form-error-label"
+                   minHeight="18" maxHeight="18" visible="false" managed="true"/>
+        </VBox>
+        <VBox fx:id="roleRow" spacing="6" prefWidth="300" minWidth="300" maxWidth="300">
+            <Label text="Rol *" styleClass="form-label"/>
+            <!-- prefWidth + maxWidth fuerzan que el combo nunca se expanda -->
+            <ComboBox fx:id="cmbRole"
+                      promptText="Seleccionar rol"
+                      styleClass="form-combo"
+                      prefWidth="300" maxWidth="300"
+                      prefHeight="40" minHeight="40" maxHeight="40"/>
+            <Region minHeight="18" maxHeight="18"/>
+        </VBox>
+    </HBox>
+
+    <Region minHeight="16"/>
+
+    <!-- Fila 3: Contraseña | Confirmar (solo creación) -->
+    <HBox fx:id="passwordSection" spacing="20">
+        <VBox spacing="6" prefWidth="300" minWidth="300" maxWidth="300">
+            <Label text="Contraseña *" styleClass="form-label"/>
+            <PasswordField fx:id="txtPassword"
+                           promptText="Mínimo 8 caracteres"
+                           styleClass="form-input"
+                           prefWidth="300" maxWidth="300"/>
+            <Region minHeight="18" maxHeight="18"/>
+        </VBox>
+        <VBox spacing="6" prefWidth="300" minWidth="300" maxWidth="300">
+            <Label text="Confirmar contraseña *" styleClass="form-label"/>
+            <PasswordField fx:id="txtConfirmPassword"
+                           promptText="Repite la contraseña"
+                           styleClass="form-input"
+                           prefWidth="300" maxWidth="300"/>
+            <Label fx:id="passwordMatchError" text="" styleClass="form-error-label"
+                   minHeight="18" maxHeight="18" visible="false" managed="true"/>
+        </VBox>
+    </HBox>
+
+    <!-- Reset contraseña (solo edición) -->
+    <VBox fx:id="resetSection" spacing="6" visible="false" managed="false">
+        <Label text="Contraseña" styleClass="form-label"/>
+        <Button fx:id="btnResetPassword"
+                text="🔑  Resetear contraseña"
+                styleClass="btn-link-reset"
+                onAction="#onResetPassword"/>
+    </VBox>
+
+    <Region minHeight="24"/>
+
+    <!-- Botones -->
+    <HBox styleClass="modal-divider" spacing="10" alignment="CENTER_RIGHT">
+        <Button text="Cancelar"     styleClass="btn-modal-cancel"  onAction="#onCancel"/>
+        <Button fx:id="btnSubmit"   text="Crear usuario"
+                styleClass="btn-modal-primary" onAction="#onSubmit"/>
+    </HBox>
+
+</VBox>

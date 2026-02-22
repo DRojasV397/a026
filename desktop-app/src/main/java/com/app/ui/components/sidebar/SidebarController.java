@@ -91,7 +91,7 @@ public class SidebarController {
         userNameLabel.setText(UserSession.getUser());
 
         //Control por rol
-        if (!UserSession.isAdmin()) {
+        if (UserSession.isAdmin()) {
             adminItem.setManaged(false);
             adminItem.setVisible(false);
         }

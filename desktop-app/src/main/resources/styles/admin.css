@@ -1,0 +1,523 @@
+/* ═══════════════════════════════════════════════════════
+   admin.css  —  Módulo de Administración
+   Paleta consistente con el resto de la app:
+     Fondo:      #E3EDF7  |  Superficie: white
+     Texto:      #1E293B  |  Muted: #94A3B8
+     Borde:      #E2E8F0  |  Acento: #3B8EA5
+     Primario:   #3B8EA5  |  Warn: #D9A441
+════════════════════════════════════════════════════ */
+
+/* ── Root ──────────────────────────────────────────── */
+.admin-root {
+    -fx-background-color: #E3EDF7;
+}
+
+/* ── Scroll ────────────────────────────────────────── */
+.admin-scroll {
+    -fx-background-color: transparent;
+    -fx-background: transparent;
+}
+.admin-scroll > .viewport {
+    -fx-background-color: transparent;
+}
+.admin-content {
+    -fx-background-color: transparent;
+}
+
+/* ── KPI Cards ─────────────────────────────────────── */
+/* ── FlowPane KPIs ─────────────────────────────────────
+   Se adapta al ancho disponible: 4 en fila cuando hay
+   espacio, baja a 2x2 o 1 columna al comprimir
+────────────────────────────────────────────────────── */
+.kpi-flow {
+    -fx-background-color: transparent;
+}
+
+.kpi-card {
+    -fx-background-color: white;
+    -fx-background-radius: 12;
+    -fx-border-color: #E2E8F0;
+    -fx-border-radius: 12;
+    -fx-border-width: 1;
+    -fx-padding: 18 20 18 20;
+    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.06), 10, 0, 0, 3);
+    /* Ancho mínimo y preferido — FlowPane los distribuye */
+    -fx-min-width: 220;
+    -fx-pref-width: 240;
+}
+
+.kpi-card-warn {
+    -fx-border-color: rgba(217,164,65,0.35);
+    -fx-background-color: #FFFDF5;
+}
+
+.kpi-label {
+    -fx-font-size: 12px;
+    -fx-text-fill: #64748B;
+    -fx-font-weight: normal;
+}
+
+/* ── KPI value más grande ──────────────────────────── */
+.kpi-value {
+    -fx-font-size: 36px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #1E293B;
+}
+
+.kpi-value-warn {
+    -fx-text-fill: #D9A441;
+}
+
+.kpi-sub {
+    -fx-font-size: 11px;
+    -fx-text-fill: #94A3B8;
+}
+
+/* ── Users Card ────────────────────────────────────── */
+.users-card {
+    -fx-background-color: white;
+    -fx-background-radius: 14;
+    -fx-border-color: #E2E8F0;
+    -fx-border-radius: 14;
+    -fx-border-width: 1;
+    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.06), 14, 0, 0, 4);
+}
+
+/* ── Toolbar ───────────────────────────────────────── */
+.users-toolbar {
+    -fx-padding: 14 16 14 16;
+    -fx-border-color: transparent transparent #F1F5F9 transparent;
+    -fx-border-width: 0 0 1 0;
+}
+
+.search-wrapper {
+    -fx-background-color: #F8FAFC;
+    -fx-border-color: #E2E8F0;
+    -fx-border-radius: 8;
+    -fx-background-radius: 8;
+    -fx-padding: 6 12 6 12;
+    -fx-max-width: 380;
+}
+
+.search-icon {
+    -fx-font-size: 13px;
+    -fx-text-fill: #94A3B8;
+}
+
+.search-input {
+    -fx-background-color: transparent;
+    -fx-border-color: transparent;
+    -fx-font-size: 13px;
+    -fx-text-fill: #1E293B;
+    -fx-prompt-text-fill: #94A3B8;
+    -fx-padding: 0;
+}
+
+/* ── Table Header ──────────────────────────────────── */
+/* GridPane header */
+.table-header {
+    -fx-background-color: #F8FAFC;
+    -fx-padding: 10 16 10 16;
+    -fx-border-color: transparent transparent #E2E8F0 transparent;
+    -fx-border-width: 0 0 1 0;
+}
+
+/* GridPane fila */
+.user-row {
+    -fx-padding: 12 16 12 16;
+    -fx-background-color: white;
+    -fx-border-color: transparent transparent #F1F5F9 transparent;
+    -fx-border-width: 0 0 1 0;
+}
+
+.user-row:hover {
+    -fx-background-color: #F8FAFC;
+}
+
+.th-label {
+    -fx-font-size: 12px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #5e6877;
+    -fx-text-alignment: center;
+}
+
+/* ── User Row ──────────────────────────────────────── */
+.user-row {
+    -fx-padding: 12 16 12 24;
+    -fx-background-color: white;
+    -fx-border-color: transparent transparent #F1F5F9 transparent;
+    -fx-border-width: 0 0 1 0;
+    -fx-text-alignment: center;
+}
+
+.user-row:hover {
+    -fx-background-color: #F8FAFC;
+}
+
+/* Avatar */
+.user-avatar-wrap {
+    -fx-background-radius: 50;
+    -fx-min-width: 36;
+    -fx-min-height: 36;
+    -fx-max-width: 36;
+    -fx-max-height: 36;
+    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.10), 4, 0, 0, 1);
+}
+
+.user-name {
+    -fx-font-size: 13px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #1E293B;
+}
+
+.user-email {
+    -fx-font-size: 11.5px;
+    -fx-text-fill: #94A3B8;
+}
+
+/* ── Pills de rol ──────────────────────────────────────
+   Administrador → azul primario (#3B8EA5)
+   Analista      → azul grisáceo (#5B7FA6)
+   Default       → gris neutro
+────────────────────────────────────────────────────── */
+.role-pill {
+    -fx-font-size: 11px;
+    -fx-font-weight: bold;
+    -fx-padding: 3 14 3 14;
+    -fx-background-radius: 20;
+    -fx-border-radius: 20;
+    -fx-border-width: 1;
+    -fx-background-color: transparent;
+}
+
+.role-admin {
+    -fx-background-color: #3B8EA5;
+    -fx-text-fill: white;
+}
+
+.role-analyst {
+    -fx-background-color: rgba(91,127,166,0.10);
+    -fx-text-fill: #3D5A80;
+    -fx-border-color: rgba(91,127,166,0.35);
+}
+
+.role-default {
+    -fx-background-color: #F1F5F9;
+    -fx-text-fill: #475569;
+    -fx-border-color: #E2E8F0;
+}
+
+
+
+/* ── Ocultar TODOS los scrollbars ─────────────────────
+   Aplica a cualquier ScrollPane de la app que use
+   admin.css — el contenido sigue siendo scrolleable
+   con trackpad/rueda, solo se oculta la barra visual
+────────────────────────────────────────────────────── */
+.scroll-pane > .scroll-bar:vertical,
+.scroll-pane > .scroll-bar:horizontal {
+    -fx-pref-width: 0;
+    -fx-pref-height: 0;
+    -fx-opacity: 0;
+    -fx-padding: -1;
+}
+
+.scroll-pane > .corner {
+    -fx-background-color: transparent;
+}
+
+/* ScrollBar interno de ComboBox y ListView */
+.combo-box-popup .scroll-pane > .scroll-bar:vertical {
+    -fx-pref-width: 6;
+    -fx-opacity: 0.4;
+}
+
+/* Estado */
+.status-dot-active {
+    -fx-text-fill: #2E7D5A;
+    -fx-font-size: 11px;
+    -fx-font-weight: bold;
+}
+
+.status-dot-inactive {
+    -fx-text-fill: #94A3B8;
+    -fx-font-size: 11px;
+}
+
+/* Fechas */
+.date-label {
+    -fx-font-size: 12px;
+    -fx-text-fill: #64748B;
+}
+
+/* Botón acciones */
+.btn-row-actions {
+    -fx-background-color: transparent;
+    -fx-text-fill: #94A3B8;
+    -fx-font-size: 15px;
+    -fx-font-weight: bold;
+    -fx-padding: 4 8 4 8;
+    -fx-background-radius: 6;
+    -fx-cursor: hand;
+    -fx-min-width: 32;
+    -fx-min-height: 32;
+}
+
+.btn-row-actions:hover {
+    -fx-background-color: #F1F5F9;
+    -fx-text-fill: #1E293B;
+}
+
+/* Menú contextual de acciones */
+.actions-context-menu .menu-item {
+    -fx-padding: 8 16 8 16;
+    -fx-font-size: 12px;
+}
+
+.actions-context-menu .menu-item:focused {
+    -fx-background-color: #F0F4FF;
+}
+
+.deactivate-menu-item {
+    -fx-text-fill: #D9534F;
+}
+
+.deactivate-menu-item:focused {
+    -fx-background-color: #FFF0F0;
+}
+
+/* ── Paginación ────────────────────────────────────── */
+.pagination-bar {
+    -fx-padding: 12 16 12 16;
+    -fx-border-color: #F1F5F9 transparent transparent transparent;
+    -fx-border-width: 1 0 0 0;
+}
+
+.btn-page {
+    -fx-background-color: #F1F5F9;
+    -fx-text-fill: #475569;
+    -fx-font-size: 13px;
+    -fx-font-weight: bold;
+    -fx-padding: 6 14 6 14;
+    -fx-background-radius: 8;
+    -fx-border-color: #E2E8F0;
+    -fx-border-radius: 8;
+    -fx-border-width: 1;
+    -fx-cursor: hand;
+}
+
+.btn-page:hover {
+    -fx-background-color: #E2E8F0;
+    -fx-text-fill: #1E293B;
+}
+
+.btn-page:disabled {
+    -fx-opacity: 0.4;
+    -fx-cursor: default;
+}
+
+.page-label {
+    -fx-font-size: 12px;
+    -fx-text-fill: #64748B;
+    -fx-padding: 0 8 0 8;
+}
+
+/* ── Botones globales ──────────────────────────────── */
+.btn-admin-primary {
+    -fx-background-color: #3B8EA5;
+    -fx-text-fill: white;
+    -fx-font-size: 13px;
+    -fx-font-weight: bold;
+    -fx-padding: 10 20 10 20;
+    -fx-background-radius: 8;
+    -fx-cursor: hand;
+    -fx-effect: dropshadow(gaussian, rgba(59,142,165,0.25), 8, 0, 0, 2);
+}
+
+.btn-admin-primary:hover {
+    -fx-background-color: #32778A;
+}
+
+.btn-admin-export {
+    -fx-background-color: white;
+    -fx-text-fill: #3B8EA5;
+    -fx-font-size: 12px;
+    -fx-font-weight: bold;
+    -fx-padding: 8 16 8 16;
+    -fx-background-radius: 8;
+    -fx-border-color: #3B8EA5;
+    -fx-border-radius: 8;
+    -fx-border-width: 1.5;
+    -fx-cursor: hand;
+}
+
+.btn-admin-export:hover {
+    -fx-background-color: #F8FAFC;
+}
+
+/* ── Modal Forms ───────────────────────────────────── */
+.modal-root {
+    -fx-background-color: white;
+    -fx-background-radius: 14;
+    -fx-padding: 28 28 24 28;
+}
+
+.modal-title {
+    -fx-font-size: 16px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #1E293B;
+}
+
+.modal-subtitle {
+    -fx-font-size: 12px;
+    -fx-text-fill: #94A3B8;
+}
+
+.form-label {
+    -fx-font-size: 12px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #475569;
+}
+
+.form-input {
+    -fx-background-color: #F8FAFC;
+    -fx-text-fill: #1E293B;
+    -fx-prompt-text-fill: #94A3B8;
+    -fx-border-color: #E2E8F0;
+    -fx-border-radius: 8;
+    -fx-background-radius: 8;
+    -fx-padding: 10 12 10 12;
+    -fx-font-size: 13px;
+    -fx-pref-height: 40;
+}
+
+.form-input:focused {
+    -fx-border-color: #3B8EA5;
+    -fx-background-color: white;
+    -fx-effect: dropshadow(gaussian, rgba(59,142,165,0.15), 6, 0, 0, 0);
+}
+
+.form-input-error {
+    -fx-border-color: #E74C3C;
+    -fx-background-color: #FFF5F5;
+}
+
+.form-error-label {
+    -fx-font-size: 11px;
+    -fx-text-fill: #D9534F;
+    -fx-padding: 2 4 2 4;
+    -fx-background-color: #FDECEA;
+    -fx-background-radius: 4;
+}
+
+.modal-divider {
+    -fx-border-color: #E2E8F0 transparent transparent transparent;
+    -fx-border-width: 1 0 0 0;
+    -fx-padding: 12 0 0 0;
+}
+
+.btn-modal-primary {
+    -fx-background-color: #3B8EA5;
+    -fx-text-fill: white;
+    -fx-font-size: 13px;
+    -fx-font-weight: bold;
+    -fx-padding: 10 22 10 22;
+    -fx-background-radius: 8;
+    -fx-cursor: hand;
+}
+
+.btn-modal-primary:hover { -fx-background-color: #32778A; }
+.btn-modal-primary:disabled { -fx-opacity: 0.55; }
+
+.btn-modal-cancel {
+    -fx-background-color: #F1F5F9;
+    -fx-text-fill: #475569;
+    -fx-font-size: 13px;
+    -fx-font-weight: bold;
+    -fx-padding: 10 22 10 22;
+    -fx-background-radius: 8;
+    -fx-border-color: #E2E8F0;
+    -fx-border-radius: 8;
+    -fx-border-width: 1;
+    -fx-cursor: hand;
+}
+
+.btn-modal-cancel:hover { -fx-background-color: #E2E8F0; }
+
+/* ── Estado vacío ──────────────────────────────────── */
+.empty-state {
+    -fx-padding: 40 20 40 20;
+    -fx-alignment: CENTER;
+}
+
+.empty-state-icon {
+    -fx-font-size: 32px;
+    -fx-text-fill: #CBD5E1;
+}
+
+.empty-state-text {
+    -fx-font-size: 13px;
+    -fx-text-fill: #94A3B8;
+    -fx-text-alignment: CENTER;
+}
+
+/* Reset password link */
+.btn-link-reset {
+    -fx-background-color: transparent;
+    -fx-text-fill: #3B8EA5;
+    -fx-font-size: 12px;
+    -fx-font-weight: bold;
+    -fx-cursor: hand;
+    -fx-underline: false;
+    -fx-padding: 4 0 4 0;
+}
+
+.btn-link-reset:hover {
+    -fx-text-fill: #1E6A85;
+    -fx-underline: true;
+}
+
+/* ── ComboBox alineado con TextField ──────────────────
+   Mismo alto fijo que form-input (40px), sin expansión
+────────────────────────────────────────────────────── */
+.form-combo {
+    -fx-background-color: #F8FAFC;
+    -fx-border-color: #E2E8F0;
+    -fx-border-radius: 8;
+    -fx-background-radius: 8;
+    -fx-font-size: 13px;
+    -fx-pref-height: 40;
+    -fx-min-height: 40;
+    -fx-max-height: 40;
+}
+
+.form-combo:focused {
+    -fx-border-color: #3B8EA5;
+    -fx-background-color: white;
+}
+
+.form-combo .list-cell {
+    -fx-text-fill: #1E293B;
+    -fx-font-size: 13px;
+    -fx-padding: 0 10 0 10;
+}
+
+.form-combo .arrow-button {
+    -fx-background-color: transparent;
+    -fx-border-color: transparent;
+}
+
+/* ── Ocultar TODOS los scrollbars ─────────────────────
+   El scroll sigue funcionando con rueda/trackpad
+────────────────────────────────────────────────────── */
+.scroll-pane > .scroll-bar:vertical,
+.scroll-pane > .scroll-bar:horizontal {
+    -fx-pref-width:  0;
+    -fx-pref-height: 0;
+    -fx-opacity:     0;
+    -fx-padding:    -1;
+}
+
+.scroll-pane > .corner {
+    -fx-background-color: transparent;
+}

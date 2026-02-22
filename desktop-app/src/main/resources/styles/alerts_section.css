@@ -57,6 +57,18 @@
     -fx-background-color: transparent;
 }
 
+.alrt-scroll > .scroll-bar:vertical,
+.alrt-scroll > .scroll-bar:horizontal {
+    -fx-pref-width:  0;
+    -fx-pref-height: 0;
+    -fx-opacity:     0;
+    -fx-padding:    -1;
+}
+
+.alrt-scroll > .corner {
+    -fx-background-color: transparent;
+}
+
 /* ── Toolbar superior ───────────────────────────────────────────── */
 .alrt-toolbar {
     -fx-background-color: white;
