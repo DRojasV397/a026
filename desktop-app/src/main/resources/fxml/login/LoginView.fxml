@@ -9,6 +9,8 @@
 <?import javafx.scene.control.Button?>
 <?import javafx.scene.control.Hyperlink?>
 <?import javafx.geometry.Insets?>
+<?import javafx.scene.image.ImageView?>
+<?import javafx.scene.image.Image?>
 <HBox xmlns="http://javafx.com/javafx/21"
       xmlns:fx="http://javafx.com/fxml/1"
       fx:controller="com.app.ui.login.LoginController"
@@ -22,11 +24,14 @@
         <!-- Header -->
         <VBox spacing="8">
             <HBox spacing="10" alignment="CENTER_LEFT">
-                <Label text="⬢" styleClass="app-icon"/>
+                <ImageView fitWidth="28" fitHeight="28" preserveRatio="true">
+                    <image>
+                        <Image url="@/images/app-icon.png"/>
+                    </image>
+                </ImageView>
                 <VBox>
                     <Label text="SANI" styleClass="app-name"/>
-                    <Label text="Negocios Inteligentes"
-                           styleClass="app-subtitle"/>
+                    <Label text="Negocios Inteligentes" styleClass="app-subtitle"/>
                 </VBox>
             </HBox>
         </VBox>

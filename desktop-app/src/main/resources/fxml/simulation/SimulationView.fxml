@@ -1,103 +1,283 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <?import javafx.scene.control.*?>
 <?import javafx.scene.layout.*?>
+<?import javafx.scene.image.*?>
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.chart.*?>
 
-<BorderPane xmlns:fx="http://javafx.com/fxml"
+<BorderPane xmlns="http://javafx.com/javafx/21"
+            xmlns:fx="http://javafx.com/fxml/1"
             fx:controller="com.app.ui.simulation.SimulationController"
             stylesheets="@/styles/simulation.css"
             styleClass="sim-root">
 
     <center>
         <ScrollPane fx:id="mainScroll" fitToWidth="true" styleClass="sim-scroll">
-            <VBox spacing="20" styleClass="sim-container">
+            <VBox spacing="28" styleClass="sim-container">
 
-                <!-- Grid de escenarios -->
-                <VBox spacing="12">
-                    <Label text="Escenarios guardados" styleClass="section-title"/>
-                    <FlowPane fx:id="scenariosGrid" hgap="16" vgap="16"
-                              styleClass="scenarios-grid"/>
+                <!-- ═══════════════════════════════════════════════
+                     SECCIÓN 1 — CABECERA + GRID DE ESCENARIOS
+                ════════════════════════════════════════════════ -->
+                <VBox spacing="16">
 
-                    <!-- Estado vacío -->
+                    <FlowPane fx:id="scenariosGrid" hgap="16" vgap="16" styleClass="scenarios-grid"/>
+
                     <VBox fx:id="emptyState" styleClass="empty-state"
-                          alignment="CENTER" spacing="10" visible="false" managed="false">
+                          alignment="CENTER" spacing="12" visible="false" managed="false">
                         <Label text="📊" styleClass="empty-icon"/>
-                        <Label text="No hay escenarios creados" styleClass="empty-text"/>
+                        <Label text="No hay escenarios creados aún" styleClass="empty-text"/>
+                        <Label text="Usa el botón + para crear tu primer escenario" styleClass="empty-subtext"/>
                     </VBox>
                 </VBox>
 
-                <!-- Panel de edición -->
-                <VBox fx:id="editionPanel" spacing="16" styleClass="edition-card"
+                <!-- ═══════════════════════════════════════════════
+                     SECCIÓN 2 — FORMULARIO DE EDICIÓN
+                ════════════════════════════════════════════════ -->
+                <VBox fx:id="editionPanel" spacing="0" styleClass="edition-card"
                       visible="false" managed="false">
-                    <Label text="Configurar escenario" styleClass="section-title"/>
 
-                    <HBox spacing="20">
-                        <!-- Columna izq: formulario -->
-                        <VBox spacing="12" HBox.hgrow="ALWAYS">
-                            <VBox spacing="4">
-                                <Label text="Nombre" styleClass="form-label"/>
-                                <TextField fx:id="txtScenarioName"
-                                           promptText="Ej: Incremento de precios"
-                                           styleClass="form-input"/>
-                            </VBox>
-
-                            <VBox spacing="4">
-                                <Label text="Descripción" styleClass="form-label"/>
-                                <TextArea fx:id="txtScenarioDesc"
-                                          promptText="Breve descripción del escenario"
-                                          styleClass="form-input" prefRowCount="2"/>
-                            </VBox>
-
-                            <HBox spacing="12">
-                                <VBox spacing="4" HBox.hgrow="ALWAYS">
-                                    <Label text="Período (meses)" styleClass="form-label"/>
-                                    <ComboBox fx:id="cmbPeriod" maxWidth="Infinity"
-                                              styleClass="form-combo"/>
-                                </VBox>
-                                <VBox spacing="4" HBox.hgrow="ALWAYS">
-                                    <Label text="Escenario base" styleClass="form-label"/>
-                                    <ComboBox fx:id="cmbBaseScenario" maxWidth="Infinity"
-                                              styleClass="form-combo"/>
-                                </VBox>
-                            </HBox>
-
-                            <Label text="Variables a modificar" styleClass="form-label"/>
-                            <ScrollPane fitToWidth="true" prefHeight="300" styleClass="variables-scroll">
-                                <VBox fx:id="variablesList" spacing="12"/>
-                            </ScrollPane>
-
-                            <HBox spacing="12" alignment="CENTER_RIGHT">
-                                <Button text="Cancelar" styleClass="btn-secondary"/>
-                                <Button fx:id="btnSaveScenario" text="Guardar"
-                                        onAction="#onSaveScenario" styleClass="btn-primary"/>
-                                <Button fx:id="btnExecute" text="Ejecutar simulación"
-                                        styleClass="btn-execute"/>
-                            </HBox>
+                    <!-- Header -->
+                    <HBox styleClass="edition-header" alignment="CENTER_LEFT" spacing="12">
+                        <VBox spacing="4" HBox.hgrow="ALWAYS">
+                            <Label fx:id="editionPanelTitle" text="Nuevo escenario" styleClass="edition-title"/>
+                            <Label text="Configura todos los campos para generar la simulación"
+                                   styleClass="edition-subtitle"/>
                         </VBox>
-
-                        <!-- Columna der: preview de cambios -->
-                        <VBox fx:id="previewPanel" spacing="10" styleClass="preview-panel"
-                              prefWidth="280">
-                            <Label text="Vista previa de cambios" styleClass="preview-title"/>
-                            <ScrollPane fitToWidth="true" prefHeight="400">
-                                <VBox fx:id="changesPreview" spacing="6"/>
-                            </ScrollPane>
-                        </VBox>
+                        <Button text="✕" styleClass="btn-close-panel" onAction="#onCloseEdition"/>
                     </HBox>
+
+                    <VBox spacing="24" styleClass="edition-body">
+
+                        <!-- Bloque 1: Modelo predictivo -->
+                        <VBox spacing="0" styleClass="form-section">
+                            <HBox styleClass="form-section-header" alignment="CENTER_LEFT" spacing="10">
+                                <Label text="🧠" styleClass="form-section-icon"/>
+                                <Label text="Modelo predictivo" styleClass="form-section-title"/>
+                                <Label text="Obligatorio" styleClass="required-badge"/>
+                            </HBox>
+                            <VBox spacing="12" styleClass="form-section-body">
+                                <Label text="Selecciona un modelo previamente entrenado como base para la simulación."
+                                       styleClass="form-block-hint"/>
+                                <ComboBox fx:id="cmbTrainedModel"
+                                          promptText="— Seleccionar modelo entrenado —"
+                                          styleClass="form-combo-large" maxWidth="Infinity"/>
+                                <HBox fx:id="modelInfoBox" styleClass="model-info-box"
+                                      spacing="12" alignment="CENTER_LEFT" visible="false" managed="false">
+                                    <Label fx:id="modelInfoIcon" text="🧠" styleClass="model-info-icon"/>
+                                    <VBox spacing="3">
+                                        <Label fx:id="modelInfoName" text="" styleClass="model-info-name"/>
+                                        <Label fx:id="modelInfoMeta" text="" styleClass="model-info-meta"/>
+                                    </VBox>
+                                </HBox>
+                            </VBox>
+                        </VBox>
+
+                        <!-- Bloque 2: Info del escenario -->
+                        <VBox spacing="0" styleClass="form-section">
+                            <HBox styleClass="form-section-header" alignment="CENTER_LEFT" spacing="10">
+                                <Label text="📋" styleClass="form-section-icon"/>
+                                <Label text="Información del escenario" styleClass="form-section-title"/>
+                            </HBox>
+                            <VBox spacing="16" styleClass="form-section-body">
+                                <HBox spacing="20">
+                                    <!-- Col izquierda -->
+                                    <VBox spacing="14" HBox.hgrow="ALWAYS">
+                                        <VBox spacing="6">
+                                            <Label text="Nombre del escenario *" styleClass="form-label"/>
+                                            <TextField fx:id="txtScenarioName"
+                                                       promptText="Ej: Incremento de precios Q2"
+                                                       styleClass="form-input"/>
+                                        </VBox>
+                                        <HBox spacing="16">
+                                            <VBox spacing="6" HBox.hgrow="ALWAYS">
+                                                <Label text="Período a simular *" styleClass="form-label"/>
+                                                <HBox spacing="10" alignment="CENTER_LEFT">
+                                                    <ComboBox fx:id="cmbPeriod" styleClass="form-combo" prefWidth="130"/>
+                                                    <Label text="meses · máx. 6" styleClass="form-hint-inline"/>
+                                                </HBox>
+                                            </VBox>
+                                            <VBox spacing="6" HBox.hgrow="ALWAYS">
+                                                <Label text="Escenario base *" styleClass="form-label"/>
+                                                <ComboBox fx:id="cmbBaseScenario" styleClass="form-combo" maxWidth="Infinity"/>
+                                            </VBox>
+                                        </HBox>
+                                    </VBox>
+                                    <!-- Col derecha -->
+                                    <VBox spacing="6" HBox.hgrow="ALWAYS">
+                                        <Label text="Descripción" styleClass="form-label"/>
+                                        <TextArea fx:id="txtScenarioDesc"
+                                                  promptText="Describe el propósito y contexto del escenario"
+                                                  styleClass="form-input, form-textarea"
+                                                  prefRowCount="5" wrapText="true"/>
+                                    </VBox>
+                                </HBox>
+                            </VBox>
+                        </VBox>
+
+                        <!-- Bloque 3: Variables -->
+                        <VBox spacing="0" styleClass="form-section">
+                            <HBox styleClass="form-section-header" alignment="CENTER_LEFT" spacing="10">
+                                <Label text="⚙" styleClass="form-section-icon"/>
+                                <VBox spacing="2" HBox.hgrow="ALWAYS">
+                                    <Label text="Variables a modificar" styleClass="form-section-title"/>
+                                </VBox>
+                            </HBox>
+                            <VBox spacing="12" styleClass="form-section-body">
+                                <HBox styleClass="range-notice" spacing="8" alignment="CENTER_LEFT">
+                                    <Label text="ℹ️" styleClass="notice-icon"/>
+                                    <Label text="Ajusta cada variable dentro del rango ±50% sobre su valor base. Los valores fuera del rango se restringen automáticamente."
+                                           styleClass="notice-text" wrapText="true" HBox.hgrow="ALWAYS"/>
+                                </HBox>
+                                <ScrollPane fitToWidth="true" prefHeight="310" styleClass="variables-scroll">
+                                    <VBox fx:id="variablesList" spacing="12" styleClass="variables-container">
+                                        <padding><Insets top="4" right="4" bottom="4" left="4"/></padding>
+                                    </VBox>
+                                </ScrollPane>
+                            </VBox>
+                        </VBox>
+
+                        <!-- Acciones -->
+                        <HBox spacing="12" alignment="CENTER_RIGHT" styleClass="edition-actions">
+                            <Button text="Cancelar" styleClass="btn-secondary" onAction="#onCloseEdition"/>
+                            <Button fx:id="btnSaveScenario" text="💾  Guardar borrador"
+                                    onAction="#onSaveScenario" styleClass="btn-secondary"/>
+                            <Button fx:id="btnExecute" text="▶  Ejecutar simulación"
+                                    onAction="#onExecuteFromForm" styleClass="btn-execute"/>
+                        </HBox>
+                    </VBox>
                 </VBox>
 
-                <!-- Panel de comparación -->
-                <VBox fx:id="comparisonPanel" spacing="12" styleClass="comparison-card"
+                <!-- ═══════════════════════════════════════════════
+                     SECCIÓN 3 — PROCESAMIENTO
+                ════════════════════════════════════════════════ -->
+                <VBox fx:id="processingPanel" styleClass="processing-card"
+                      alignment="CENTER" spacing="24" visible="false" managed="false">
+                    <VBox alignment="CENTER" spacing="20">
+                        <StackPane styleClass="processing-icon-wrap">
+                            <!-- FIX #8: loading.png en lugar de brain.png -->
+                            <ImageView fx:id="processingIcon" fitWidth="64" fitHeight="64" preserveRatio="true">
+                                <Image url="@/images/icons/loading.png"/>
+                            </ImageView>
+                        </StackPane>
+                        <VBox alignment="CENTER" spacing="6">
+                            <Label fx:id="processingTitle" text="Procesando simulación…" styleClass="processing-title"/>
+                            <Label fx:id="processingSubtitle"
+                                   text="Aplicando variaciones al modelo predictivo base"
+                                   styleClass="processing-subtitle"/>
+                        </VBox>
+                        <ProgressBar fx:id="processingBar" progress="-1"
+                                     styleClass="processing-bar" prefWidth="380"/>
+                        <Label fx:id="processingStep" text="Iniciando…" styleClass="processing-step"/>
+                    </VBox>
+                </VBox>
+
+                <!-- ═══════════════════════════════════════════════
+                     SECCIÓN 4 — RESULTADOS INDIVIDUALES
+                ════════════════════════════════════════════════ -->
+                <VBox fx:id="resultsPanel" spacing="20" visible="false" managed="false">
+
+                    <!-- Header -->
+                    <HBox styleClass="results-header" alignment="CENTER_LEFT" spacing="12">
+                        <VBox spacing="4" HBox.hgrow="ALWAYS">
+                            <Label fx:id="resultsTitleLabel" text="Resultados de simulación" styleClass="results-title"/>
+                            <Label fx:id="resultsMetaLabel" text="" styleClass="results-meta"/>
+                        </VBox>
+                        <Button text="↩  Nueva simulación" styleClass="btn-secondary" onAction="#onNewSimulation"/>
+                        <Button text="↓  Exportar" styleClass="btn-admin-export" onAction="#onExportResults"/>
+                    </HBox>
+
+                    <!-- KPIs -->
+                    <HBox fx:id="resultKpisBox" spacing="14"/>
+
+                    <!-- Gráfica principal -->
+                    <VBox styleClass="chart-card-sim" spacing="12">
+                        <VBox spacing="3" styleClass="chart-header-sim">
+                            <Label text="Proyección: Escenario base vs Simulado" styleClass="chart-title-sim"/>
+                            <Label text="Comparación de tendencias en el período seleccionado"
+                                   styleClass="chart-subtitle-sim"/>
+                        </VBox>
+                        <LineChart fx:id="comparisonChart" animated="false" legendVisible="true"
+                                   prefHeight="280" styleClass="sim-line-chart">
+                            <xAxis><CategoryAxis label="Período"/></xAxis>
+                            <!-- FIX #2: \% para que FXML no lo interprete como resource bundle -->
+                            <yAxis><NumberAxis label="Valor"/></yAxis>
+                        </LineChart>
+                    </VBox>
+
+                    <!-- Dos gráficas secundarias -->
+                    <HBox spacing="16">
+                        <!-- FIX #3: BarChart con estilo explícito y label escrito con \% -->
+                        <VBox styleClass="chart-card-sim" spacing="12" HBox.hgrow="ALWAYS">
+                            <VBox spacing="3" styleClass="chart-header-sim">
+                                <Label text="Variación mensual (\%)" styleClass="chart-title-sim"/>
+                                <Label text="Diferencia relativa por período" styleClass="chart-subtitle-sim"/>
+                            </VBox>
+                            <BarChart fx:id="monthlyDeltaChart" animated="false" legendVisible="true"
+                                      prefHeight="240" styleClass="sim-bar-chart">
+                                <xAxis><CategoryAxis/></xAxis>
+                                <yAxis><NumberAxis label="\%"/></yAxis>
+                            </BarChart>
+                        </VBox>
+
+                        <VBox styleClass="chart-card-sim" spacing="12" HBox.hgrow="ALWAYS">
+                            <VBox spacing="3" styleClass="chart-header-sim">
+                                <Label text="Variables modificadas" styleClass="chart-title-sim"/>
+                                <Label text="Impacto individual de cada variable" styleClass="chart-subtitle-sim"/>
+                            </VBox>
+                            <LineChart fx:id="variablesChart" animated="false" legendVisible="true"
+                                       prefHeight="240" styleClass="sim-line-chart">
+                                <xAxis><CategoryAxis/></xAxis>
+                                <yAxis><NumberAxis/></yAxis>
+                            </LineChart>
+                        </VBox>
+                    </HBox>
+
+                    <!-- Resumen de variables aplicadas -->
+                    <VBox styleClass="changes-summary-card" spacing="14">
+                        <HBox alignment="CENTER_LEFT" spacing="8">
+                            <Label text="📦" styleClass="chart-title-icon"/>
+                            <Label text="Resumen de variables aplicadas" styleClass="chart-title-sim"/>
+                        </HBox>
+                        <VBox fx:id="changesSummaryContainer" spacing="0"/>
+                    </VBox>
+                </VBox>
+
+                <!-- ═══════════════════════════════════════════════
+                     SECCIÓN 5 — COMPARACIÓN ENTRE ESCENARIOS
+                     Solo visible con ≥2 escenarios EJECUTADOS
+                ════════════════════════════════════════════════ -->
+                <VBox fx:id="comparisonPanel" spacing="18" styleClass="comparison-card"
                       visible="false" managed="false">
-                    <Label text="Comparar escenarios" styleClass="section-title"/>
-                    <HBox spacing="12" alignment="CENTER_LEFT">
-                        <ComboBox fx:id="cmbCompare1" promptText="Escenario 1"
-                                  prefWidth="250" styleClass="form-combo"/>
+
+                    <VBox spacing="4">
+                        <HBox alignment="CENTER_LEFT" spacing="10">
+                            <Label text="⚖" styleClass="comparison-icon"/>
+                            <Label text="Comparar escenarios ejecutados" styleClass="section-title"/>
+                        </HBox>
+                        <Label fx:id="comparisonNoticeLabel"
+                               text="Selecciona dos escenarios ejecutados con el mismo período y variables."
+                               styleClass="comparison-notice" wrapText="true"/>
+                    </VBox>
+
+                    <!-- Selectores -->
+                    <HBox spacing="14" alignment="BOTTOM_LEFT">
+                        <VBox spacing="6" HBox.hgrow="ALWAYS">
+                            <Label text="Escenario A" styleClass="form-label"/>
+                            <ComboBox fx:id="cmbCompare1" promptText="— Escenario A —"
+                                      maxWidth="Infinity" styleClass="form-combo"/>
+                        </VBox>
                         <Label text="vs" styleClass="vs-label"/>
-                        <ComboBox fx:id="cmbCompare2" promptText="Escenario 2"
-                                  prefWidth="250" styleClass="form-combo"/>
-                        <Button fx:id="btnCompare" text="Comparar"
+                        <VBox spacing="6" HBox.hgrow="ALWAYS">
+                            <Label text="Escenario B" styleClass="form-label"/>
+                            <ComboBox fx:id="cmbCompare2" promptText="— Escenario B —"
+                                      maxWidth="Infinity" styleClass="form-combo"/>
+                        </VBox>
+                        <Button fx:id="btnCompare" text="⚖  Comparar"
                                 onAction="#onCompareScenarios" styleClass="btn-primary"/>
                     </HBox>
+
+                    <!-- Resultados dinámicos (tabla + gráfica) -->
+                    <VBox fx:id="comparisonResultContainer" spacing="14"/>
                 </VBox>
 
             </VBox>
