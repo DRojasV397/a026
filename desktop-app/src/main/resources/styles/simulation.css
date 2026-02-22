@@ -1,0 +1,317 @@
+/* ═══════════════════════════════════════════════════════════════════
+   simulation.css — Módulo de Simulación de Escenarios
+   Paleta: #E3EDF7 (fondo), white (cards), #3B8EA5 (acento)
+═══════════════════════════════════════════════════════════════════ */
+
+.sim-root {
+    -fx-background-color: #E3EDF7;
+}
+
+.sim-scroll {
+    -fx-background-color: transparent;
+    -fx-background: transparent;
+}
+.sim-scroll > .viewport {
+    -fx-background-color: transparent;
+}
+
+.sim-container {
+    -fx-padding: 30;
+}
+
+.section-title {
+    -fx-font-size: 18px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #1E293B;
+}
+
+/* ── Grid de escenarios ────────────────────────────────────────── */
+.scenarios-grid {
+    -fx-padding: 0;
+}
+
+/* Card de escenario existente */
+.scenario-card {
+    -fx-background-color: white;
+    -fx-background-radius: 12;
+    -fx-border-color: #E2E8F0;
+    -fx-border-radius: 12;
+    -fx-border-width: 1;
+    -fx-padding: 16;
+    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.06), 12, 0, 0, 3);
+    -fx-pref-width: 320;
+    -fx-min-width: 320;
+    -fx-max-width: 320;
+    -fx-cursor: hand;
+}
+.scenario-card:hover {
+    -fx-border-color: #3B8EA5;
+    -fx-effect: dropshadow(gaussian, rgba(59,142,165,0.15), 14, 0, 0, 4);
+}
+
+.scenario-card-name {
+    -fx-font-size: 15px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #1E293B;
+}
+
+.scenario-card-desc {
+    -fx-font-size: 12px;
+    -fx-text-fill: #64748B;
+}
+
+.scenario-meta {
+    -fx-font-size: 11px;
+    -fx-text-fill: #94A3B8;
+}
+
+.scenario-badge {
+    -fx-font-size: 10px;
+    -fx-font-weight: bold;
+    -fx-padding: 3 8;
+    -fx-background-radius: 12;
+}
+.badge-draft {
+    -fx-background-color: rgba(148,163,184,0.15);
+    -fx-text-fill: #64748B;
+}
+.badge-configured {
+    -fx-background-color: rgba(59,142,165,0.15);
+    -fx-text-fill: #3B8EA5;
+}
+.badge-executed {
+    -fx-background-color: rgba(88,189,139,0.15);
+    -fx-text-fill: #2E7D5A;
+}
+
+.btn-scenario-execute {
+    -fx-background-color: #3B8EA5;
+    -fx-text-fill: white;
+    -fx-font-size: 12px;
+    -fx-font-weight: bold;
+    -fx-padding: 7 16;
+    -fx-background-radius: 6;
+    -fx-cursor: hand;
+}
+.btn-scenario-execute:hover { -fx-background-color: #32778A; }
+
+.btn-icon-sm {
+    -fx-background-color: #F8FAFC;
+    -fx-border-color: #E2E8F0;
+    -fx-border-radius: 6;
+    -fx-background-radius: 6;
+    -fx-padding: 6;
+    -fx-cursor: hand;
+}
+.btn-icon-sm:hover {
+    -fx-background-color: #EFF6FF;
+    -fx-border-color: #BFDBFE;
+}
+
+/* Card "+" para crear nuevo */
+.scenario-card-new {
+    -fx-background-color: #F8FAFC;
+    -fx-background-radius: 12;
+    -fx-border-color: #CBD5E1;
+    -fx-border-style: dashed;
+    -fx-border-radius: 12;
+    -fx-border-width: 2;
+    -fx-padding: 40;
+    -fx-pref-width: 320;
+    -fx-min-width: 320;
+    -fx-max-width: 320;
+    -fx-min-height: 180;
+    -fx-cursor: hand;
+}
+.scenario-card-new:hover {
+    -fx-background-color: #EFF6FF;
+    -fx-border-color: #3B8EA5;
+}
+
+.new-scenario-icon {
+    -fx-font-size: 48px;
+    -fx-text-fill: #94A3B8;
+}
+.new-scenario-label {
+    -fx-font-size: 14px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #64748B;
+}
+
+/* ── Panel de edición ──────────────────────────────────────────── */
+.edition-card {
+    -fx-background-color: white;
+    -fx-background-radius: 15;
+    -fx-border-color: #E2E8F0;
+    -fx-border-radius: 15;
+    -fx-border-width: 1;
+    -fx-padding: 24;
+    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.06), 14, 0, 0, 4);
+}
+
+.form-label {
+    -fx-font-size: 12px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #475569;
+}
+
+.form-input {
+    -fx-background-color: #F8FAFC;
+    -fx-text-fill: #1E293B;
+    -fx-prompt-text-fill: #94A3B8;
+    -fx-border-color: #E2E8F0;
+    -fx-border-radius: 8;
+    -fx-background-radius: 8;
+    -fx-padding: 9 12;
+    -fx-font-size: 13px;
+}
+.form-input:focused {
+    -fx-border-color: #3B8EA5;
+    -fx-background-color: white;
+    -fx-effect: dropshadow(gaussian, rgba(59,142,165,0.15), 6, 0, 0, 0);
+}
+
+.form-combo {
+    -fx-background-color: #F8FAFC;
+    -fx-border-color: #E2E8F0;
+    -fx-border-radius: 8;
+    -fx-background-radius: 8;
+}
+
+.variables-scroll {
+    -fx-background-color: transparent;
+}
+
+.variable-editor-row {
+    -fx-background-color: #F8FAFC;
+    -fx-background-radius: 8;
+    -fx-padding: 12;
+    -fx-border-color: #E2E8F0;
+    -fx-border-radius: 8;
+    -fx-border-width: 1;
+}
+
+.variable-label {
+    -fx-font-size: 13px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #1E293B;
+}
+
+.variable-value-label {
+    -fx-font-size: 13px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #3B8EA5;
+    -fx-alignment: CENTER_RIGHT;
+}
+
+/* ── Preview panel ─────────────────────────────────────────────── */
+.preview-panel {
+    -fx-background-color: #F8FAFC;
+    -fx-background-radius: 12;
+    -fx-padding: 16;
+    -fx-border-color: #E2E8F0;
+    -fx-border-radius: 12;
+    -fx-border-width: 1;
+}
+
+.preview-title {
+    -fx-font-size: 13px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #475569;
+}
+
+.preview-change-row {
+    -fx-background-color: white;
+    -fx-background-radius: 6;
+    -fx-padding: 8;
+    -fx-border-color: #E2E8F0;
+    -fx-border-radius: 6;
+    -fx-border-width: 1;
+}
+
+.preview-var-name {
+    -fx-font-size: 12px;
+    -fx-text-fill: #475569;
+}
+
+.change-up {
+    -fx-font-size: 12px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #58BD8B;
+}
+
+.change-down {
+    -fx-font-size: 12px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #A03C48;
+}
+
+/* ── Botones ───────────────────────────────────────────────────── */
+.btn-primary {
+    -fx-background-color: #3B8EA5;
+    -fx-text-fill: white;
+    -fx-font-size: 13px;
+    -fx-font-weight: bold;
+    -fx-padding: 10 24;
+    -fx-background-radius: 8;
+    -fx-cursor: hand;
+}
+.btn-primary:hover { -fx-background-color: #32778A; }
+
+.btn-secondary {
+    -fx-background-color: #F1F5F9;
+    -fx-text-fill: #475569;
+    -fx-font-size: 13px;
+    -fx-font-weight: bold;
+    -fx-padding: 10 24;
+    -fx-background-radius: 8;
+    -fx-border-color: #E2E8F0;
+    -fx-border-radius: 8;
+    -fx-border-width: 1;
+    -fx-cursor: hand;
+}
+.btn-secondary:hover {
+    -fx-background-color: #E2E8F0;
+}
+
+.btn-execute {
+    -fx-background-color: #58BD8B;
+    -fx-text-fill: white;
+    -fx-font-size: 13px;
+    -fx-font-weight: bold;
+    -fx-padding: 10 24;
+    -fx-background-radius: 8;
+    -fx-cursor: hand;
+}
+.btn-execute:hover { -fx-background-color: #4AA877; }
+
+/* ── Comparación ───────────────────────────────────────────────── */
+.comparison-card {
+    -fx-background-color: white;
+    -fx-background-radius: 15;
+    -fx-border-color: #E2E8F0;
+    -fx-border-radius: 15;
+    -fx-border-width: 1;
+    -fx-padding: 20;
+    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.06), 14, 0, 0, 4);
+}
+
+.vs-label {
+    -fx-font-size: 14px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #94A3B8;
+}
+
+/* ── Estado vacío ──────────────────────────────────────────────── */
+.empty-state {
+    -fx-padding: 60 0;
+}
+
+.empty-icon {
+    -fx-font-size: 48px;
+}
+
+.empty-text {
+    -fx-font-size: 14px;
+    -fx-text-fill: #94A3B8;
+}

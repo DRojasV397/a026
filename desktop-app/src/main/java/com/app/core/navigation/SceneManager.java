@@ -174,4 +174,19 @@ public class SceneManager {
         }
     }
 
+    /**
+     * Limpia el estado interno del SceneManager y regresa al login.
+     * Llamar siempre después de limpiar UserSession.
+     */
+    public static void resetToLogin() {
+        // Resetear estado de navegación
+        currentRoute = null;
+        baseController = null;
+        navigationGuard = null;
+        onRouteChanged = null;
+
+        // Cargar la escena de login desde cero
+        showLogin();
+    }
+
 }

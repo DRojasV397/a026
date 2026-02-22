@@ -1,14 +1,107 @@
 <?xml version="1.0" encoding="UTF-8"?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
 
-<?import javafx.scene.layout.BorderPane?>
-<?import javafx.scene.control.Label?>
 <BorderPane xmlns:fx="http://javafx.com/fxml"
             fx:controller="com.app.ui.simulation.SimulationController"
-            stylesheets="@/styles/dashboard.css"
-            styleClass="dashboard-root">
+            stylesheets="@/styles/simulation.css"
+            styleClass="sim-root">
 
     <center>
-        <Label text="Bienvenido al módulo de Simulación"/>
+        <ScrollPane fx:id="mainScroll" fitToWidth="true" styleClass="sim-scroll">
+            <VBox spacing="20" styleClass="sim-container">
+
+                <!-- Grid de escenarios -->
+                <VBox spacing="12">
+                    <Label text="Escenarios guardados" styleClass="section-title"/>
+                    <FlowPane fx:id="scenariosGrid" hgap="16" vgap="16"
+                              styleClass="scenarios-grid"/>
+
+                    <!-- Estado vacío -->
+                    <VBox fx:id="emptyState" styleClass="empty-state"
+                          alignment="CENTER" spacing="10" visible="false" managed="false">
+                        <Label text="📊" styleClass="empty-icon"/>
+                        <Label text="No hay escenarios creados" styleClass="empty-text"/>
+                    </VBox>
+                </VBox>
+
+                <!-- Panel de edición -->
+                <VBox fx:id="editionPanel" spacing="16" styleClass="edition-card"
+                      visible="false" managed="false">
+                    <Label text="Configurar escenario" styleClass="section-title"/>
+
+                    <HBox spacing="20">
+                        <!-- Columna izq: formulario -->
+                        <VBox spacing="12" HBox.hgrow="ALWAYS">
+                            <VBox spacing="4">
+                                <Label text="Nombre" styleClass="form-label"/>
+                                <TextField fx:id="txtScenarioName"
+                                           promptText="Ej: Incremento de precios"
+                                           styleClass="form-input"/>
+                            </VBox>
+
+                            <VBox spacing="4">
+                                <Label text="Descripción" styleClass="form-label"/>
+                                <TextArea fx:id="txtScenarioDesc"
+                                          promptText="Breve descripción del escenario"
+                                          styleClass="form-input" prefRowCount="2"/>
+                            </VBox>
+
+                            <HBox spacing="12">
+                                <VBox spacing="4" HBox.hgrow="ALWAYS">
+                                    <Label text="Período (meses)" styleClass="form-label"/>
+                                    <ComboBox fx:id="cmbPeriod" maxWidth="Infinity"
+                                              styleClass="form-combo"/>
+                                </VBox>
+                                <VBox spacing="4" HBox.hgrow="ALWAYS">
+                                    <Label text="Escenario base" styleClass="form-label"/>
+                                    <ComboBox fx:id="cmbBaseScenario" maxWidth="Infinity"
+                                              styleClass="form-combo"/>
+                                </VBox>
+                            </HBox>
+
+                            <Label text="Variables a modificar" styleClass="form-label"/>
+                            <ScrollPane fitToWidth="true" prefHeight="300" styleClass="variables-scroll">
+                                <VBox fx:id="variablesList" spacing="12"/>
+                            </ScrollPane>
+
+                            <HBox spacing="12" alignment="CENTER_RIGHT">
+                                <Button text="Cancelar" styleClass="btn-secondary"/>
+                                <Button fx:id="btnSaveScenario" text="Guardar"
+                                        onAction="#onSaveScenario" styleClass="btn-primary"/>
+                                <Button fx:id="btnExecute" text="Ejecutar simulación"
+                                        styleClass="btn-execute"/>
+                            </HBox>
+                        </VBox>
+
+                        <!-- Columna der: preview de cambios -->
+                        <VBox fx:id="previewPanel" spacing="10" styleClass="preview-panel"
+                              prefWidth="280">
+                            <Label text="Vista previa de cambios" styleClass="preview-title"/>
+                            <ScrollPane fitToWidth="true" prefHeight="400">
+                                <VBox fx:id="changesPreview" spacing="6"/>
+                            </ScrollPane>
+                        </VBox>
+                    </HBox>
+                </VBox>
+
+                <!-- Panel de comparación -->
+                <VBox fx:id="comparisonPanel" spacing="12" styleClass="comparison-card"
+                      visible="false" managed="false">
+                    <Label text="Comparar escenarios" styleClass="section-title"/>
+                    <HBox spacing="12" alignment="CENTER_LEFT">
+                        <ComboBox fx:id="cmbCompare1" promptText="Escenario 1"
+                                  prefWidth="250" styleClass="form-combo"/>
+                        <Label text="vs" styleClass="vs-label"/>
+                        <ComboBox fx:id="cmbCompare2" promptText="Escenario 2"
+                                  prefWidth="250" styleClass="form-combo"/>
+                        <Button fx:id="btnCompare" text="Comparar"
+                                onAction="#onCompareScenarios" styleClass="btn-primary"/>
+                    </HBox>
+                </VBox>
+
+            </VBox>
+        </ScrollPane>
     </center>
 
 </BorderPane>

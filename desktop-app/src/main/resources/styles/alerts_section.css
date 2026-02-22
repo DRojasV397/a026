@@ -402,14 +402,16 @@
 .config-rule-condition { -fx-text-fill: #64748B; -fx-font-size: 11.5px; }
 
 .btn-config-edit {
+    -fx-text-fill: #2b3f5e;
     -fx-background-color: transparent;
     -fx-padding: 3 7 3 7;
     -fx-cursor: hand;
-    -fx-font-size: 13px;
+    -fx-font-size: 11px;
 }
 .btn-config-edit:hover {
-    -fx-background-color: #F1F5F9;
+    -fx-background-color: #dee4ed;
     -fx-background-radius: 4;
+    -fx-text-fill: #1E293B;
 }
 
 /* Dots de regla */

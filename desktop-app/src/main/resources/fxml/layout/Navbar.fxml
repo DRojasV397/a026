@@ -55,7 +55,7 @@
         </VBox>
 
         <!-- Avatar simbólico -->
-        <StackPane styleClass="navbar-avatar">
+        <StackPane  fx:id="avatarPane" styleClass="navbar-avatar">
             <ImageView fx:id="navbarAvatarView"
                        fitWidth="36" fitHeight="36"
                        preserveRatio="false">

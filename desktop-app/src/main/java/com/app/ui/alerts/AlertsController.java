@@ -10,6 +10,7 @@ import javafx.collections.transformation.FilteredList;
 import javafx.concurrent.Task;
 import javafx.fxml.FXML;
 import javafx.geometry.Pos;
+import javafx.scene.Node;
 import javafx.scene.canvas.Canvas;
 import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.control.*;
@@ -30,6 +31,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.function.BiFunction;
 import java.util.stream.Collectors;
 
 public class AlertsController {
@@ -718,31 +720,48 @@ public class AlertsController {
         );
 
         List<HBox> rows = new ArrayList<>();
+
+        // Función helper para crear columna con ancho fijo
+        BiFunction<Node, Double, HBox> fixedCol = (node, width) -> {
+            HBox col = new HBox(node);
+            col.setMinWidth(width);
+            col.setMaxWidth(width);
+            col.setAlignment(Pos.CENTER_LEFT);
+            return col;
+        };
+
         for (Rule rule : rules) {
             HBox row = new HBox(12);
             row.setAlignment(Pos.CENTER_LEFT);
             row.getStyleClass().add("config-rule-row");
 
-            // Indicador activo/inactivo
+            // ── Col 1: Dot indicador (20px) ───────────────────────────────────────
             Circle dot = new Circle(5);
             dot.getStyleClass().add(rule.active() ? "rule-active-dot" : "rule-inactive-dot");
+            HBox colDot = fixedCol.apply(dot, 20.0);
 
+            // ── Col 2: Métrica (flexible, pero con límite) ───────────────────────
             Label lblMetric = new Label(rule.metric());
             lblMetric.getStyleClass().add("config-rule-metric");
+            lblMetric.setMaxWidth(Double.MAX_VALUE);
             HBox.setHgrow(lblMetric, Priority.ALWAYS);
 
+            // ── Col 3: Condición (160px) ──────────────────────────────────────────
             Label lblCond = new Label(rule.condition() + " " + rule.threshold());
             lblCond.getStyleClass().add("config-rule-condition");
+            HBox colCond = fixedCol.apply(lblCond, 160.0);
 
-            Button btnEdit = new Button("\u270F\uFE0F");
+            // ── Col 4: Botón editar (80px) ────────────────────────────────────────
+            Button btnEdit = new Button("Editar");
             btnEdit.getStyleClass().add("btn-config-edit");
             btnEdit.setOnAction(e -> {
                 System.out.printf("[CONFIG] Editar regla: '%s' %s %s%n",
                         rule.metric(), rule.condition(), rule.threshold());
                 // TODO: abrir modal de edición de regla
             });
+            HBox colBtn = fixedCol.apply(btnEdit, 80.0);
 
-            row.getChildren().addAll(dot, lblMetric, lblCond, btnEdit);
+            row.getChildren().addAll(colDot, lblMetric, colCond, colBtn);
             rows.add(row);
         }
 

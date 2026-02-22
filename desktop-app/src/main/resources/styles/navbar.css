@@ -25,3 +25,26 @@
 .navbar-user-subtitle{
     -fx-font-size: 10px;
 }
+
+/* ── Menú contextual de perfil ── */
+.profile-context-menu .menu-item {
+    -fx-padding: 8 16 8 16;
+    -fx-font-size: 12px;
+}
+
+.profile-context-menu .menu-item:focused {
+    -fx-background-color: #f0f4ff;
+}
+
+.profile-context-menu .separator {
+    -fx-padding: 2 0 2 0;
+}
+
+/* Ítem de logout con color de advertencia */
+.logout-menu-item {
+    -fx-text-fill: #e53935;
+}
+
+.logout-menu-item:focused {
+    -fx-background-color: #fff0f0;
+}
