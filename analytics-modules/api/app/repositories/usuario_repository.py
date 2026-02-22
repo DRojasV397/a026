@@ -81,7 +81,7 @@ class RolRepository(BaseRepository[Rol]):
             Optional[Rol]: Rol encontrado o None
         """
         try:
-            return self.db.query(Rol).filter(Rol.nombreRol == nombre).first()
+            return self.db.query(Rol).filter(Rol.nombre == nombre).first()
         except Exception as e:
             logger.error(f"Error al buscar rol por nombre: {str(e)}")
             return None

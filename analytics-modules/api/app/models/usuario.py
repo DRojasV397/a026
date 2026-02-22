@@ -46,7 +46,7 @@ class Rol(Base):
     usuarios = relationship("UsuarioRol", back_populates="rol")
 
     def __repr__(self):
-        return f"<Rol(id={self.idRol}, nombre={self.nombreRol})>"
+        return f"<Rol(id={self.idRol}, nombre={self.nombre})>"
 
 
 class UsuarioRol(Base):

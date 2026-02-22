@@ -7,6 +7,10 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import field_validator
 from typing import Optional, Union
 from functools import lru_cache
+from pathlib import Path
+
+# Ruta absoluta al .env, siempre relativa a este archivo (config/settings.py → api/.env)
+_ENV_FILE = Path(__file__).parent.parent.parent / ".env"
 
 
 class Settings(BaseSettings):
@@ -63,7 +67,7 @@ class Settings(BaseSettings):
     DEBUG: bool = True
 
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=str(_ENV_FILE),
         env_file_encoding="utf-8",
         case_sensitive=True
     )
