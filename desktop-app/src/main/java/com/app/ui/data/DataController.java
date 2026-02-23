@@ -435,14 +435,19 @@ public class DataController {
         tipoDialog.setHeaderText("¿Qué tipo de datos contiene este archivo?");
         tipoDialog.setContentText(currentFile.getName());
 
-        ButtonType btnVentas  = new ButtonType("Ventas",  ButtonBar.ButtonData.LEFT);
-        ButtonType btnCompras = new ButtonType("Compras", ButtonBar.ButtonData.RIGHT);
-        ButtonType btnCancel  = new ButtonType("Cancelar", ButtonBar.ButtonData.CANCEL_CLOSE);
-        tipoDialog.getDialogPane().getButtonTypes().setAll(btnVentas, btnCompras, btnCancel);
+        ButtonType btnVentas    = new ButtonType("Ventas",     ButtonBar.ButtonData.LEFT);
+        ButtonType btnCompras   = new ButtonType("Compras",    ButtonBar.ButtonData.RIGHT);
+        ButtonType btnProductos = new ButtonType("Productos",  ButtonBar.ButtonData.LEFT);
+        ButtonType btnInventario= new ButtonType("Inventario", ButtonBar.ButtonData.RIGHT);
+        ButtonType btnCancel    = new ButtonType("Cancelar",   ButtonBar.ButtonData.CANCEL_CLOSE);
+        tipoDialog.getDialogPane().getButtonTypes().setAll(
+                btnVentas, btnCompras, btnProductos, btnInventario, btnCancel);
 
         tipoDialog.setResultConverter(btn -> {
-            if (btn == btnVentas)  return "ventas";
-            if (btn == btnCompras) return "compras";
+            if (btn == btnVentas)     return "ventas";
+            if (btn == btnCompras)    return "compras";
+            if (btn == btnProductos)  return "productos";
+            if (btn == btnInventario) return "inventario";
             return null;
         });
 
