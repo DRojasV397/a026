@@ -21,7 +21,7 @@ from app.schemas.data_upload import (
     REQUIRED_COLUMNS, OPTIONAL_COLUMNS
 )
 from app.models import Venta, DetalleVenta, Compra, DetalleCompra, Producto, Categoria, HistorialCarga
-from app.repositories import VentaRepository, CompraRepository, ProductoRepository, CategoriaRepository
+from app.repositories import VentaRepository, CompraRepository, ProductoRepository, CategoriaRepository, DetalleVentaRepository, DetalleCompraRepository
 
 logger = logging.getLogger(__name__)
 
@@ -443,7 +443,8 @@ class DataService:
         self,
         upload_id: str,
         data_type: DataType,
-        column_mappings: Dict[str, str]
+        column_mappings: Dict[str, str],
+        user_id: Optional[int] = None
     ) -> Dict[str, Any]:
         """
         Confirma la carga e inserta los datos en la BD.
@@ -452,6 +453,7 @@ class DataService:
             upload_id: ID del upload
             data_type: Tipo de datos
             column_mappings: Mapeo de columnas
+            user_id: ID del usuario autenticado (fuente autoritativa)
 
         Returns:
             Dict: Resultado de la insercion
@@ -461,7 +463,11 @@ class DataService:
             return {"success": False, "message": "Upload no encontrado"}
 
         df = upload["data"]
-        user_id = upload.get("user_id")
+        # Usar user_id del parámetro (fuente autoritativa del router).
+        # Si no viene (llamada directa sin autenticación), caer a lo que
+        # se guardó durante el upload.
+        if user_id is None:
+            user_id = upload.get("user_id")
         filename = upload.get("filename")
 
         # Renombrar columnas segun mapeo
@@ -476,8 +482,10 @@ class DataService:
                 updated = 0
             elif data_type == DataType.PRODUCTOS:
                 inserted, updated = self._insert_productos(df, user_id)
+            elif data_type == DataType.INVENTARIO:
+                inserted, updated = self._insert_inventario(df, user_id)
             else:
-                return {"success": False, "message": f"Tipo de datos no soportado: {data_type}"}
+                return {"success": False, "message": f"Tipo de datos no soportado: {data_type.value}"}
 
             upload["status"] = UploadStatus.CONFIRMED
 
@@ -506,9 +514,16 @@ class DataService:
             return {"success": False, "message": str(e)}
 
     def _insert_ventas(self, df: pd.DataFrame, user_id: Optional[int] = None) -> int:
-        """Inserta datos de ventas en la BD asociados al usuario."""
+        """Inserta datos de ventas en la BD, incluyendo DetalleVenta si el CSV lo tiene."""
         repo = VentaRepository(self.db)
+        repo_detalle = DetalleVentaRepository(self.db)
+        repo_prod = ProductoRepository(self.db)
         inserted = 0
+
+        has_sku_producto = 'sku_producto' in df.columns   # columna "producto_sku" renombrada
+        has_producto = 'producto' in df.columns           # columna "producto_nombre" renombrada
+        has_cantidad = 'cantidad' in df.columns
+        has_precio = 'precio_unitario' in df.columns
 
         for _, row in df.iterrows():
             try:
@@ -518,8 +533,38 @@ class DataService:
                     creadoPor=user_id
                 )
                 created = repo.create(venta)
-                if created:
-                    inserted += 1
+                if not created:
+                    continue
+                inserted += 1
+
+                # Crear DetalleVenta si el CSV incluye columnas de producto
+                if (has_sku_producto or has_producto) and has_cantidad and has_precio:
+                    sku_val = str(row.get('sku_producto', '')).strip() if has_sku_producto else ''
+                    nombre_val = str(row.get('producto', '')).strip() if has_producto else ''
+                    cantidad_raw = row.get('cantidad')
+                    precio_raw = row.get('precio_unitario')
+                    if (sku_val or nombre_val) and cantidad_raw is not None and precio_raw is not None:
+                        producto = None
+                        # Preferir lookup por SKU (más confiable)
+                        if sku_val:
+                            producto = repo_prod.get_by_sku(sku_val)
+                        # Fallback: buscar por nombre contra el usuario
+                        if not producto and nombre_val and user_id:
+                            producto = repo_prod.get_by_nombre_y_usuario(nombre_val, user_id)
+                        if producto:
+                            detalle = DetalleVenta(
+                                idVenta=created.idVenta,
+                                renglon=1,
+                                idProducto=producto.idProducto,
+                                cantidad=float(cantidad_raw),
+                                precioUnitario=float(precio_raw)
+                            )
+                            repo_detalle.create(detalle)
+                        else:
+                            logger.warning(
+                                f"Venta {created.idVenta}: producto sku='{sku_val}' nombre='{nombre_val}' "
+                                f"no encontrado, DetalleVenta omitido"
+                            )
             except Exception as e:
                 logger.warning(f"Error al insertar venta: {str(e)}")
                 continue
@@ -527,9 +572,16 @@ class DataService:
         return inserted
 
     def _insert_compras(self, df: pd.DataFrame, user_id: Optional[int] = None) -> int:
-        """Inserta datos de compras en la BD asociados al usuario."""
+        """Inserta datos de compras en la BD, incluyendo DetalleCompra si el CSV lo tiene."""
         repo = CompraRepository(self.db)
+        repo_detalle = DetalleCompraRepository(self.db)
+        repo_prod = ProductoRepository(self.db)
         inserted = 0
+
+        has_sku_producto = 'sku_producto' in df.columns   # columna "producto_sku" renombrada
+        has_producto = 'producto' in df.columns           # columna "producto_nombre" renombrada
+        has_cantidad = 'cantidad' in df.columns
+        has_costo = 'costo' in df.columns
 
         for _, row in df.iterrows():
             try:
@@ -540,8 +592,41 @@ class DataService:
                     creadoPor=user_id
                 )
                 created = repo.create(compra)
-                if created:
-                    inserted += 1
+                if not created:
+                    continue
+                inserted += 1
+
+                # Crear DetalleCompra si el CSV incluye columnas de producto
+                if (has_sku_producto or has_producto) and has_cantidad and has_costo:
+                    sku_val = str(row.get('sku_producto', '')).strip() if has_sku_producto else ''
+                    nombre_val = str(row.get('producto', '')).strip() if has_producto else ''
+                    cantidad_raw = row.get('cantidad')
+                    costo_raw = row.get('costo')
+                    if (sku_val or nombre_val) and cantidad_raw is not None and costo_raw is not None:
+                        producto = None
+                        # Preferir lookup por SKU (más confiable)
+                        if sku_val:
+                            producto = repo_prod.get_by_sku(sku_val)
+                        # Fallback: buscar por nombre contra el usuario
+                        if not producto and nombre_val and user_id:
+                            producto = repo_prod.get_by_nombre_y_usuario(nombre_val, user_id)
+                        if producto:
+                            cantidad = float(cantidad_raw)
+                            costo = float(costo_raw)
+                            detalle = DetalleCompra(
+                                idCompra=created.idCompra,
+                                renglon=1,
+                                idProducto=producto.idProducto,
+                                cantidad=cantidad,
+                                costo=costo,
+                                subtotal=round(cantidad * costo, 2)
+                            )
+                            repo_detalle.create(detalle)
+                        else:
+                            logger.warning(
+                                f"Compra {created.idCompra}: producto sku='{sku_val}' nombre='{nombre_val}' "
+                                f"no encontrado, DetalleCompra omitido"
+                            )
             except Exception as e:
                 logger.warning(f"Error al insertar compra: {str(e)}")
                 continue
@@ -620,6 +705,71 @@ class DataService:
                 continue
 
         return inserted, updated
+
+    def _insert_inventario(
+        self, df: pd.DataFrame, user_id: Optional[int] = None
+    ) -> tuple[int, int]:
+        """
+        Actualiza el stock de productos existentes por SKU.
+
+        - Si el SKU existe para el usuario: actualiza stock, stockMinimo,
+          stockMaximo y ubicacion.
+        - Si el SKU no existe: se omite (no se puede crear un producto
+          desde datos de inventario sin nombre ni categoría).
+
+        Returns:
+            Tuple (no_encontrados_omitidos, actualizados)
+        """
+        repo = ProductoRepository(self.db)
+        updated = 0
+        skipped = 0
+
+        for _, row in df.iterrows():
+            try:
+                sku = str(row.get('sku', '')).strip()
+                if not sku:
+                    skipped += 1
+                    continue
+
+                # Buscar producto del usuario por SKU (incluye legacy con creadoPor=NULL)
+                existing = None
+                if user_id:
+                    existing = repo.get_by_sku_y_usuario(sku, user_id)
+                if not existing:
+                    existing = repo.get_by_sku(sku)
+
+                if not existing:
+                    logger.warning(f"Inventario: SKU '{sku}' no encontrado, omitiendo")
+                    skipped += 1
+                    continue
+
+                updates: dict = {}
+
+                cantidad_raw = row.get('cantidad')
+                if cantidad_raw is not None and str(cantidad_raw).strip() != '':
+                    updates['stock'] = int(float(cantidad_raw))
+
+                minimo_raw = row.get('minimo')
+                if minimo_raw is not None and str(minimo_raw).strip() != '':
+                    updates['stockMinimo'] = int(float(minimo_raw))
+
+                maximo_raw = row.get('maximo')
+                if maximo_raw is not None and str(maximo_raw).strip() != '':
+                    updates['stockMaximo'] = int(float(maximo_raw))
+
+                ubicacion_raw = row.get('ubicacion')
+                if ubicacion_raw is not None and str(ubicacion_raw).strip() != '':
+                    updates['ubicacion'] = str(ubicacion_raw).strip()
+
+                if updates:
+                    repo.update(existing.idProducto, updates)
+                    updated += 1
+
+            except Exception as e:
+                logger.warning(f"Error al actualizar inventario SKU '{row.get('sku')}': {str(e)}")
+                continue
+
+        return skipped, updated
 
     def _save_historial(
         self,

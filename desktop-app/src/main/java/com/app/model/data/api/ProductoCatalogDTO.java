@@ -14,6 +14,10 @@ public class ProductoCatalogDTO {
     private Double  precioUnitario;
     private Double  costoUnitario;
     private Integer activo;
+    private Integer stock;
+    private Integer stockMinimo;
+    private Integer stockMaximo;
+    private String  ubicacion;
 
     public int     getIdProducto()       { return idProducto; }
     public String  getSku()              { return sku != null ? sku : ""; }
@@ -24,6 +28,10 @@ public class ProductoCatalogDTO {
     public Double  getCostoUnitario()    { return costoUnitario; }
     public Integer getActivo()           { return activo; }
     public boolean isActivo()            { return activo != null && activo == 1; }
+    public Integer getStock()            { return stock; }
+    public Integer getStockMinimo()      { return stockMinimo; }
+    public Integer getStockMaximo()      { return stockMaximo; }
+    public String  getUbicacion()        { return ubicacion != null ? ubicacion : ""; }
 
     /** Margen bruto en porcentaje, formateado. */
     public String getMargen() {

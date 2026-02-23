@@ -108,6 +108,27 @@ class ProductoRepository(BaseRepository[Producto]):
             logger.error(f"Error al obtener productos por usuario: {str(e)}")
             return []
 
+    def get_by_nombre_y_usuario(self, nombre: str, user_id: int) -> Optional[Producto]:
+        """
+        Busca un producto por nombre (case-insensitive) para un usuario.
+        Incluye productos sin propietario asignado (legacy/seed).
+
+        Args:
+            nombre: Nombre del producto
+            user_id: ID del usuario
+
+        Returns:
+            Optional[Producto]: Producto encontrado o None
+        """
+        try:
+            return self.db.query(Producto).filter(
+                Producto.nombre.ilike(nombre),
+                or_(Producto.creadoPor == user_id, Producto.creadoPor.is_(None))
+            ).first()
+        except Exception as e:
+            logger.error(f"Error al buscar producto por nombre y usuario: {str(e)}")
+            return None
+
     def get_activos_por_usuario(self, user_id: int) -> List[Producto]:
         """
         Obtiene los productos activos de un usuario.

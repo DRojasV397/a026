@@ -37,6 +37,10 @@ class Producto(Base):
     precioUnitario = Column(DECIMAL(18, 2), nullable=True)
     activo = Column(Integer, nullable=True, default=1)
     creadoPor = Column(Integer, ForeignKey('Usuario.idUsuario'), nullable=True)
+    stock = Column(Integer, nullable=True)
+    stockMinimo = Column(Integer, nullable=True)
+    stockMaximo = Column(Integer, nullable=True)
+    ubicacion = Column(String(120), nullable=True)
 
     # Relaciones
     categoria = relationship("Categoria", back_populates="productos")

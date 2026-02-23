@@ -1292,16 +1292,20 @@ public class DataController {
             case "ventas" -> {
                 columnMappings.put("fecha",           "fecha");
                 columnMappings.put("total",           "total");
+                columnMappings.put("sku_producto",    "producto_sku");    // SKU directo (preferido)
+                columnMappings.put("producto",        "producto_nombre"); // nombre (fallback)
                 columnMappings.put("cantidad",        "cantidad");
                 columnMappings.put("precio_unitario", "precio_unitario");
                 columnMappings.put("cliente",         "cliente");
             }
             case "compras" -> {
-                columnMappings.put("fecha",     "fecha");
-                columnMappings.put("total",     "total");
-                columnMappings.put("proveedor", "proveedor");
-                columnMappings.put("cantidad",  "cantidad");
-                columnMappings.put("costo",     "costo");
+                columnMappings.put("fecha",        "fecha");
+                columnMappings.put("total",        "total");
+                columnMappings.put("proveedor",    "proveedor");
+                columnMappings.put("sku_producto", "producto_sku");    // SKU directo (preferido)
+                columnMappings.put("producto",     "producto_nombre"); // nombre (fallback)
+                columnMappings.put("cantidad",     "cantidad");
+                columnMappings.put("costo",        "costo");
             }
             case "productos" -> {
                 columnMappings.put("sku",        "sku");

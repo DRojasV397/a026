@@ -16,8 +16,8 @@ from app.schemas.data_upload import (
     ConfirmRequest, ConfirmResponse, QualityReportResponse,
     HistorialCargaResponse
 )
-from app.middleware.auth_middleware import get_current_user
-from app.schemas.auth import TokenData
+from app.middleware.auth_middleware import get_current_active_user
+from app.models import Usuario
 
 logger = logging.getLogger(__name__)
 
@@ -29,7 +29,7 @@ async def upload_file(
     file: UploadFile = File(...),
     sheet_name: Optional[str] = Query(None, description="Nombre de hoja Excel"),
     db: Session = Depends(get_db),
-    current_user: TokenData = Depends(get_current_user)
+    current_user: Usuario = Depends(get_current_active_user)
 ):
     """
     Carga un archivo CSV o Excel para procesamiento.
@@ -72,7 +72,7 @@ async def upload_file(
 async def validate_structure(
     request: ValidateRequest,
     db: Session = Depends(get_db),
-    current_user: TokenData = Depends(get_current_user)
+    current_user: Usuario = Depends(get_current_active_user)
 ):
     """
     Valida la estructura del archivo contra el tipo de datos esperado.
@@ -99,7 +99,7 @@ async def get_preview(
     upload_id: str,
     rows: int = Query(default=10, ge=1, le=100),
     db: Session = Depends(get_db),
-    current_user: TokenData = Depends(get_current_user)
+    current_user: Usuario = Depends(get_current_active_user)
 ):
     """
     Obtiene una vista previa de los datos cargados.
@@ -120,7 +120,7 @@ async def get_preview(
 async def clean_data(
     request: CleanRequest,
     db: Session = Depends(get_db),
-    current_user: TokenData = Depends(get_current_user)
+    current_user: Usuario = Depends(get_current_active_user)
 ):
     """
     Ejecuta limpieza de datos segun opciones especificadas.
@@ -143,7 +143,7 @@ async def clean_data(
 async def confirm_upload(
     request: ConfirmRequest,
     db: Session = Depends(get_db),
-    current_user: TokenData = Depends(get_current_user)
+    current_user: Usuario = Depends(get_current_active_user)
 ):
     """
     Confirma la carga e inserta los datos en la base de datos.
@@ -161,7 +161,8 @@ async def confirm_upload(
     result = service.confirm_upload(
         request.upload_id,
         request.data_type,
-        request.column_mappings
+        request.column_mappings,
+        user_id=current_user.idUsuario
     )
 
     if not result["success"]:
@@ -185,7 +186,7 @@ async def confirm_upload(
 async def get_quality_report(
     upload_id: str,
     db: Session = Depends(get_db),
-    current_user: TokenData = Depends(get_current_user)
+    current_user: Usuario = Depends(get_current_active_user)
 ):
     """
     Genera un reporte de calidad de los datos cargados.
@@ -208,7 +209,7 @@ async def get_quality_report(
 async def get_historial_cargas(
     tipo: Optional[str] = Query(None, description="Filtrar por tipo: ventas, compras, productos"),
     db: Session = Depends(get_db),
-    current_user: TokenData = Depends(get_current_user)
+    current_user: Usuario = Depends(get_current_active_user)
 ):
     """
     Obtiene el historial de cargas de datos del usuario autenticado.
@@ -224,7 +225,7 @@ async def get_historial_cargas(
 async def delete_upload(
     upload_id: str,
     db: Session = Depends(get_db),
-    current_user: TokenData = Depends(get_current_user)
+    current_user: Usuario = Depends(get_current_active_user)
 ):
     """
     Elimina un upload temporal.
@@ -243,7 +244,7 @@ async def delete_upload(
 async def get_excel_sheets(
     upload_id: str,
     db: Session = Depends(get_db),
-    current_user: TokenData = Depends(get_current_user)
+    current_user: Usuario = Depends(get_current_active_user)
 ):
     """
     Obtiene lista de hojas de un archivo Excel cargado.

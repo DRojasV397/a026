@@ -69,5 +69,9 @@ class ProductoResponse(ProductoBase):
     idProducto: int
     costoUnitario: Optional[Decimal] = None
     categoriaNombre: Optional[str] = None
+    stock: Optional[int] = None
+    stockMinimo: Optional[int] = None
+    stockMaximo: Optional[int] = None
+    ubicacion: Optional[str] = None
 
     model_config = ConfigDict(from_attributes=True)

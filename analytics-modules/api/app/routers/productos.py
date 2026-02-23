@@ -79,9 +79,13 @@ def get_productos(
             "precioUnitario":  float(p.precioUnitario) if p.precioUnitario is not None else None,
             "costoUnitario":   float(p.costoUnitario)  if p.costoUnitario  is not None else None,
             "costo":           float(p.costoUnitario)  if p.costoUnitario  is not None else None,
-            "existencia":      0,
+            "existencia":      p.stock if p.stock is not None else 0,
             "activo":          p.activo if p.activo is not None else 1,
             "categoriaNombre": cat_nombre,
+            "stock":           p.stock,
+            "stockMinimo":     p.stockMinimo,
+            "stockMaximo":     p.stockMaximo,
+            "ubicacion":       p.ubicacion,
         })
     return result
 

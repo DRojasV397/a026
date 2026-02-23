@@ -27,7 +27,7 @@ class Settings(BaseSettings):
     # Configuración de base de datos SQL Server
     DB_SERVER: str = "localhost"
     DB_PORT: int = 1433
-    DB_NAME: str = "SistemaBI"
+    DB_NAME: str = "TTA026"
     DB_USER: str = "sa"
     DB_PASSWORD: str = ""
     DB_DRIVER: str = "ODBC Driver 17 for SQL Server"
