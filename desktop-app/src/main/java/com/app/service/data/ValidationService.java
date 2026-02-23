@@ -34,7 +34,7 @@ public class ValidationService {
         List<String> log = new ArrayList<>();
 
         // ── Cabecera ──────────────────────────────────────────────────────────
-        List<String> rawHeaders = rows.get(0);
+        List<String> rawHeaders = rows.getFirst();
         List<String> headers    = rawHeaders.stream()
                 .map(DataSchema::normalize)
                 .toList();

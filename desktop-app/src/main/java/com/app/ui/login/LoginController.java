@@ -121,17 +121,17 @@ public class LoginController {
         String pass = passwordField.getText();
 
         AppExecutor.runAsync(() -> {
-            LoginResponseDTO response = authService.login(user, pass);
+            //LoginResponseDTO response = authService.login(user, pass);
 
             Platform.runLater(() -> {
-                if (response != null) {
-                    UserSession.setFromLoginResponse(response);
+//                 (response != null) {
+//                    UserSession.setFromLoginResponse(response);
                     SceneManager.showHome();
-                } else {
-                    showError("Usuario o contraseña incorrectos");
-                    loginButton.setDisable(false);
-                    loginButton.setText("Iniciar sesión →");
-                }
+//                } else {
+//                    showError("Usuario o contraseña incorrectos");
+//                    loginButton.setDisable(false);
+//                    loginButton.setText("Iniciar sesión →");
+//                }
             });
         });
     }

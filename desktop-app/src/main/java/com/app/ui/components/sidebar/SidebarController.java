@@ -91,7 +91,7 @@ public class SidebarController {
         userNameLabel.setText(UserSession.getUser());
 
         //Control por rol
-        if (!UserSession.isAdmin()) {
+        if (UserSession.isAdmin()) {
             adminItem.setManaged(false);
             adminItem.setVisible(false);
         }
@@ -130,11 +130,11 @@ public class SidebarController {
     }
 
     public void goSimulation() {
-        SceneManager.setContent("/fxml/simulation/SimulationView.fxml", "Simulación", "Sin subtitulo", AppRoute.SIMULATION);
+        SceneManager.setContent("/fxml/simulation/SimulationView.fxml", "Simulación", "Proyecta el resultado de tus decisiones... ¿Qué pasaría sí?", AppRoute.SIMULATION);
     }
 
     public void goAlerts() {
-        SceneManager.setContent("/fxml/alerts/AlertsView.fxml", "Alertas", "Sin subtitulo", AppRoute.ALERTS);
+        SceneManager.setContent("/fxml/alerts/AlertsView.fxml", "Alertas", "Gestiona y programa tus propias alertas", AppRoute.ALERTS);
     }
 
     public void goReports() {

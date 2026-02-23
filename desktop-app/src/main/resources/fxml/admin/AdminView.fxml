@@ -1,14 +1,137 @@
 <?xml version="1.0" encoding="UTF-8"?>
+<?import javafx.scene.layout.*?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.image.*?>
+<?import javafx.geometry.Insets?>
 
-<?import javafx.scene.layout.BorderPane?>
-<?import javafx.scene.control.Label?>
-<BorderPane xmlns:fx="http://javafx.com/fxml"
-            fx:controller="com.app.ui.admin.AdminController"
-            stylesheets="@/styles/dashboard.css"
-            styleClass="dashboard-root">
+<VBox xmlns="http://javafx.com/javafx/21"
+      xmlns:fx="http://javafx.com/fxml/1"
+      fx:controller="com.app.ui.admin.AdminController"
+      fx:id="adminRoot"
+      styleClass="admin-root"
+      stylesheets="@/styles/admin.css"
+      spacing="0">
 
-    <center>
-        <Label text="Bienvenido al módulo de Administración"/>
-    </center>
+    <!-- ═══════════════════════════════════════════════════
+         SCROLL PRINCIPAL — envuelve TODO el contenido
+    ════════════════════════════════════════════════════ -->
+    <ScrollPane styleClass="admin-scroll" fitToWidth="true" VBox.vgrow="ALWAYS">
+        <VBox spacing="20" styleClass="admin-content">
+            <padding><Insets top="20" right="10" bottom="24" left="20"/></padding>
 
-</BorderPane>
+            <!-- ── KPI CARDS: FlowPane responsivo ─────────── -->
+            <FlowPane styleClass="kpi-flow"
+                      hgap="14" vgap="14">
+
+                <!-- Usuarios activos -->
+                <VBox styleClass="kpi-card" spacing="14">
+                    <HBox alignment="CENTER_LEFT" spacing="14">
+                        <ImageView fitWidth="48" fitHeight="48" preserveRatio="true">
+                            <image><Image url="@/images/admin-users-active.png"/></image>
+                        </ImageView>
+                        <VBox spacing="3">
+                            <Label text="Usuarios activos" styleClass="kpi-label"/>
+                            <Label fx:id="kpiActiveUsers" text="—" styleClass="kpi-value"/>
+                        </VBox>
+                    </HBox>
+                    <Label fx:id="kpiActiveSubtitle" text="En el sistema" styleClass="kpi-sub"/>
+                </VBox>
+
+                <!-- Acceso completo -->
+                <VBox styleClass="kpi-card" spacing="14">
+                    <HBox alignment="CENTER_LEFT" spacing="14">
+                        <ImageView fitWidth="48" fitHeight="48" preserveRatio="true">
+                            <image><Image url="@/images/admin-full-access.png"/></image>
+                        </ImageView>
+                        <VBox spacing="3">
+                            <Label text="Acceso completo" styleClass="kpi-label"/>
+                            <Label fx:id="kpiFullAccess" text="—" styleClass="kpi-value"/>
+                        </VBox>
+                    </HBox>
+                    <Label fx:id="kpiFullAccessSubtitle" text="Rol Administrador" styleClass="kpi-sub"/>
+                </VBox>
+
+                <!-- Conectados hoy -->
+                <VBox styleClass="kpi-card" spacing="14">
+                    <HBox alignment="CENTER_LEFT" spacing="14">
+                        <ImageView fitWidth="48" fitHeight="48" preserveRatio="true">
+                            <image><Image url="@/images/admin-online-today.png"/></image>
+                        </ImageView>
+                        <VBox spacing="3">
+                            <Label text="Conectados hoy" styleClass="kpi-label"/>
+                            <Label fx:id="kpiOnlineToday" text="—" styleClass="kpi-value"/>
+                        </VBox>
+                    </HBox>
+                    <Label fx:id="kpiOnlineSubtitle" text="Último acceso hoy" styleClass="kpi-sub"/>
+                </VBox>
+
+                <!-- Sin verificar -->
+                <VBox styleClass="kpi-card, kpi-card-warn" spacing="14">
+                    <HBox alignment="CENTER_LEFT" spacing="14">
+                        <ImageView fitWidth="48" fitHeight="48" preserveRatio="true">
+                            <image><Image url="@/images/admin-pending-verify.png"/></image>
+                        </ImageView>
+                        <VBox spacing="3">
+                            <Label text="Sin verificar" styleClass="kpi-label"/>
+                            <Label fx:id="kpiPendingVerify" text="—"
+                                   styleClass="kpi-value, kpi-value-warn"/>
+                        </VBox>
+                    </HBox>
+                    <Label fx:id="kpiVerifySubtitle" text="Requieren verificación"
+                           styleClass="kpi-sub"/>
+                </VBox>
+
+            </FlowPane>
+
+            <!-- ── LISTA DE USUARIOS ──────────────────────── -->
+            <VBox styleClass="users-card" spacing="0">
+
+                <!-- Toolbar -->
+                <HBox styleClass="users-toolbar" alignment="CENTER_LEFT" spacing="10">
+                    <HBox styleClass="search-wrapper" alignment="CENTER_LEFT" spacing="8">
+                        <Label text="🔍" styleClass="search-icon"/>
+                        <TextField fx:id="searchField"
+                                   promptText="Buscar por nombre, correo o usuario…"
+                                   styleClass="search-input"
+                                   prefWidth="260"/>
+                    </HBox>
+                    <Region HBox.hgrow="ALWAYS"/>
+                    <Button fx:id="btnExport"
+                            styleClass="btn-admin-export"
+                            onAction="#onExport"
+                            contentDisplay="LEFT"
+                            graphicTextGap="6">
+                        <graphic>
+                            <ImageView fitWidth="18" fitHeight="18" preserveRatio="true">
+                                <image>
+                                    <Image url="@/images/reports/icon-download.png"/>
+                                </image>
+                            </ImageView>
+                        </graphic>
+                        <text>Exportar</text>
+                    </Button>
+                    <Button fx:id="btnAddUser"
+                            text="＋  Nuevo usuario"
+                            styleClass="btn-admin-primary"
+                            onAction="#onAddUser"/>
+                </HBox>
+
+                <!-- Filas -->
+                <VBox fx:id="usersContainer" styleClass="users-list" spacing="0"/>
+
+                <!-- Paginación -->
+                <HBox fx:id="paginationBar" styleClass="pagination-bar"
+                      alignment="CENTER" spacing="8">
+                    <Button fx:id="btnPrevPage" text="←" styleClass="btn-page"
+                            onAction="#onPrevPage"/>
+                    <Label fx:id="pageLabel" text="Página 1 de 1" styleClass="page-label"/>
+                    <Button fx:id="btnNextPage" text="→" styleClass="btn-page"
+                            onAction="#onNextPage"/>
+                </HBox>
+
+            </VBox>
+
+        </VBox>
+    </ScrollPane>
+
+</VBox>
