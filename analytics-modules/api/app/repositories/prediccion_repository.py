@@ -46,15 +46,12 @@ class PrediccionRepository(BaseRepository[Prediccion]):
         Args:
             tipo_entidad: Tipo de entidad (Producto, Categoria, General)
             id_entidad: ID de la entidad
-
-        Returns:
-            List[Prediccion]: Lista de predicciones
         """
         try:
             return self.db.query(Prediccion).filter(
-                Prediccion.tipoEntidad == tipo_entidad,
-                Prediccion.idEntidad == id_entidad
-            ).order_by(desc(Prediccion.fechaPrediccion)).all()
+                Prediccion.entidad == tipo_entidad,
+                Prediccion.claveEntidad == id_entidad
+            ).order_by(desc(Prediccion.periodo)).all()
         except Exception as e:
             logger.error(f"Error al obtener predicciones por entidad: {str(e)}")
             return []
@@ -87,15 +84,12 @@ class PrediccionRepository(BaseRepository[Prediccion]):
             tipo_entidad: Tipo de entidad
             id_entidad: ID de la entidad
             limite: Numero maximo de predicciones
-
-        Returns:
-            List[Prediccion]: Lista de predicciones recientes
         """
         try:
             return self.db.query(Prediccion).filter(
-                Prediccion.tipoEntidad == tipo_entidad,
-                Prediccion.idEntidad == id_entidad
-            ).order_by(desc(Prediccion.fechaPrediccion)).limit(limite).all()
+                Prediccion.entidad == tipo_entidad,
+                Prediccion.claveEntidad == id_entidad
+            ).order_by(desc(Prediccion.periodo)).limit(limite).all()
         except Exception as e:
             logger.error(f"Error al obtener ultimas predicciones: {str(e)}")
             return []
@@ -106,13 +100,10 @@ class PrediccionRepository(BaseRepository[Prediccion]):
 
         Args:
             confianza_minima: Nivel minimo de confianza
-
-        Returns:
-            List[Prediccion]: Lista de predicciones con alta confianza
         """
         try:
             return self.db.query(Prediccion).filter(
-                Prediccion.confianza >= confianza_minima
+                Prediccion.nivelConfianza >= confianza_minima
             ).all()
         except Exception as e:
             logger.error(f"Error al obtener predicciones alta confianza: {str(e)}")
@@ -130,16 +121,13 @@ class PrediccionRepository(BaseRepository[Prediccion]):
             id_entidad: ID de la entidad
             fecha_inicio: Fecha inicial
             fecha_fin: Fecha final
-
-        Returns:
-            List[Prediccion]: Lista de predicciones
         """
         try:
             return self.db.query(Prediccion).filter(
-                Prediccion.tipoEntidad == tipo_entidad,
-                Prediccion.idEntidad == id_entidad,
-                Prediccion.fechaPrediccion >= fecha_inicio,
-                Prediccion.fechaPrediccion <= fecha_fin
+                Prediccion.entidad == tipo_entidad,
+                Prediccion.claveEntidad == id_entidad,
+                Prediccion.periodo >= fecha_inicio.strftime('%Y-%m-%d'),
+                Prediccion.periodo <= fecha_fin.strftime('%Y-%m-%d')
             ).order_by(Prediccion.periodo).all()
         except Exception as e:
             logger.error(f"Error al obtener historial de predicciones: {str(e)}")
@@ -158,9 +146,9 @@ class PrediccionRepository(BaseRepository[Prediccion]):
         try:
             result = self.db.query(
                 func.count(Prediccion.idPred).label('total'),
-                func.avg(Prediccion.confianza).label('confianza_promedio'),
-                func.min(Prediccion.confianza).label('confianza_minima'),
-                func.max(Prediccion.confianza).label('confianza_maxima')
+                func.avg(Prediccion.nivelConfianza).label('confianza_promedio'),
+                func.min(Prediccion.nivelConfianza).label('confianza_minima'),
+                func.max(Prediccion.nivelConfianza).label('confianza_maxima')
             ).filter(
                 Prediccion.idVersion == id_version
             ).first()

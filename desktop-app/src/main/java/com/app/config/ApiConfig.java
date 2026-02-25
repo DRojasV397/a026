@@ -82,6 +82,14 @@ public class ApiConfig {
         return BASE_URL + "/predictions/models/load-all";
     }
 
+    public static String getPredictionsLoadModelUrl() {
+        return BASE_URL + "/predictions/models/load";
+    }
+
+    public static String getPredictionsSavedModelsUrl() {
+        return BASE_URL + "/predictions/models/saved";
+    }
+
     public static String getPredictionsSalesDataUrl() {
         return BASE_URL + "/predictions/sales-data";
     }

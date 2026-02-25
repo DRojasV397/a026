@@ -33,7 +33,7 @@ import java.util.concurrent.CompletableFuture;
  * - GET  /predictions/models/saved   -> listSavedModels()
  * - POST /predictions/validate-data  -> validateData()
  * - POST /predictions/sales-data     -> getSalesData()
- * - GET  /predictions/history        -> getHistory()
+ * - GET  /predictions/history        -> getHistory(int limit)
  * - GET  /predictions/model-types    -> getModelTypes()
  */
 
@@ -221,7 +221,7 @@ public class PredictionService {
         String jsonBody = gson.toJson(body);
 
         HttpRequest httpRequest = HttpRequest.newBuilder()
-                .uri(URI.create(ApiConfig.getBaseUrl() + "/predictions/models/load"))
+                .uri(URI.create(ApiConfig.getPredictionsLoadModelUrl()))
                 .header("Content-Type", "application/json")
                 .header("Authorization", "Bearer " + UserSession.getAccessToken())
                 .timeout(Duration.ofSeconds(30))
@@ -249,7 +249,7 @@ public class PredictionService {
      */
     public CompletableFuture<List<SavedModelInfoDTO>> listSavedModels() {
         HttpRequest httpRequest = HttpRequest.newBuilder()
-                .uri(URI.create(ApiConfig.getBaseUrl() + "/predictions/models/saved"))
+                .uri(URI.create(ApiConfig.getPredictionsSavedModelsUrl()))
                 .header("Authorization", "Bearer " + UserSession.getAccessToken())
                 .timeout(Duration.ofSeconds(15))
                 .GET()
@@ -271,10 +271,10 @@ public class PredictionService {
     }
 
     /**
-     * Obtiene el historial de predicciones con DTOs tipados.
+     * Obtiene el historial de predicciones.
      * GET /predictions/history
      */
-    public CompletableFuture<List<PredictionHistoryItemDTO>> getHistoryTyped(int limit) {
+    public CompletableFuture<List<PredictionHistoryItemDTO>> getHistory(int limit) {
         String url = ApiConfig.getPredictionsHistoryUrl() + "?limit=" + limit;
 
         HttpRequest httpRequest = HttpRequest.newBuilder()
@@ -299,10 +299,10 @@ public class PredictionService {
     }
 
     /**
-     * Obtiene tipos de modelo disponibles con DTO tipado.
+     * Obtiene los tipos de modelo disponibles.
      * GET /predictions/model-types
      */
-    public CompletableFuture<ModelTypesResponseDTO> getModelTypesTyped() {
+    public CompletableFuture<ModelTypesResponseDTO> getModelTypes() {
         HttpRequest httpRequest = HttpRequest.newBuilder()
                 .uri(URI.create(ApiConfig.getPredictionsModelTypesUrl()))
                 .header("Authorization", "Bearer " + UserSession.getAccessToken())
@@ -315,7 +315,7 @@ public class PredictionService {
                     if (response.statusCode() == 200) {
                         return gson.fromJson(response.body(), ModelTypesResponseDTO.class);
                     }
-                    logger.warn("GetModelTypesTyped failed - HTTP {}", response.statusCode());
+                    logger.warn("GetModelTypes failed - HTTP {}", response.statusCode());
                     return null;
                 })
                 .exceptionally(ex -> {
@@ -392,62 +392,6 @@ public class PredictionService {
                 })
                 .exceptionally(ex -> {
                     logger.error("Error al obtener datos de ventas: {}", ex.getMessage());
-                    return Map.of();
-                });
-    }
-
-    /**
-     * Obtiene el historial de predicciones.
-     * GET /predictions/history
-     */
-    @SuppressWarnings("unchecked")
-    public CompletableFuture<List<Map<String, Object>>> getHistory(int limit) {
-        String url = ApiConfig.getPredictionsHistoryUrl() + "?limit=" + limit;
-
-        HttpRequest httpRequest = HttpRequest.newBuilder()
-                .uri(URI.create(url))
-                .header("Authorization", "Bearer " + UserSession.getAccessToken())
-                .timeout(Duration.ofSeconds(15))
-                .GET()
-                .build();
-
-        return httpClient.sendAsync(httpRequest, HttpResponse.BodyHandlers.ofString())
-                .thenApply(response -> {
-                    if (response.statusCode() == 200) {
-                        return gson.fromJson(response.body(),
-                                new TypeToken<List<Map<String, Object>>>(){}.getType());
-                    }
-                    return List.<Map<String, Object>>of();
-                })
-                .exceptionally(ex -> {
-                    logger.error("Error al obtener historial: {}", ex.getMessage());
-                    return List.of();
-                });
-    }
-
-    /**
-     * Obtiene los tipos de modelo disponibles.
-     * GET /predictions/model-types
-     */
-    public CompletableFuture<Map<String, Object>> getModelTypes() {
-        HttpRequest httpRequest = HttpRequest.newBuilder()
-                .uri(URI.create(ApiConfig.getPredictionsModelTypesUrl()))
-                .header("Authorization", "Bearer " + UserSession.getAccessToken())
-                .timeout(Duration.ofSeconds(15))
-                .GET()
-                .build();
-
-        return httpClient.sendAsync(httpRequest, HttpResponse.BodyHandlers.ofString())
-                .thenApply(response -> {
-                    if (response.statusCode() == 200) {
-                        Map<String, Object> result = gson.fromJson(response.body(),
-                                new TypeToken<Map<String, Object>>(){}.getType());
-                        return result;
-                    }
-                    return Map.<String, Object>of();
-                })
-                .exceptionally(ex -> {
-                    logger.error("Error al obtener tipos de modelo: {}", ex.getMessage());
                     return Map.of();
                 });
     }

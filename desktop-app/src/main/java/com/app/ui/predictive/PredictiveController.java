@@ -1334,11 +1334,11 @@ public class PredictiveController {
         ));
 
         // Extraer métricas reales
-        Map<String, Double> metrics = response.getMetrics();
-        String r2 = metrics != null && metrics.containsKey("r2")
-                ? String.format("%.4f", metrics.get("r2")) : "N/A";
+        Map<String, Object> metrics = response.getMetrics();
+        String r2 = metrics != null && metrics.containsKey("r2_score")
+                ? String.format("%.4f", ((Number) metrics.get("r2_score")).doubleValue()) : "N/A";
         String mae = metrics != null && metrics.containsKey("mae")
-                ? String.format("%.2f", metrics.get("mae")) : "N/A";
+                ? String.format("%.2f", ((Number) metrics.get("mae")).doubleValue()) : "N/A";
 
         lblTrainingTime.setText(response.getTrainingSamples() + " muestras");
         lblMetric.setText("R² = " + r2);
@@ -1468,13 +1468,13 @@ public class PredictiveController {
     private void loadResultsKpisFromApi() {
         resultsKpiContainer.getChildren().clear();
 
-        Map<String, Double> metrics = lastTrainResponse.getMetrics();
-        String r2 = metrics != null && metrics.containsKey("r2")
-                ? String.format("%.1f%%", metrics.get("r2") * 100) : "N/A";
+        Map<String, Object> metrics = lastTrainResponse.getMetrics();
+        String r2 = metrics != null && metrics.containsKey("r2_score")
+                ? String.format("%.1f%%", ((Number) metrics.get("r2_score")).doubleValue() * 100) : "N/A";
         String mae = metrics != null && metrics.containsKey("mae")
-                ? String.format("$%.2f", metrics.get("mae")) : "N/A";
+                ? String.format("$%.2f", ((Number) metrics.get("mae")).doubleValue()) : "N/A";
         String rmse = metrics != null && metrics.containsKey("rmse")
-                ? String.format("$%.2f", metrics.get("rmse")) : "N/A";
+                ? String.format("$%.2f", ((Number) metrics.get("rmse")).doubleValue()) : "N/A";
 
         boolean meetsThreshold = Boolean.TRUE.equals(lastTrainResponse.getMeetsR2Threshold());
 
@@ -1520,7 +1520,7 @@ public class PredictiveController {
     private void loadTrainingSummaryFromApi() {
         trainingSummaryContainer.getChildren().clear();
 
-        Map<String, Double> metrics = lastTrainResponse.getMetrics();
+        Map<String, Object> metrics = lastTrainResponse.getMetrics();
 
         Map<String, String> summary = new LinkedHashMap<>();
         summary.put("Modelo", lastTrainResponse.getModelType() != null
@@ -1528,8 +1528,10 @@ public class PredictiveController {
         summary.put("Clave", lastTrainResponse.getModelKey() != null
                 ? lastTrainResponse.getModelKey() : "N/A");
         if (metrics != null) {
-            for (Map.Entry<String, Double> entry : metrics.entrySet()) {
-                summary.put(entry.getKey().toUpperCase(), String.format("%.4f", entry.getValue()));
+            for (Map.Entry<String, Object> entry : metrics.entrySet()) {
+                if (entry.getValue() instanceof Number) {
+                    summary.put(entry.getKey().toUpperCase(), String.format("%.4f", ((Number) entry.getValue()).doubleValue()));
+                }
             }
         }
         summary.put("Muestras Entrenamiento", lastTrainResponse.getTrainingSamples() != null
@@ -1696,10 +1698,12 @@ public class PredictiveController {
                 XYChart.Series<String, Number> metricsSeries = new XYChart.Series<>();
                 metricsSeries.setName("Métricas");
 
-                for (Map.Entry<String, Double> entry : lastTrainResponse.getMetrics().entrySet()) {
-                    metricsSeries.getData().add(
-                            new XYChart.Data<>(entry.getKey().toUpperCase(), entry.getValue())
-                    );
+                for (Map.Entry<String, Object> entry : lastTrainResponse.getMetrics().entrySet()) {
+                    if (entry.getValue() instanceof Number) {
+                        metricsSeries.getData().add(
+                                new XYChart.Data<>(entry.getKey().toUpperCase(), ((Number) entry.getValue()).doubleValue())
+                        );
+                    }
                 }
 
                 controller.loadCustomData(metricsSeries);

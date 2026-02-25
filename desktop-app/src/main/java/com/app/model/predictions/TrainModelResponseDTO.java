@@ -21,7 +21,7 @@ public class TrainModelResponseDTO {
     @SerializedName("model_type")
     private String modelType;
 
-    private Map<String, Double> metrics;
+    private Map<String, Object> metrics;
 
     @SerializedName("meets_r2_threshold")
     private Boolean meetsR2Threshold;
@@ -41,7 +41,7 @@ public class TrainModelResponseDTO {
     public Integer getModelId() { return modelId; }
     public String getModelKey() { return modelKey; }
     public String getModelType() { return modelType; }
-    public Map<String, Double> getMetrics() { return metrics; }
+    public Map<String, Object> getMetrics() { return metrics; }
     public Boolean getMeetsR2Threshold() { return meetsR2Threshold; }
     public String getRecommendation() { return recommendation; }
     public Integer getTrainingSamples() { return trainingSamples; }

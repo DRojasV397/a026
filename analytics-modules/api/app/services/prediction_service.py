@@ -3,6 +3,7 @@ Servicio de prediccion.
 Orquesta el entrenamiento, evaluacion y uso de modelos predictivos.
 """
 
+import json
 import pandas as pd
 import numpy as np
 from typing import Optional, Dict, Any, List, Tuple
@@ -12,8 +13,8 @@ import logging
 import os
 import pickle
 
-from app.models import Venta, Modelo, Prediccion
-from app.repositories import VentaRepository, ModeloRepository, PrediccionRepository
+from app.models import Venta, Modelo, VersionModelo, Prediccion
+from app.repositories import VentaRepository, ModeloRepository, VersionModeloRepository, PrediccionRepository
 from app.analytics.models import (
     BaseModel, ModelConfig, ModelMetrics, PredictionResult, ModelType,
     LinearRegressionModel, ARIMAModel, SARIMAModel, RandomForestModel
@@ -60,6 +61,7 @@ class PredictionService:
         self.db = db
         self.venta_repo = VentaRepository(db)
         self.modelo_repo = ModeloRepository(db)
+        self.version_repo = VersionModeloRepository(db)
         self.prediccion_repo = PrediccionRepository(db)
         self.evaluator = ModelEvaluator()
 
@@ -237,9 +239,9 @@ class PredictionService:
             model_key = f"{model_type}_{datetime.now().strftime('%Y%m%d%H%M%S')}"
             self._trained_models[model_key] = model
 
-            # Guardar en BD y registrar su ID para usarlo al persistir predicciones
-            modelo_db = self._save_model_to_db(model, model_key, metrics)
-            self._trained_model_ids[model_key] = modelo_db.idModelo if modelo_db else None
+            # Guardar en BD y registrar idVersion para asociar predicciones
+            version_db = self._save_model_to_db(model, model_key, metrics)
+            self._trained_model_ids[model_key] = version_db.idVersion if version_db else None
 
             # Guardar modelo en disco
             model_path = os.path.join(self.MODELS_DIR, f"{model_key}.pkl")
@@ -252,7 +254,7 @@ class PredictionService:
 
             return {
                 "success": True,
-                "model_id": modelo_db.idModelo if modelo_db else None,
+                "model_id": version_db.idVersion if version_db else None,
                 "model_key": model_key,
                 "model_type": model_type,
                 "metrics": metrics.to_dict(),
@@ -314,15 +316,30 @@ class PredictionService:
         model: BaseModel,
         model_key: str,
         metrics: ModelMetrics
-    ) -> Optional[Modelo]:
-        """Guarda informacion del modelo en la BD."""
+    ) -> Optional[VersionModelo]:
+        """
+        Guarda Modelo y VersionModelo en la BD.
+        Retorna la VersionModelo creada (su idVersion es la FK que usa Prediccion).
+        """
         try:
             modelo = Modelo(
                 tipoModelo=model.model_type.value,
                 objetivo=f"Prediccion de ventas - {model_key}",
                 creadoEn=datetime.now()
             )
-            return self.modelo_repo.create(modelo)
+            modelo = self.modelo_repo.create(modelo)
+
+            version = VersionModelo(
+                idModelo=modelo.idModelo,
+                numeroVersion="1.0",
+                algoritmo=model.model_type.value,
+                parametros=None,
+                metricas=json.dumps(metrics.to_dict()),
+                precision=metrics.r2_score,
+                estado='Activo',
+                fechaEntrenamiento=datetime.now()
+            )
+            return self.version_repo.create(version)
         except Exception as e:
             logger.error(f"Error guardando modelo en BD: {str(e)}")
             return None
@@ -426,19 +443,20 @@ class PredictionService:
     ) -> None:
         """Guarda predicciones en la BD."""
         try:
-            for date, pred, lower, upper in zip(
-                result.dates,
-                result.predictions,
-                result.confidence_lower or [None] * len(result.predictions),
-                result.confidence_upper or [None] * len(result.predictions)
-            ):
+            for date, pred in zip(result.dates, result.predictions):
+                # periodo se almacena como string (campo VARCHAR(20) en BD)
+                if hasattr(date, 'strftime'):
+                    periodo_str = date.strftime('%Y-%m-%d')
+                else:
+                    periodo_str = str(date)
+
                 prediccion = Prediccion(
-                    idModelo=model_id,
-                    fecha=date,
-                    valorPredicho=pred,
-                    intervaloInferior=lower,
-                    intervaloSuperior=upper,
-                    confianza=result.confidence_level
+                    idVersion=model_id,
+                    entidad="General",
+                    claveEntidad=0,
+                    periodo=periodo_str,
+                    valorPredicho=float(pred) if pred is not None else None,
+                    nivelConfianza=float(result.confidence_level) if result.confidence_level is not None else None
                 )
                 self.prediccion_repo.create(prediccion)
         except Exception as e:
@@ -547,11 +565,9 @@ class PredictionService:
         return [
             {
                 "id": p.idPred,
-                "fecha": p.fecha.isoformat() if p.fecha else None,
+                "fecha": p.periodo if p.periodo else None,
                 "valor_predicho": float(p.valorPredicho) if p.valorPredicho else None,
-                "intervalo_inferior": float(p.intervaloInferior) if p.intervaloInferior else None,
-                "intervalo_superior": float(p.intervaloSuperior) if p.intervaloSuperior else None,
-                "confianza": float(p.confianza) if p.confianza else None
+                "confianza": float(p.nivelConfianza) if p.nivelConfianza else None
             }
             for p in predicciones
         ]
