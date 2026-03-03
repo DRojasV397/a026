@@ -12,6 +12,7 @@ from enum import Enum
 class TipoModelo(str, Enum):
     """Tipos de modelos predictivos disponibles."""
     LINEAR_REGRESSION = "linear_regression"
+    MULTIPLE_REGRESSION = "multiple_regression"
     ARIMA = "arima"
     SARIMA = "sarima"
     RANDOM_FOREST = "random_forest"

@@ -76,7 +76,7 @@ class DatabaseManager:
                 pool_timeout=settings.DB_POOL_TIMEOUT,
                 pool_recycle=settings.DB_POOL_RECYCLE,
                 pool_pre_ping=True,  # Verifica conexión antes de usar
-                echo=settings.DEBUG,  # Muestra SQL en desarrollo
+                echo=settings.DB_ECHO,  # Activar con DB_ECHO=True en .env para ver SQL
             )
 
             # Crear SessionMaker

@@ -223,7 +223,12 @@ class TimeSeriesLinearRegression(LinearRegressionModel):
         super().__init__(config)
         self.date_column = date_column
         self.last_date = None
+        self.start_date = None   # Fecha mínima del entrenamiento (para time_index consistente)
         self.trend_coef = 0.0
+        # Lag features para capturar autocorrelación de la serie.
+        # lag_1 captura la autocorrelación más fuerte (día anterior).
+        self.lag_features = [1, 7, 14, 30]
+        self.last_lag_values: Dict[str, float] = {}  # Valores del final del entrenamiento
 
     def _create_time_features(
         self,
@@ -237,14 +242,21 @@ class TimeSeriesLinearRegression(LinearRegressionModel):
         if not pd.api.types.is_datetime64_any_dtype(df[self.date_column]):
             df[self.date_column] = pd.to_datetime(df[self.date_column])
 
-        # Guardar ultima fecha
+        # Guardar fechas de referencia durante el entrenamiento
         if fit:
             self.last_date = df[self.date_column].max()
+            self.start_date = df[self.date_column].min()
 
-        # Crear features temporales
-        df['time_index'] = (
-            df[self.date_column] - df[self.date_column].min()
-        ).dt.days
+        # Usar siempre la fecha de inicio del entrenamiento como referencia,
+        # para que time_index sea consistente entre train y forecast.
+        ref_date = (
+            self.start_date
+            if (not fit and self.start_date is not None)
+            else df[self.date_column].min()
+        )
+
+        # Índice temporal (días desde el inicio del entrenamiento)
+        df['time_index'] = (df[self.date_column] - ref_date).dt.days
 
         df['month'] = df[self.date_column].dt.month
         df['day_of_week'] = df[self.date_column].dt.dayofweek
@@ -259,7 +271,44 @@ class TimeSeriesLinearRegression(LinearRegressionModel):
         df['dow_sin'] = np.sin(2 * np.pi * df['day_of_week'] / 7)
         df['dow_cos'] = np.cos(2 * np.pi * df['day_of_week'] / 7)
 
+        # Lag features (solo cuando el target está disponible — entrenamiento)
+        target = self.config.target_column
+        if target in df.columns:
+            for lag in self.lag_features:
+                df[f'lag_{lag}'] = df[target].shift(lag)
+            df['rolling_mean_7'] = df[target].rolling(7, min_periods=1).mean()
+
+            # Guardar últimos valores conocidos para usar en forecast
+            if fit:
+                for lag in self.lag_features:
+                    col = f'lag_{lag}'
+                    non_null = df[col].dropna()
+                    self.last_lag_values[col] = float(non_null.iloc[-1]) if len(non_null) > 0 else 0.0
+                self.last_lag_values['rolling_mean_7'] = float(df['rolling_mean_7'].iloc[-1])
+
         return df
+
+    def _split_data(self, X, y):
+        """
+        Split temporal para series de tiempo.
+        Usa los primeros (1-test_size)% para entrenamiento y el último test_size% para prueba,
+        ordenando siempre por time_index para respetar la causalidad.
+        """
+        n = len(X)
+        split_idx = int(n * (1 - self.config.test_size))
+
+        if isinstance(X, pd.DataFrame) and 'time_index' in X.columns:
+            sorted_idx = X['time_index'].argsort().values
+            X = X.iloc[sorted_idx].reset_index(drop=True)
+            if isinstance(y, pd.Series):
+                y = y.iloc[sorted_idx].reset_index(drop=True)
+
+        X_train = X.iloc[:split_idx]
+        X_test  = X.iloc[split_idx:]
+        y_train = y.iloc[:split_idx] if isinstance(y, pd.Series) else y[:split_idx]
+        y_test  = y.iloc[split_idx:] if isinstance(y, pd.Series) else y[split_idx:]
+
+        return X_train, X_test, y_train, y_test
 
     def train_from_dataframe(
         self,
@@ -276,14 +325,22 @@ class TimeSeriesLinearRegression(LinearRegressionModel):
         Returns:
             ModelMetrics: Metricas del modelo
         """
+        # Ordenar por fecha para garantizar split temporal correcto
+        df = df.sort_values(self.date_column).reset_index(drop=True)
+
         # Crear features temporales
         df_features = self._create_time_features(df, fit=True)
 
+        # Eliminar filas con NaN (provenientes de los lags)
+        df_features = df_features.dropna().reset_index(drop=True)
+
         # Seleccionar features
+        lag_cols = [f'lag_{lag}' for lag in self.lag_features] + ['rolling_mean_7']
         feature_cols = [
-            'time_index', 'month', 'day_of_week', 'quarter',
+            'time_index',
+            'month', 'day_of_week', 'quarter',
             'is_weekend', 'month_sin', 'month_cos', 'dow_sin', 'dow_cos'
-        ]
+        ] + [c for c in lag_cols if c in df_features.columns]
 
         # Agregar features adicionales si existen
         if self.config.feature_columns:
@@ -339,9 +396,21 @@ class TimeSeriesLinearRegression(LinearRegressionModel):
         future_df = pd.DataFrame({self.date_column: future_dates})
         future_df = self._create_time_features(future_df, fit=False)
 
+        # Inicializar columnas de lag que no existen en future_df
+        # (el target no está presente → _create_time_features no las crea)
+        for lag_col in self.last_lag_values:
+            if lag_col not in future_df.columns:
+                future_df[lag_col] = np.nan
+
         # Preparar features
         feature_cols = self.feature_names
-        X_future = future_df[feature_cols]
+        X_future = future_df[feature_cols].copy()
+
+        # Rellenar lag features con los últimos valores conocidos del entrenamiento
+        # (approximación razonable: el "nivel base" de ventas reciente)
+        for lag_col, val in self.last_lag_values.items():
+            if lag_col in X_future.columns:
+                X_future[lag_col] = val
 
         # Predecir
         predictions, lower, upper = self.predict(X_future, return_confidence=True)
@@ -370,12 +439,15 @@ class TimeSeriesLinearRegression(LinearRegressionModel):
             "training_data_info": self.training_data_info,
             # Atributos especificos de TimeSeriesLinearRegression
             "last_date": self.last_date,
+            "start_date": self.start_date,
             "date_column": self.date_column,
             "trend_coef": self.trend_coef,
             "intercept": getattr(self, 'intercept', 0.0),
             "coefficients": getattr(self, 'coefficients', {}),
             "scaler": getattr(self, 'scaler', None),
-            "poly_features": getattr(self, 'poly_features', None)
+            "poly_features": getattr(self, 'poly_features', None),
+            "lag_features": getattr(self, 'lag_features', [7, 14, 30]),
+            "last_lag_values": getattr(self, 'last_lag_values', {}),
         }
 
         with open(filepath, 'wb') as f:
@@ -402,11 +474,14 @@ class TimeSeriesLinearRegression(LinearRegressionModel):
 
         # Atributos especificos de TimeSeriesLinearRegression
         self.last_date = model_data.get("last_date")
+        self.start_date = model_data.get("start_date")
         self.date_column = model_data.get("date_column", self.date_column)
         self.trend_coef = model_data.get("trend_coef", 0.0)
         self.intercept = model_data.get("intercept", 0.0)
         self.coefficients = model_data.get("coefficients", {})
         self.scaler = model_data.get("scaler")
         self.poly_features = model_data.get("poly_features")
+        self.lag_features = model_data.get("lag_features", [7, 14, 30])
+        self.last_lag_values = model_data.get("last_lag_values", {})
 
         logger.info(f"Modelo cargado desde {filepath}")

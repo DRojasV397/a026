@@ -20,7 +20,7 @@ public class LoadModelResponseDTO {
     @SerializedName("is_fitted")
     private Boolean isFitted;
 
-    private Map<String, Double> metrics;
+    private Map<String, Object> metrics;
 
     @SerializedName("trained_at")
     private String trainedAt;
@@ -32,7 +32,7 @@ public class LoadModelResponseDTO {
     public String getModelKey() { return modelKey; }
     public String getModelType() { return modelType; }
     public Boolean getIsFitted() { return isFitted; }
-    public Map<String, Double> getMetrics() { return metrics; }
+    public Map<String, Object> getMetrics() { return metrics; }
     public String getTrainedAt() { return trainedAt; }
     public String getPath() { return path; }
     public String getError() { return error; }

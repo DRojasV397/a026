@@ -291,6 +291,8 @@ class TimeSeriesRandomForest(RandomForestModel):
         self.rolling_windows = rolling_windows or [7, 14, 30]
         self.last_date = None
         self.last_values: Dict[str, float] = {}
+        # Datos históricos guardados en training para usarlos en forecast iterativo
+        self._historical_df: Optional[pd.DataFrame] = None
 
     def _create_time_features(
         self,
@@ -354,6 +356,22 @@ class TimeSeriesRandomForest(RandomForestModel):
 
         return df
 
+    def _split_data(self, X, y):
+        """
+        Split temporal para series de tiempo.
+        Usa los primeros (1-test_size)% para entrenamiento y el último test_size% para prueba.
+        Los datos ya llegan ordenados por fecha desde train_from_dataframe().
+        """
+        n = len(X)
+        split_idx = int(n * (1 - self.config.test_size))
+
+        X_train = X.iloc[:split_idx]
+        X_test  = X.iloc[split_idx:]
+        y_train = y.iloc[:split_idx] if isinstance(y, pd.Series) else y[:split_idx]
+        y_test  = y.iloc[split_idx:] if isinstance(y, pd.Series) else y[split_idx:]
+
+        return X_train, X_test, y_train, y_test
+
     def train_from_dataframe(
         self,
         df: pd.DataFrame,
@@ -369,8 +387,11 @@ class TimeSeriesRandomForest(RandomForestModel):
         Returns:
             ModelMetrics del modelo entrenado
         """
-        # Ordenar por fecha
-        df = df.sort_values(self.date_column)
+        # Ordenar por fecha (crítico para el split temporal)
+        df = df.sort_values(self.date_column).reset_index(drop=True)
+
+        # Guardar datos históricos para forecast iterativo
+        self._historical_df = df[[self.date_column, self.config.target_column]].copy()
 
         # Crear features
         df_features = self._create_time_features(df, fit=True)
@@ -433,7 +454,12 @@ class TimeSeriesRandomForest(RandomForestModel):
         upper_bounds = []
 
         # Para cada fecha futura, predecir y usar el valor para la siguiente
-        current_data = historical_data.copy() if historical_data is not None else None
+        if historical_data is not None:
+            current_data = historical_data.copy()
+        elif self._historical_df is not None:
+            current_data = self._historical_df.copy()
+        else:
+            current_data = None
 
         for date in future_dates:
             # Crear features para esta fecha
@@ -443,7 +469,10 @@ class TimeSeriesRandomForest(RandomForestModel):
                 # Agregar el target temporal para calcular lags
                 temp_df = pd.concat([current_data, future_df], ignore_index=True)
                 temp_df = self._create_time_features(temp_df, fit=False)
-                row_features = temp_df.iloc[-1:][self.feature_names]
+                row_features = temp_df.iloc[-1:][self.feature_names].copy()
+                # Los diffs del último paso son NaN porque total[t] es desconocido.
+                # Se reemplazan con 0 para evitar errores en sklearn.predict.
+                row_features = row_features.fillna(0)
             else:
                 future_df = self._create_time_features(future_df, fit=False)
                 row_features = future_df[self.feature_names]
@@ -494,7 +523,8 @@ class TimeSeriesRandomForest(RandomForestModel):
             "date_column": self.date_column,
             "lags": self.lags,
             "rolling_windows": self.rolling_windows,
-            "scaler": getattr(self, 'scaler', None)
+            "scaler": getattr(self, 'scaler', None),
+            "historical_df": self._historical_df
         }
 
         with open(filepath, 'wb') as f:
@@ -526,5 +556,6 @@ class TimeSeriesRandomForest(RandomForestModel):
         self.lags = model_data.get("lags", self.lags)
         self.rolling_windows = model_data.get("rolling_windows", self.rolling_windows)
         self.scaler = model_data.get("scaler")
+        self._historical_df = model_data.get("historical_df")
 
         logger.info(f"Modelo cargado desde {filepath}")

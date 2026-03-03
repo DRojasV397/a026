@@ -115,6 +115,8 @@ class ForecastResponse(BaseModel):
     periods: Optional[int] = None
     error: Optional[str] = None
     suggestion: Optional[str] = None
+    quality_warning: Optional[bool] = None
+    quality_message: Optional[str] = None
 
 
 class ModelInfoResponse(BaseModel):
@@ -397,6 +399,19 @@ async def get_model_types(
                 "name": "Regresion Lineal",
                 "description": "Modelo de regresion lineal con features temporales",
                 "use_case": "Tendencias lineales simples"
+            },
+            {
+                "id": "multiple_regression",
+                "name": "Regresion Multiple",
+                "description": (
+                    "Regresion lineal enriquecida con variables exogenas (compras), "
+                    "lags de ventas, medias moviles y componentes ciclicos. "
+                    "Regularizacion Ridge/Lasso/ElasticNet configurable."
+                ),
+                "use_case": (
+                    "Mercados donde las compras (reposicion) anticipan ventas. "
+                    "Supera a la regresion lineal simple en datos con autocorrelacion."
+                )
             },
             {
                 "id": "arima",

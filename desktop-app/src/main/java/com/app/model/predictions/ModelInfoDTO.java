@@ -18,7 +18,7 @@ public class ModelInfoDTO {
     @SerializedName("is_fitted")
     private boolean isFitted;
 
-    private Map<String, Double> metrics;
+    private Map<String, Object> metrics;
 
     @SerializedName("trained_at")
     private String trainedAt;
@@ -26,6 +26,6 @@ public class ModelInfoDTO {
     public String getModelKey() { return modelKey; }
     public String getModelType() { return modelType; }
     public boolean isFitted() { return isFitted; }
-    public Map<String, Double> getMetrics() { return metrics; }
+    public Map<String, Object> getMetrics() { return metrics; }
     public String getTrainedAt() { return trainedAt; }
 }

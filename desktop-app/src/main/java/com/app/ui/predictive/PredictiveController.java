@@ -71,6 +71,15 @@ public class PredictiveController {
     private Label horizonValueLabel;
     private TableView<Map<String, String>> previewTable;
 
+    // Controles de hiperparámetros avanzados (Regresión Múltiple)
+    private ComboBox<String> regularizationCombo;
+    private Slider alphaSlider;
+    private Label alphaValueLabel;
+    private CheckBox useComprasCheck;
+    private ComboBox<String> polynomialCombo;
+    private CheckBox logTransformCheck;
+    private CheckBox autoTuneCheck;
+
     @FXML private HBox predictiveFooter;
 
     @FXML private ImageView timeIcon;
@@ -96,6 +105,7 @@ public class PredictiveController {
     private final PredictionService predictionService = new PredictionService();
     private TrainModelResponseDTO lastTrainResponse;
     private ForecastResponseDTO lastForecastResponse;
+    private String lastPreviewDateRange = null;
 
     @FXML
     private void initialize() {
@@ -120,7 +130,7 @@ public class PredictiveController {
                         "Análisis de tendencia directa y relaciones proporcionales.",
                         List.of("Esencial", "Polinomial", "Ágil"),
                         "La opción más estable para proyecciones de crecimiento base.",
-                        "📉", "85%", "< 1 min",
+                        "📉", "Alta", "Instantáneo",
                         List.of(
                                 new PredictiveModelDTO.ModelFeature("📐", "Complejidad", "Lineal / Polinomial", "#3498db"),
                                 new PredictiveModelDTO.ModelFeature("🛡", "Regularización", "Lasso / Ridge / ElasticNet", "#2ecc71"),
@@ -132,7 +142,7 @@ public class PredictiveController {
                         "Especializado en series de tiempo sin estacionalidad.",
                         List.of("Cronológico", "Autoregresivo", "Histórico"),
                         "Analiza el pasado inmediato para proyectar el futuro cercano.",
-                        "📈", "92%", "1-2 min",
+                        "📈", "Muy Alta", "Rápido",
                         List.of(
                                 new PredictiveModelDTO.ModelFeature("🔢", "Componentes", "AR (Lags) + I (Diff) + MA", "#3498db"),
                                 new PredictiveModelDTO.ModelFeature("🤖", "Optimización", "Auto-order automático", "#9b59b6"),
@@ -144,7 +154,7 @@ public class PredictiveController {
                         "Potente para negocios con picos estacionales (ventas, feriados).",
                         List.of("Estacional", "Rítmico", "Recurrente"),
                         "Identifica ciclos anuales, mensuales o semanales con precisión.",
-                        "🗓", "95%", "2-5 min",
+                        "🗓", "Excelente", "Moderado",
                         List.of(
                                 new PredictiveModelDTO.ModelFeature("🔄", "Ciclos", "Soporta periodos de 1-365 días", "#2ecc71"),
                                 new PredictiveModelDTO.ModelFeature("📊", "Criterios", "Selección vía AIC / BIC", "#3498db"),
@@ -156,11 +166,23 @@ public class PredictiveController {
                         "Sistema de múltiples árboles para decisiones multivariable.",
                         List.of("Jerárquico", "Robusto", "Multivariable"),
                         "Ideal cuando intervienen muchas variables (clima, precios, stock).",
-                        "🌳", "98%", "3-8 min",
+                        "🌳", "Superior", "Intensivo",
                         List.of(
                                 new PredictiveModelDTO.ModelFeature("🌲", "Bosque", "Ensamble de 10-1000 árboles", "#27ae60"),
                                 new PredictiveModelDTO.ModelFeature("🏗", "Muestreo", "Técnica Bootstrap (Bagging)", "#8e44ad"),
                                 new PredictiveModelDTO.ModelFeature("🎯", "Precisión", "Mejor manejo de outliers", "#e74c3c")
+                        )
+                ),
+                new PredictiveModelDTO(
+                        "Regresión Múltiple",
+                        "Regresión enriquecida con compras, lags y variables exógenas.",
+                        List.of("Exógeno", "Lags", "Configurable"),
+                        "Supera a la regresión lineal al incorporar datos de compras como predictor y lags de autocorrelación.",
+                        "📐", "Alta", "Rápido",
+                        List.of(
+                                new PredictiveModelDTO.ModelFeature("🛒", "Variable exógena", "Datos de compras como predictor", "#e67e22"),
+                                new PredictiveModelDTO.ModelFeature("🔁", "Autocorrelación", "Lags 1, 7, 14 y 30 días", "#3498db"),
+                                new PredictiveModelDTO.ModelFeature("🛡", "Regularización", "Ridge / Lasso / ElasticNet", "#2ecc71")
                         )
                 )
         );
@@ -201,7 +223,7 @@ public class PredictiveController {
                 createInfoRow("Tiempo de entrenamiento:", model.tiempoTrain());
 
         HBox precisionRow =
-                createInfoRow("Precisión esperada:", model.presicion());
+                createInfoRow("Rendimiento típico:", model.presicion());
 
         Button selectButton = new Button("Seleccionar");
         selectButton.setMaxWidth(Double.MAX_VALUE);
@@ -333,6 +355,7 @@ public class PredictiveController {
             case "Modelo ARIMA" -> "arima";
             case "Modelo SARIMA" -> "sarima";
             case "Random Forest" -> "random_forest";
+            case "Regresión Múltiple" -> "multiple_regression";
             default -> "linear";
         };
     }
@@ -471,6 +494,12 @@ public class PredictiveController {
         VBox variablesCard = createVariablesCard();
         parametersContainer.getChildren().add(variablesCard);
 
+        // 2.5 PARÁMETROS AVANZADOS — solo para Regresión Múltiple
+        if ("Regresión Múltiple".equals(selectedModel.title())) {
+            VBox advancedCard = createMultipleRegressionParamsCard();
+            parametersContainer.getChildren().add(advancedCard);
+        }
+
         // 3. HORIZONTE DE PREDICCIÓN
         VBox horizonCard = createHorizonCard();
         parametersContainer.getChildren().add(horizonCard);
@@ -543,8 +572,12 @@ public class PredictiveController {
         VBox card = new VBox(12);
         card.getStyleClass().add("param-card");
 
-        Label title = new Label("📊 Variables a Considerar");
+        Label title = new Label("📊 Características del Modelo");
         title.getStyleClass().add("param-card-title");
+
+        Label note = new Label("Variables que este modelo considera internamente para el análisis");
+        note.setStyle("-fx-font-size: 11px; -fx-text-fill: #95a5a6; -fx-font-style: italic;");
+        note.setWrapText(true);
 
         // Checkbox "Seleccionar Todo"
         selectAllCheckbox = new CheckBox("Seleccionar Todo");
@@ -579,7 +612,136 @@ public class PredictiveController {
             }
         }
 
-        card.getChildren().addAll(title, selectAllCheckbox, sep, variablesGrid);
+        card.getChildren().addAll(title, note, selectAllCheckbox, sep, variablesGrid);
+        return card;
+    }
+
+    /**
+     * Card de hiperparámetros avanzados exclusivo de Regresión Múltiple.
+     * Permite configurar: regularización, alpha, uso de compras y grado polinomial.
+     */
+    private VBox createMultipleRegressionParamsCard() {
+        VBox card = new VBox(14);
+        card.getStyleClass().add("param-card");
+
+        Label title = new Label("⚙️ Parámetros de Regresión Múltiple");
+        title.getStyleClass().add("param-card-title");
+
+        Label note = new Label("Configura el tipo de regularización y las variables exógenas");
+        note.setStyle("-fx-font-size: 11px; -fx-text-fill: #95a5a6; -fx-font-style: italic;");
+        note.setWrapText(true);
+
+        // ── Fila 1: Regularización ──────────────────────────────────────────
+        VBox regBox = new VBox(6);
+        Label regLabel = new Label("Tipo de Regularización");
+        regLabel.setStyle("-fx-font-size: 12px; -fx-font-weight: bold; -fx-text-fill: #2c3e50;");
+
+        regularizationCombo = new ComboBox<>();
+        regularizationCombo.getItems().addAll("Ridge (L2)", "Lasso (L1)", "ElasticNet (L1+L2)", "Ninguna");
+        regularizationCombo.setValue("Ridge (L2)");
+        regularizationCombo.setMaxWidth(Double.MAX_VALUE);
+        regularizationCombo.setStyle("-fx-font-size: 12px;");
+
+        Label regHint = new Label("Ridge: estabilidad general. Lasso: selección automática de features. ElasticNet: combinación.");
+        regHint.setStyle("-fx-font-size: 10px; -fx-text-fill: #7f8c8d;");
+        regHint.setWrapText(true);
+
+        regBox.getChildren().addAll(regLabel, regularizationCombo, regHint);
+
+        // ── Fila 2: Alpha (fuerza de regularización) ────────────────────────
+        VBox alphaBox = new VBox(6);
+        HBox alphaHeader = new HBox(8);
+        alphaHeader.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
+        Label alphaLabel = new Label("Alpha (fuerza de regularización)");
+        alphaLabel.setStyle("-fx-font-size: 12px; -fx-font-weight: bold; -fx-text-fill: #2c3e50;");
+        Region alphaSpacerH = new Region();
+        HBox.setHgrow(alphaSpacerH, Priority.ALWAYS);
+        alphaValueLabel = new Label("1.00");
+        alphaValueLabel.setStyle("-fx-font-size: 12px; -fx-font-weight: bold; -fx-text-fill: #3498db;");
+        alphaHeader.getChildren().addAll(alphaLabel, alphaSpacerH, alphaValueLabel);
+
+        alphaSlider = new Slider(0.01, 10.0, 1.0);
+        alphaSlider.setShowTickLabels(false);
+        alphaSlider.setShowTickMarks(false);
+        alphaSlider.setMajorTickUnit(1.0);
+        alphaSlider.setBlockIncrement(0.1);
+
+        alphaSlider.valueProperty().addListener((obs, old, newVal) ->
+            alphaValueLabel.setText(String.format("%.2f", newVal.doubleValue()))
+        );
+
+        HBox alphaLabelsRow = new HBox();
+        Label alphaMin = new Label("0.01 (mínimo)");
+        alphaMin.setStyle("-fx-font-size: 10px; -fx-text-fill: #95a5a6;");
+        Region alphaSpacer = new Region();
+        HBox.setHgrow(alphaSpacer, Priority.ALWAYS);
+        Label alphaMax = new Label("10.0 (máximo)");
+        alphaMax.setStyle("-fx-font-size: 10px; -fx-text-fill: #95a5a6;");
+        alphaLabelsRow.getChildren().addAll(alphaMin, alphaSpacer, alphaMax);
+
+        alphaBox.getChildren().addAll(alphaHeader, alphaSlider, alphaLabelsRow);
+
+        // ── Fila 3: Usar datos de compras ───────────────────────────────────
+        HBox comprasRow = new HBox(10);
+        comprasRow.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
+        comprasRow.setStyle("-fx-padding: 8; -fx-background-color: #fef9e7; -fx-background-radius: 6;");
+
+        useComprasCheck = new CheckBox("Incluir datos de compras como variable exógena");
+        useComprasCheck.setSelected(true);
+        useComprasCheck.setStyle("-fx-font-size: 12px; -fx-text-fill: #2c3e50;");
+
+        Label comprasHint = new Label("🛒 Las compras del negocio correlacionan con las ventas futuras");
+        comprasHint.setStyle("-fx-font-size: 10px; -fx-text-fill: #7f8c8d;");
+        comprasHint.setWrapText(true);
+
+        VBox comprasContent = new VBox(3, useComprasCheck, comprasHint);
+        comprasRow.getChildren().add(comprasContent);
+
+        // ── Fila 4: Grado polinomial ────────────────────────────────────────
+        VBox polyBox = new VBox(6);
+        Label polyLabel = new Label("Tendencia Temporal");
+        polyLabel.setStyle("-fx-font-size: 12px; -fx-font-weight: bold; -fx-text-fill: #2c3e50;");
+
+        polynomialCombo = new ComboBox<>();
+        polynomialCombo.getItems().addAll("Lineal (grado 1)", "Cuadrático (grado 2)");
+        polynomialCombo.setValue("Lineal (grado 1)");
+        polynomialCombo.setMaxWidth(Double.MAX_VALUE);
+        polynomialCombo.setStyle("-fx-font-size: 12px;");
+
+        Label polyHint = new Label("Cuadrático: captura aceleración o desaceleración en tendencia de ventas.");
+        polyHint.setStyle("-fx-font-size: 10px; -fx-text-fill: #7f8c8d;");
+        polyHint.setWrapText(true);
+
+        polyBox.getChildren().addAll(polyLabel, polynomialCombo, polyHint);
+
+        // ── Fila 5: Opciones avanzadas de entrenamiento ─────────────────────
+        VBox trainingOptsBox = new VBox(8);
+        Label trainingOptsLabel = new Label("Opciones de Entrenamiento");
+        trainingOptsLabel.setStyle("-fx-font-size: 12px; -fx-font-weight: bold; -fx-text-fill: #2c3e50;");
+
+        logTransformCheck = new CheckBox("Transformación logarítmica del target");
+        logTransformCheck.setSelected(false);
+        logTransformCheck.setStyle("-fx-font-size: 12px; -fx-text-fill: #2c3e50;");
+        Label logHint = new Label("Actívalo si las ventas tienen varianza multiplicativa (crece con el nivel). Desactivado por defecto para datos con tendencia aditiva.");
+        logHint.setStyle("-fx-font-size: 10px; -fx-text-fill: #7f8c8d;");
+        logHint.setWrapText(true);
+
+        autoTuneCheck = new CheckBox("Auto-tuning de alpha (RidgeCV / LassoCV)");
+        autoTuneCheck.setSelected(true);
+        autoTuneCheck.setStyle("-fx-font-size: 12px; -fx-text-fill: #2c3e50;");
+        Label autoTuneHint = new Label("Selecciona automáticamente la fuerza de regularización óptima usando validación cruzada temporal.");
+        autoTuneHint.setStyle("-fx-font-size: 10px; -fx-text-fill: #7f8c8d;");
+        autoTuneHint.setWrapText(true);
+
+        trainingOptsBox.getChildren().addAll(
+                trainingOptsLabel,
+                logTransformCheck, logHint,
+                autoTuneCheck, autoTuneHint
+        );
+
+        card.getChildren().addAll(title, note, new Separator(), regBox, alphaBox,
+                new Separator(), comprasRow, new Separator(), polyBox,
+                new Separator(), trainingOptsBox);
         return card;
     }
 
@@ -603,6 +765,10 @@ public class PredictiveController {
                     // El MD dice: "Múltiples features/variables", aquí metemos todo
                     "Ventas", "Precio", "Competencia", "Stock",
                     "Descuentos", "Clima", "Categoría", "Región"
+            );
+            case "Regresión Múltiple" -> List.of(
+                    "Ventas Históricas", "Datos de Compras", "Lags (1/7/14/30d)",
+                    "Tendencia Temporal", "Estacionalidad", "Día de la Semana"
             );
             default -> List.of("Variable Base", "Variable Tiempo");
         };
@@ -822,54 +988,69 @@ public class PredictiveController {
      */
     @FXML
     private void refreshPreviewTable() {
-        if (phase2Config.getSelectedVariables() == null ||
-                phase2Config.getSelectedVariables().isEmpty()) {
-            return;
-        }
-
-        // Limpiar columnas excepto Fecha
-        previewTable.getColumns().clear();
-
-        // Re-agregar Fecha
-        TableColumn<Map<String, String>, String> dateCol = new TableColumn<>("Fecha");
-        dateCol.setCellValueFactory(data ->
-                new javafx.beans.property.SimpleStringProperty(data.getValue().get("Fecha"))
-        );
-        dateCol.setPrefWidth(120);
-        previewTable.getColumns().add(dateCol);
-
-        // Agregar columnas de variables seleccionadas
-        for (String variable : phase2Config.getSelectedVariables()) {
-            TableColumn<Map<String, String>, String> col = new TableColumn<>(variable);
-            col.setCellValueFactory(data ->
-                    new javafx.beans.property.SimpleStringProperty(data.getValue().get(variable))
-            );
-            col.setPrefWidth(100);
-            previewTable.getColumns().add(col);
-        }
-
-        // Cargar datos mock
-        previewTable.getItems().setAll(getMockPreviewData());
+        loadPreviewFromApi();
     }
 
     /**
-     * Datos mock para vista previa
+     * Carga la vista previa de datos desde la API con datos reales.
      */
-    private List<Map<String, String>> getMockPreviewData() {
-        List<Map<String, String>> data = new ArrayList<>();
+    private void loadPreviewFromApi() {
+        if (previewTable == null) return;
+        if (phase2Config == null || phase2Config.getStartDate() == null
+                || phase2Config.getEndDate() == null) return;
 
-        for (int i = 1; i <= 100; i++) {
-            Map<String, String> row = new HashMap<>();
-            row.put("Fecha", "2024-" + String.format("%02d", i) + "-01");
+        String fechaInicio = phase2Config.getStartDate().toString();
+        String fechaFin    = phase2Config.getEndDate().toString();
 
-            for (String variable : phase2Config.getSelectedVariables()) {
-                row.put(variable, "$" + (1000 + i * 100));
-            }
+        previewTable.setPlaceholder(new Label("Cargando datos..."));
+        previewTable.getItems().clear();
+        previewTable.getColumns().clear();
 
-            data.add(row);
-        }
+        predictionService.getSalesData(fechaInicio, fechaFin, "M")
+            .thenAccept(result -> Platform.runLater(() -> {
+                if (result == null || !Boolean.TRUE.equals(result.get("success"))) {
+                    previewTable.setPlaceholder(new Label("No se pudieron cargar los datos."));
+                    return;
+                }
+                @SuppressWarnings("unchecked")
+                List<Map<String, Object>> rows = (List<Map<String, Object>>) result.get("data");
+                if (rows == null || rows.isEmpty()) {
+                    previewTable.setPlaceholder(new Label("Sin datos en el rango seleccionado."));
+                    return;
+                }
 
-        return data;
+                previewTable.getColumns().clear();
+
+                TableColumn<Map<String, String>, String> fechaCol = new TableColumn<>("Fecha");
+                fechaCol.setCellValueFactory(d ->
+                    new javafx.beans.property.SimpleStringProperty(d.getValue().get("fecha")));
+                fechaCol.setPrefWidth(130);
+
+                TableColumn<Map<String, String>, String> totalCol = new TableColumn<>("Total Ventas");
+                totalCol.setCellValueFactory(d ->
+                    new javafx.beans.property.SimpleStringProperty(d.getValue().get("total")));
+                totalCol.setPrefWidth(140);
+
+                previewTable.getColumns().addAll(fechaCol, totalCol);
+
+                List<Map<String, String>> tableData = new ArrayList<>();
+                java.text.NumberFormat nf = java.text.NumberFormat.getCurrencyInstance(
+                        new java.util.Locale("es", "MX"));
+                for (Map<String, Object> row : rows) {
+                    Map<String, String> r = new HashMap<>();
+                    r.put("fecha", String.valueOf(row.getOrDefault("fecha", "")));
+                    Object total = row.get("total");
+                    r.put("total", total instanceof Number
+                            ? nf.format(((Number) total).doubleValue()) : "N/A");
+                    tableData.add(r);
+                }
+                previewTable.getItems().setAll(tableData);
+            }))
+            .exceptionally(ex -> {
+                Platform.runLater(() ->
+                    previewTable.setPlaceholder(new Label("Error al cargar datos.")));
+                return null;
+            });
     }
 
     /**
@@ -984,12 +1165,7 @@ public class PredictiveController {
         HBox dataItem = createValidationItem("❌", validationDataLabel);
         dataItem.setUserData("data");
 
-        // Item 2: Variables válidas
-        Label validationVariablesLabel = new Label("Variables válidas");
-        HBox variablesItem = createValidationItem("❌", validationVariablesLabel);
-        variablesItem.setUserData("variables");
-
-        // Item 3: Sin errores
+        // Item 2: Sin errores
         Label validationErrorsLabel = new Label("Sin errores detectados");
         HBox errorsItem = createValidationItem("✅", validationErrorsLabel);
         errorsItem.setUserData("errors");
@@ -1011,7 +1187,6 @@ public class PredictiveController {
         card.getChildren().addAll(
                 title,
                 dataItem,
-                variablesItem,
                 errorsItem,
                 errorMessageContainer
         );
@@ -1105,15 +1280,18 @@ public class PredictiveController {
      * Valida la configuración de Fase 2 y actualiza UI
      */
     private void validatePhase2() {
-        // Actualizar validaciones en el config
-        // Ya se hace automáticamente en los setters
-
-        // Actualizar emojis de validación
         updateValidationEmojis();
-
-        // Actualizar estado de botón siguiente
         validPhase2 = phase2Config.isValid();
         updateFooterState();
+
+        // Auto-cargar preview cuando las fechas sean válidas
+        if (phase2Config.isHasEnoughData() && previewTable != null) {
+            String range = phase2Config.getStartDate() + "_" + phase2Config.getEndDate();
+            if (!range.equals(lastPreviewDateRange)) {
+                lastPreviewDateRange = range;
+                loadPreviewFromApi();
+            }
+        }
     }
 
     /**
@@ -1145,22 +1323,6 @@ public class PredictiveController {
                     switch (type) {
                         case "data":
                             if (phase2Config.isHasEnoughData()) {
-                                emojiLabel.setText("✅");
-                                textLabel.getStyleClass().remove("invalid");
-                                if (!textLabel.getStyleClass().contains("valid")) {
-                                    textLabel.getStyleClass().add("valid");
-                                }
-                            } else {
-                                emojiLabel.setText("❌");
-                                textLabel.getStyleClass().remove("valid");
-                                if (!textLabel.getStyleClass().contains("invalid")) {
-                                    textLabel.getStyleClass().add("invalid");
-                                }
-                            }
-                            break;
-
-                        case "variables":
-                            if (phase2Config.isHasValidVariables()) {
                                 emojiLabel.setText("✅");
                                 textLabel.getStyleClass().remove("invalid");
                                 if (!textLabel.getStyleClass().contains("valid")) {
@@ -1232,7 +1394,17 @@ public class PredictiveController {
         horizonSlider = null;
         horizonValueLabel = null;
         previewTable = null;
+        lastPreviewDateRange = null;
         validPhase2 = false;
+
+        // Limpiar controles de Regresión Múltiple
+        regularizationCombo = null;
+        alphaSlider = null;
+        alphaValueLabel = null;
+        useComprasCheck = null;
+        polynomialCombo = null;
+        logTransformCheck = null;
+        autoTuneCheck = null;
 
         System.out.println("✓ Configuración de Fase 2 limpiada");
     }
@@ -1293,6 +1465,47 @@ public class PredictiveController {
                     trainingTitleTxt.setText("Entrenando el modelo, este proceso puede tardar unos minutos...");
 
                     TrainModelRequestDTO request = new TrainModelRequestDTO(modelType, fechaInicio, fechaFin);
+
+                    // Agregar hiperparámetros configurados para Regresión Múltiple
+                    if ("Regresión Múltiple".equals(selectedModel.title())) {
+                        Map<String, Object> hyperparams = new HashMap<>();
+
+                        // Regularización
+                        if (regularizationCombo != null) {
+                            String regVal = switch (regularizationCombo.getValue()) {
+                                case "Lasso (L1)" -> "lasso";
+                                case "ElasticNet (L1+L2)" -> "elasticnet";
+                                case "Ninguna" -> "none";
+                                default -> "ridge";
+                            };
+                            hyperparams.put("regularization", regVal);
+                        }
+
+                        // Alpha
+                        if (alphaSlider != null) {
+                            hyperparams.put("alpha", alphaSlider.getValue());
+                        }
+
+                        // Usar compras
+                        hyperparams.put("use_compras",
+                                useComprasCheck == null || useComprasCheck.isSelected());
+
+                        // Grado polinomial
+                        if (polynomialCombo != null) {
+                            int degree = polynomialCombo.getValue().contains("2") ? 2 : 1;
+                            hyperparams.put("polynomial_degree", degree);
+                        }
+
+                        // Transformación logarítmica (default: false)
+                        hyperparams.put("log_transform",
+                                logTransformCheck != null && logTransformCheck.isSelected());
+
+                        // Auto-tuning de alpha
+                        hyperparams.put("auto_tune",
+                                autoTuneCheck == null || autoTuneCheck.isSelected());
+
+                        request.setHyperparameters(hyperparams);
+                    }
 
                     predictionService.trainModel(request)
                             .thenAccept(response -> Platform.runLater(() -> {
@@ -1449,15 +1662,17 @@ public class PredictiveController {
             loadResultsKpisFromApi();
             loadTrainingSummaryFromApi();
             loadModelInfoFromApi();
-
-            // Solicitar forecast para alimentar los charts
+            // Mostrar placeholder mientras llega el forecast
+            Label loadingLabel = new Label("Generando gráficas con datos reales...");
+            loadingLabel.setStyle("-fx-text-fill: #7f8c8d; -fx-font-style: italic; -fx-padding: 20;");
+            resultsChartsContainer.getChildren().setAll(loadingLabel);
             requestForecastForCharts();
         } else {
             loadResultsKpis();
             loadTrainingSummary();
             loadModelInfo();
+            loadResultsCharts();  // fallback con mock solo cuando no hay datos reales
         }
-        loadResultsCharts();
         predictiveFooter.setVisible(false);
         predictiveFooter.setManaged(false);
     }
@@ -1529,9 +1744,23 @@ public class PredictiveController {
                 ? lastTrainResponse.getModelKey() : "N/A");
         if (metrics != null) {
             for (Map.Entry<String, Object> entry : metrics.entrySet()) {
-                if (entry.getValue() instanceof Number) {
-                    summary.put(entry.getKey().toUpperCase(), String.format("%.4f", ((Number) entry.getValue()).doubleValue()));
+                if (!(entry.getValue() instanceof Number)) continue;
+                double val = ((Number) entry.getValue()).doubleValue();
+                String key = entry.getKey();
+                String formatted;
+                switch (key) {
+                    case "training_samples", "test_samples" ->
+                        formatted = String.format("%,d", (long) val);
+                    case "training_time" ->
+                        formatted = String.format("%.2f s", val);
+                    case "mae", "rmse", "mse" ->
+                        formatted = String.format("$%,.2f", val);
+                    case "mape" ->
+                        formatted = String.format("%.2f%%", val * 100);
+                    default ->
+                        formatted = String.format("%.4f", val);
                 }
+                summary.put(key.toUpperCase(), formatted);
             }
         }
         summary.put("Muestras Entrenamiento", lastTrainResponse.getTrainingSamples() != null
@@ -1698,10 +1927,12 @@ public class PredictiveController {
                 XYChart.Series<String, Number> metricsSeries = new XYChart.Series<>();
                 metricsSeries.setName("Métricas");
 
+                Set<String> metricasRelevantes = Set.of("r2_score", "mae", "rmse", "mape");
                 for (Map.Entry<String, Object> entry : lastTrainResponse.getMetrics().entrySet()) {
-                    if (entry.getValue() instanceof Number) {
+                    String key = entry.getKey().toLowerCase();
+                    if (metricasRelevantes.contains(key) && entry.getValue() instanceof Number) {
                         metricsSeries.getData().add(
-                                new XYChart.Data<>(entry.getKey().toUpperCase(), ((Number) entry.getValue()).doubleValue())
+                                new XYChart.Data<>(key.toUpperCase(), ((Number) entry.getValue()).doubleValue())
                         );
                     }
                 }
@@ -1711,6 +1942,55 @@ public class PredictiveController {
                 controller.loadData();
             }
 
+            resultsChartsContainer.getChildren().add(chartNode);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+        // Chart 4: Importancia de Features (solo para Regresión Múltiple)
+        if ("Regresión Múltiple".equals(selectedModel != null ? selectedModel.title() : "")
+                && lastTrainResponse != null
+                && lastTrainResponse.getMetrics() != null) {
+            Object featureImpObj = lastTrainResponse.getMetrics().get("feature_importance");
+            if (featureImpObj instanceof Map) {
+                loadFeatureImportanceChartFromData((Map<?, ?>) featureImpObj);
+            }
+        }
+    }
+
+    /**
+     * Carga un BarChart con la importancia de features del modelo de Regresión Múltiple.
+     * Solo muestra el top-10 para legibilidad.
+     */
+    @SuppressWarnings("unchecked")
+    private void loadFeatureImportanceChartFromData(Map<?, ?> featureImportance) {
+        try {
+            FXMLLoader loader = new FXMLLoader(
+                    getClass().getResource("/fxml/components/charts/BarChartCard.fxml")
+            );
+            VBox chartNode = loader.load();
+            BarChartCardController controller = loader.getController();
+
+            controller.setTitle("Importancia de Variables");
+            controller.setSubtitle("Top features por coeficiente absoluto normalizado (%)");
+
+            XYChart.Series<String, Number> series = new XYChart.Series<>();
+            series.setName("Importancia (%)");
+
+            // Ordenar por valor descendente y tomar top-10
+            featureImportance.entrySet().stream()
+                    .filter(e -> e.getValue() instanceof Number)
+                    .sorted((a, b) -> Double.compare(
+                            ((Number) b.getValue()).doubleValue(),
+                            ((Number) a.getValue()).doubleValue()))
+                    .limit(10)
+                    .forEach(e -> {
+                        String featureName = String.valueOf(e.getKey());
+                        double importance = ((Number) e.getValue()).doubleValue();
+                        series.getData().add(new XYChart.Data<>(featureName, importance));
+                    });
+
+            controller.loadCustomData(series);
             resultsChartsContainer.getChildren().add(chartNode);
         } catch (IOException e) {
             e.printStackTrace();

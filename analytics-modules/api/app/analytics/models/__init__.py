@@ -5,6 +5,7 @@ Contiene implementaciones de algoritmos de ML para prediccion de ventas.
 
 from .base_model import BaseModel, ModelConfig, ModelMetrics, PredictionResult, ModelType
 from .linear_regression import LinearRegressionModel
+from .multiple_regression import MultipleRegressionModel
 from .arima_model import ARIMAModel
 from .sarima_model import SARIMAModel
 from .random_forest import RandomForestModel
@@ -18,6 +19,7 @@ __all__ = [
     'PredictionResult',
     'ModelType',
     'LinearRegressionModel',
+    'MultipleRegressionModel',
     'ARIMAModel',
     'SARIMAModel',
     'RandomForestModel',

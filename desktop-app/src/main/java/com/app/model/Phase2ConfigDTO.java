@@ -106,7 +106,7 @@ public class Phase2ConfigDTO {
      * Verifica si la configuración es válida para continuar
      */
     public boolean isValid() {
-        return hasEnoughData && hasValidVariables && hasNoErrors &&
+        return hasEnoughData && hasNoErrors &&
                 predictionHorizon >= 1 && predictionHorizon <= 6;
     }
 }

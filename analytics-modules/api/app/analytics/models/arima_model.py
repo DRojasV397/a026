@@ -68,6 +68,7 @@ class ARIMAModel(BaseModel):
         self.freq: Optional[str] = None
         self.aic: float = 0.0
         self.bic: float = 0.0
+        self.log_transform: bool = False
 
     def _find_best_order(
         self,
@@ -212,12 +213,19 @@ class ARIMAModel(BaseModel):
 
         # Generar forecast
         forecast_result = self.model.get_forecast(steps=periods)
-        predictions = forecast_result.predicted_mean.values
 
         # Intervalos de confianza
         conf_int = forecast_result.conf_int(alpha=0.05)
-        lower = conf_int.iloc[:, 0].values
-        upper = conf_int.iloc[:, 1].values
+
+        # Back-transform si se usó log-transform en entrenamiento
+        if self.log_transform:
+            predictions = np.expm1(forecast_result.predicted_mean.values)
+            lower = np.expm1(conf_int.iloc[:, 0].values)
+            upper = np.expm1(conf_int.iloc[:, 1].values)
+        else:
+            predictions = forecast_result.predicted_mean.values
+            lower = conf_int.iloc[:, 0].values
+            upper = conf_int.iloc[:, 1].values
 
         # Generar fechas
         if last_date is None:
@@ -264,31 +272,61 @@ class ARIMAModel(BaseModel):
 
         self.last_date = df[date_col].max()
 
-        # Detectar frecuencia
-        self.freq = pd.infer_freq(df[date_col])
-
         # Crear serie con indice de fecha
         series = df.set_index(date_col)[target_col]
+
+        # Detectar y establecer frecuencia para que statsmodels la reconozca
+        inferred_freq = pd.infer_freq(series.index)
+        if inferred_freq:
+            series = series.asfreq(inferred_freq, fill_value=0)
+            self.freq = inferred_freq
+            logger.info(f"Frecuencia detectada: {self.freq}")
+        else:
+            logger.warning("No se pudo inferir frecuencia; la serie puede tener huecos")
+
+        # Log-transform: en retail la varianza diaria/semanal es proporcional al
+        # nivel de ventas (mezcla de productos de alto/bajo precio). log1p convierte
+        # errores multiplicativos en aditivos, que ARIMA puede modelar correctamente.
+        self.log_transform = True
+        series_orig = series.copy()
+        series = np.log1p(series)
 
         if validation_split:
             # Split temporal (no aleatorio para series de tiempo)
             split_idx = int(len(series) * (1 - self.config.test_size))
             train_series = series.iloc[:split_idx]
-            test_series = series.iloc[split_idx:]
+            test_series_fit = series.iloc[split_idx:]       # escala log para apply()
+            test_series_orig = series_orig.iloc[split_idx:] # escala original para R²
         else:
             train_series = series
-            test_series = series
+            test_series_fit = series
+            test_series_orig = series_orig
 
-        # Entrenar
+        # Entrenar con serie log-transformada
         self._train(None, train_series)
         self.is_fitted = True
 
         # Evaluar
-        if validation_split and len(test_series) > 0:
-            # Predecir periodos de test
-            forecast = self.model.get_forecast(steps=len(test_series))
-            y_pred = forecast.predicted_mean.values
-            y_true = test_series.values
+        if validation_split and len(test_series_orig) > 0:
+            try:
+                with warnings.catch_warnings():
+                    warnings.simplefilter("ignore")
+                    # Misma estrategia que SARIMA: filtrar la serie COMPLETA (train+test)
+                    # con los parámetros entrenados. El filtro de Kalman propaga el estado
+                    # correctamente desde el training al test sin cold-start.
+                    from statsmodels.tsa.arima.model import ARIMA as _ARIMA
+                    full_model_obj = _ARIMA(series, order=self.order)
+                    full_fitted = full_model_obj.filter(self.model.params)
+                    y_pred_log_all = full_fitted.fittedvalues.values
+                    y_pred_log = y_pred_log_all[split_idx:]
+                    valid_mask = ~np.isnan(y_pred_log)
+                    y_pred = np.expm1(y_pred_log[valid_mask])
+                    y_true = test_series_orig.values[valid_mask]
+            except Exception as e:
+                logger.warning(f"ARIMA filter() falló, usando forecast multi-paso: {e}")
+                forecast = self.model.get_forecast(steps=len(test_series_orig))
+                y_pred = np.expm1(forecast.predicted_mean.values)
+                y_true = test_series_orig.values
 
             # Calcular metricas
             from sklearn.metrics import r2_score, mean_squared_error, mean_absolute_error
@@ -307,7 +345,7 @@ class ARIMAModel(BaseModel):
                 )
 
             self.metrics.training_samples = len(train_series)
-            self.metrics.test_samples = len(test_series)
+            self.metrics.test_samples = len(y_true)
             self.metrics.validate_thresholds(self.R2_THRESHOLD)
         else:
             # Usar residuos para evaluar

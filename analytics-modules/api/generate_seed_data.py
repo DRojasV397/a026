@@ -19,7 +19,10 @@ import os
 import random
 from datetime import date, timedelta
 
+import numpy as np
+
 random.seed(42)   # Reproducible
+np.random.seed(42)
 
 OUTPUT_DIR = os.path.join(os.path.dirname(__file__), "seed_data")
 os.makedirs(OUTPUT_DIR, exist_ok=True)
@@ -97,34 +100,43 @@ def generate_productos():
 
 def generate_ventas():
     """
-    ~300 registros de ventas (enero–diciembre 2025).
-    Estacionalidad: mayor volumen en nov-dic, menor en ene-feb.
+    ~2000 registros de ventas (enero–diciembre 2025).
+    Genera un volumen diario basado en factores de tendencia, estacionalidad
+    mensual y patrón semanal, para que los modelos predictivos tengan señal real.
     """
     START = date(2025, 1, 1)
     END   = date(2025, 12, 31)
 
-    # Peso mensual (ene=1 … dic=12)  — estacionalidad
-    monthly_weight = [1.0, 0.9, 1.1, 1.1, 1.2, 1.0,
-                      1.2, 1.3, 1.2, 1.3, 1.8, 2.2]
-    total_records  = 300
-    base_per_month = total_records // 12  # ~25
+    # Factor estacional mensual (electrónica: pico verano y navidad)
+    monthly_factor = {
+        1: 0.70, 2: 0.80, 3: 0.85, 4: 1.00, 5: 1.10, 6: 1.15,
+        7: 1.30, 8: 1.05, 9: 0.90, 10: 0.95, 11: 1.40, 12: 1.80,
+    }
+    # Factor día de semana (lunes=0, domingo=6)
+    dow_factor = {0: 1.2, 1: 1.15, 2: 1.05, 3: 1.0, 4: 1.1, 5: 0.7, 6: 0.5}
+    base_tx_per_day = 4   # transacciones promedio en día normal
 
     records = []
-    for month in range(1, 13):
-        month_start = date(2025, month, 1)
-        month_end   = date(2025, month, 28) if month == 2 else \
-                      date(2025, month, 30) if month in (4,6,9,11) else \
-                      date(2025, month, 31)
+    day_num = 0
+    current = START
+    while current <= END:
+        m_factor = monthly_factor[current.month]
+        d_factor = dow_factor[current.weekday()]
+        # Tendencia lineal +60% durante el año
+        trend = 1.0 + (day_num / 365) * 0.6
+        expected_tx = base_tx_per_day * m_factor * d_factor * trend
+        n_tx = max(0, int(np.random.poisson(expected_tx)))
 
-        count = int(base_per_month * monthly_weight[month - 1])
-        for _ in range(count):
-            d    = date_range(month_start, month_end)
+        for _ in range(n_tx):
             prod = random.choice(PRODUCTOS)
-            qty  = random.randint(1, 5)
-            unit_price = round2(prod[4] * random.uniform(0.95, 1.05))  # ±5% variación
+            qty = random.choices([1, 2, 3, 4, 5], weights=[40, 30, 15, 10, 5])[0]
+            unit_price = round2(prod[4] * random.uniform(0.97, 1.03))
             total = round2(qty * unit_price)
             cliente = random.choice(CLIENTES)
-            records.append((d, prod[0], prod[1], qty, unit_price, total, cliente))
+            records.append((current, prod[0], prod[1], qty, unit_price, total, cliente))
+
+        day_num += 1
+        current += timedelta(days=1)
 
     records.sort(key=lambda r: r[0])
 

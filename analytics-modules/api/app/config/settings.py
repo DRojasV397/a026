@@ -66,6 +66,10 @@ class Settings(BaseSettings):
     ENVIRONMENT: str = "development"  # development, staging, production
     DEBUG: bool = True
 
+    # Echo SQL de SQLAlchemy (imprime cada INSERT/SELECT en consola)
+    # Activar solo para depurar queries específicos; muy ruidoso en carga masiva
+    DB_ECHO: bool = False
+
     model_config = SettingsConfigDict(
         env_file=str(_ENV_FILE),
         env_file_encoding="utf-8",

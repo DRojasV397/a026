@@ -20,6 +20,7 @@ logger = logging.getLogger(__name__)
 class ModelType(str, Enum):
     """Tipos de modelos soportados."""
     LINEAR_REGRESSION = "linear_regression"
+    MULTIPLE_REGRESSION = "multiple_regression"
     ARIMA = "arima"
     SARIMA = "sarima"
     RANDOM_FOREST = "random_forest"

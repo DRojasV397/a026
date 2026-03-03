@@ -84,6 +84,8 @@ class SARIMAModel(BaseModel):
         self.aic: float = 0.0
         self.bic: float = 0.0
         self.seasonality_detected: bool = False
+        self.use_exog: bool = False
+        self.log_transform: bool = False
 
     @staticmethod
     def detect_seasonality(
@@ -131,10 +133,28 @@ class SARIMAModel(BaseModel):
 
         return False, 0
 
+    @staticmethod
+    def _make_dow_exog(index: pd.DatetimeIndex) -> pd.DataFrame:
+        """
+        Crea dummies día-de-semana (lun–sab; domingo = línea base).
+        Pasarlas como exógenas a SARIMAX permite capturar el efecto DOW de
+        forma exacta en lugar de aproximarlo con el componente estacional.
+        """
+        dow = pd.Series(index.dayofweek, index=index)
+        return pd.DataFrame({
+            'lun': (dow == 0).astype(float),
+            'mar': (dow == 1).astype(float),
+            'mie': (dow == 2).astype(float),
+            'jue': (dow == 3).astype(float),
+            'vie': (dow == 4).astype(float),
+            'sab': (dow == 5).astype(float),
+        }, index=index)
+
     def _find_best_order(
         self,
         series: pd.Series,
-        seasonal_period: int
+        seasonal_period: int,
+        exog=None
     ) -> Tuple[Tuple[int, int, int], Tuple[int, int, int, int]]:
         """
         Encuentra los mejores ordenes para SARIMA.
@@ -176,6 +196,7 @@ class SARIMAModel(BaseModel):
                                             series,
                                             order=(p, d, q),
                                             seasonal_order=(P, D, Q, seasonal_period),
+                                            exog=exog,
                                             enforce_stationarity=False,
                                             enforce_invertibility=False
                                         )
@@ -201,7 +222,8 @@ class SARIMAModel(BaseModel):
     def _train(
         self,
         X_train: Union[pd.DataFrame, np.ndarray],
-        y_train: Union[pd.Series, np.ndarray]
+        y_train: Union[pd.Series, np.ndarray],
+        exog=None
     ) -> None:
         """Entrena el modelo SARIMA."""
         try:
@@ -232,7 +254,7 @@ class SARIMAModel(BaseModel):
         # Buscar mejor orden si esta configurado
         if self.config.hyperparameters.get("auto_order", True):
             self.order, self.seasonal_order = self._find_best_order(
-                self.series, seasonal_period
+                self.series, seasonal_period, exog=exog
             )
         else:
             self.seasonal_order = (
@@ -250,6 +272,7 @@ class SARIMAModel(BaseModel):
                 self.series,
                 order=self.order,
                 seasonal_order=self.seasonal_order,
+                exog=exog,
                 enforce_stationarity=False,
                 enforce_invertibility=False
             )
@@ -313,16 +336,7 @@ class SARIMAModel(BaseModel):
             logger.warning(f"Limitando prediccion a {self.MAX_FORECAST_PERIODS} periodos")
             periods = self.MAX_FORECAST_PERIODS
 
-        # Generar forecast
-        forecast_result = self.model.get_forecast(steps=periods)
-        predictions = forecast_result.predicted_mean.values
-
-        # Intervalos de confianza
-        conf_int = forecast_result.conf_int(alpha=0.05)
-        lower = conf_int.iloc[:, 0].values
-        upper = conf_int.iloc[:, 1].values
-
-        # Generar fechas
+        # Generar fechas futuras
         if last_date is None:
             last_date = self.last_date or datetime.now()
 
@@ -331,6 +345,25 @@ class SARIMAModel(BaseModel):
             periods=periods,
             freq=freq
         )
+
+        # Exógenas DOW para el periodo de forecast
+        future_exog = self._make_dow_exog(dates) if self.use_exog else None
+
+        # Generar forecast
+        forecast_result = self.model.get_forecast(steps=periods, exog=future_exog)
+
+        # Intervalos de confianza
+        conf_int = forecast_result.conf_int(alpha=0.05)
+
+        # Back-transform si se usó log-transform en entrenamiento
+        if self.log_transform:
+            predictions = np.expm1(forecast_result.predicted_mean.values)
+            lower = np.expm1(conf_int.iloc[:, 0].values)
+            upper = np.expm1(conf_int.iloc[:, 1].values)
+        else:
+            predictions = forecast_result.predicted_mean.values
+            lower = conf_int.iloc[:, 0].values
+            upper = conf_int.iloc[:, 1].values
 
         return PredictionResult(
             predictions=list(predictions),
@@ -366,10 +399,18 @@ class SARIMAModel(BaseModel):
             df[date_col] = pd.to_datetime(df[date_col])
 
         self.last_date = df[date_col].max()
-        self.freq = pd.infer_freq(df[date_col])
 
         # Crear serie con indice de fecha
         series = df.set_index(date_col)[target_col]
+
+        # Detectar y establecer frecuencia para que statsmodels la reconozca
+        inferred_freq = pd.infer_freq(series.index)
+        if inferred_freq:
+            series = series.asfreq(inferred_freq, fill_value=0)
+            self.freq = inferred_freq
+            logger.info(f"SARIMA frecuencia detectada: {self.freq}")
+        else:
+            logger.warning("SARIMA: no se pudo inferir frecuencia; la serie puede tener huecos")
 
         if validation_split:
             # Split temporal
@@ -380,15 +421,63 @@ class SARIMAModel(BaseModel):
             train_series = series
             test_series = series
 
-        # Entrenar
-        self._train(None, train_series)
+        # Variables exógenas DOW: capturan el efecto día-de-semana de forma exacta.
+        # SARIMAX con dummies DOW supera al componente estacional solo, porque el
+        # componente (P,D,Q,s) aproxima el patrón DOW suavemente mientras que las
+        # dummies lo modelan con un coeficiente distinto por cada día.
+        if hasattr(train_series.index, 'dayofweek'):
+            self.use_exog = True
+            train_exog = self._make_dow_exog(train_series.index)
+            test_exog = self._make_dow_exog(test_series.index)
+        else:
+            self.use_exog = False
+            train_exog = None
+            test_exog = None
+
+        # Log-transform: igual que en ARIMA, la varianza diaria de ventas retail
+        # es proporcional al nivel. log1p lo convierte en errores aditivos.
+        self.log_transform = True
+        series_orig = series.copy()
+        train_series_fit = np.log1p(train_series)
+        test_series_fit = np.log1p(test_series)   # escala log para apply()
+
+        # Entrenar con serie log-transformada + exógenas DOW
+        self._train(None, train_series_fit, exog=train_exog)
         self.is_fitted = True
 
         # Evaluar
         if validation_split and len(test_series) > 0:
-            forecast = self.model.get_forecast(steps=len(test_series))
-            y_pred = forecast.predicted_mean.values
-            y_true = test_series.values
+            try:
+                with warnings.catch_warnings():
+                    warnings.simplefilter("ignore")
+                    # apply() reinicia el filtro de Kalman desde cero: con D=1 y s=7
+                    # los lags estacionales (y_{t-7}) son incorrectos para TODOS los
+                    # pasos del test, no solo los primeros. Resultado: R² ≈ -500.
+                    # Solución: filtrar la serie COMPLETA (train+test) con los parámetros
+                    # ya estimados. fittedvalues[t] = pred 1-paso dado y_0..y_{t-1}
+                    # → walk-forward correcto con estado de Kalman bien inicializado.
+                    from statsmodels.tsa.statespace.sarimax import SARIMAX as _SARIMAX
+                    full_log = np.log1p(series)
+                    full_exog = self._make_dow_exog(full_log.index) if self.use_exog else None
+                    full_model_obj = _SARIMAX(
+                        full_log,
+                        order=self.order,
+                        seasonal_order=self.seasonal_order,
+                        exog=full_exog,
+                        enforce_stationarity=False,
+                        enforce_invertibility=False
+                    )
+                    full_fitted = full_model_obj.filter(self.model.params)
+                    y_pred_log_all = full_fitted.fittedvalues.values
+                    y_pred_log = y_pred_log_all[split_idx:]
+                    valid_mask = ~np.isnan(y_pred_log)
+                    y_pred = np.expm1(y_pred_log[valid_mask])
+                    y_true = test_series.values[valid_mask]
+            except Exception as e:
+                logger.warning(f"SARIMA filter() falló, usando forecast multi-paso: {e}")
+                forecast = self.model.get_forecast(steps=len(test_series), exog=test_exog)
+                y_pred = np.expm1(forecast.predicted_mean.values)
+                y_true = test_series.values
 
             from sklearn.metrics import r2_score, mean_squared_error, mean_absolute_error
 
@@ -405,7 +494,7 @@ class SARIMAModel(BaseModel):
                 )
 
             self.metrics.training_samples = len(train_series)
-            self.metrics.test_samples = len(test_series)
+            self.metrics.test_samples = len(y_true)
             self.metrics.validate_thresholds(self.R2_THRESHOLD)
         else:
             residuals = self.model.resid

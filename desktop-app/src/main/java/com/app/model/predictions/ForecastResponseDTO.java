@@ -21,7 +21,7 @@ public class ForecastResponseDTO {
     private String modelType;
 
     @SerializedName("model_metrics")
-    private Map<String, Double> modelMetrics;
+    private Map<String, Object> modelMetrics;
 
     private Integer periods;
     private String error;
@@ -30,7 +30,7 @@ public class ForecastResponseDTO {
     public boolean isSuccess() { return success; }
     public Map<String, Object> getPredictions() { return predictions; }
     public String getModelType() { return modelType; }
-    public Map<String, Double> getModelMetrics() { return modelMetrics; }
+    public Map<String, Object> getModelMetrics() { return modelMetrics; }
     public Integer getPeriods() { return periods; }
     public String getError() { return error; }
     public String getSuggestion() { return suggestion; }
