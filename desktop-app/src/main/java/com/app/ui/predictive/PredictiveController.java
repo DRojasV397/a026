@@ -80,6 +80,22 @@ public class PredictiveController {
     private CheckBox logTransformCheck;
     private CheckBox autoTuneCheck;
 
+    // Controles de hiperparámetros avanzados (Ensemble)
+    private List<CheckBox> ensembleBaseModelChecks;
+    private ComboBox<String> ensembleMetaLearnerCombo;
+    private CheckBox ensembleUseComprasCheck;
+
+    // Controles de hiperparámetros avanzados (XGBoost)
+    private Slider xgboostNEstimatorsSlider;
+    private ComboBox<String> xgboostMaxDepthCombo;
+    private Slider xgboostLearningRateSlider;
+    private Slider xgboostSubsampleSlider;
+
+    // Controles de hiperparámetros avanzados (Prophet)
+    private Slider prophetChangepointSlider;
+    private CheckBox prophetYearlySeasonalityCheck;
+    private CheckBox prophetWeeklySeasonalityCheck;
+
     @FXML private HBox predictiveFooter;
 
     @FXML private ImageView timeIcon;
@@ -183,6 +199,42 @@ public class PredictiveController {
                                 new PredictiveModelDTO.ModelFeature("🛒", "Variable exógena", "Datos de compras como predictor", "#e67e22"),
                                 new PredictiveModelDTO.ModelFeature("🔁", "Autocorrelación", "Lags 1, 7, 14 y 30 días", "#3498db"),
                                 new PredictiveModelDTO.ModelFeature("🛡", "Regularización", "Ridge / Lasso / ElasticNet", "#2ecc71")
+                        )
+                ),
+                new PredictiveModelDTO(
+                        "Modelo Ensemble",
+                        "Combina múltiples modelos con un meta-learner que aprende los pesos óptimos.",
+                        List.of("Stacking", "Meta-Learner", "Multi-Modelo"),
+                        "Supera modelos individuales capturando patrones complementarios: tendencia, lags y no-linealidad en conjunto.",
+                        "🧩", "Superior", "Intensivo",
+                        List.of(
+                                new PredictiveModelDTO.ModelFeature("🔗", "Técnica", "Stacking OOF temporal (sin data leakage)", "#9b59b6"),
+                                new PredictiveModelDTO.ModelFeature("🤖", "Meta-Learner", "Ridge aprende pesos óptimos por modelo base", "#3498db"),
+                                new PredictiveModelDTO.ModelFeature("📐", "Modelos Base", "Reg. Lineal + Reg. Múltiple + Random Forest", "#27ae60")
+                        )
+                ),
+                new PredictiveModelDTO(
+                        "XGBoost",
+                        "Gradient Boosting de alta precisión con regularización integrada para series de tiempo.",
+                        List.of("Gradient Boosting", "Regularización", "Lags"),
+                        "Combina boosting secuencial con regularización L1/L2 para capturar relaciones no lineales con lags automáticos.",
+                        "⚡", "Superior", "Moderado",
+                        List.of(
+                                new PredictiveModelDTO.ModelFeature("🚀", "Técnica", "Boosting secuencial de árboles", "#e67e22"),
+                                new PredictiveModelDTO.ModelFeature("🛡", "Regularización", "L1 (reg_alpha) y L2 (reg_lambda)", "#2ecc71"),
+                                new PredictiveModelDTO.ModelFeature("🔁", "Lags", "Automáticos: 1d, 7d, 14d, 30d", "#3498db")
+                        )
+                ),
+                new PredictiveModelDTO(
+                        "Prophet",
+                        "Modelo de Facebook para series de tiempo de negocio con estacionalidad múltiple.",
+                        List.of("Facebook", "Estacional", "Tendencia"),
+                        "Detecta tendencia adaptativa y estacionalidades anuales y semanales de forma automática, robusto ante outliers.",
+                        "🔮", "Alta", "Moderado",
+                        List.of(
+                                new PredictiveModelDTO.ModelFeature("📅", "Estacionalidad", "Anual + semanal automática", "#9b59b6"),
+                                new PredictiveModelDTO.ModelFeature("📈", "Tendencia", "Adaptativa con changepoints", "#3498db"),
+                                new PredictiveModelDTO.ModelFeature("🎯", "Confianza", "Intervalos de confianza nativos (80%)", "#27ae60")
                         )
                 )
         );
@@ -356,6 +408,9 @@ public class PredictiveController {
             case "Modelo SARIMA" -> "sarima";
             case "Random Forest" -> "random_forest";
             case "Regresión Múltiple" -> "multiple_regression";
+            case "Modelo Ensemble" -> "ensemble";
+            case "XGBoost" -> "xgboost";
+            case "Prophet" -> "prophet";
             default -> "linear";
         };
     }
@@ -494,10 +549,19 @@ public class PredictiveController {
         VBox variablesCard = createVariablesCard();
         parametersContainer.getChildren().add(variablesCard);
 
-        // 2.5 PARÁMETROS AVANZADOS — solo para Regresión Múltiple
+        // 2.5 PARÁMETROS AVANZADOS — según modelo seleccionado
         if ("Regresión Múltiple".equals(selectedModel.title())) {
             VBox advancedCard = createMultipleRegressionParamsCard();
             parametersContainer.getChildren().add(advancedCard);
+        } else if ("Modelo Ensemble".equals(selectedModel.title())) {
+            VBox ensembleCard = createEnsembleParamsCard();
+            parametersContainer.getChildren().add(ensembleCard);
+        } else if ("XGBoost".equals(selectedModel.title())) {
+            VBox xgboostCard = createXGBoostParamsCard();
+            parametersContainer.getChildren().add(xgboostCard);
+        } else if ("Prophet".equals(selectedModel.title())) {
+            VBox prophetCard = createProphetParamsCard();
+            parametersContainer.getChildren().add(prophetCard);
         }
 
         // 3. HORIZONTE DE PREDICCIÓN
@@ -746,6 +810,281 @@ public class PredictiveController {
     }
 
     /**
+     * Card de hiperparámetros para el Modelo Ensemble.
+     * Permite seleccionar modelos base, meta-learner y uso de compras.
+     */
+    private VBox createEnsembleParamsCard() {
+        VBox card = new VBox(14);
+        card.getStyleClass().add("param-card");
+
+        Label title = new Label("⚙️ Parámetros del Ensemble");
+        title.getStyleClass().add("param-card-title");
+
+        Label note = new Label("Configura los modelos base que se combinarán y el meta-learner");
+        note.setStyle("-fx-font-size: 11px; -fx-text-fill: #95a5a6; -fx-font-style: italic;");
+        note.setWrapText(true);
+
+        // ── Modelos base ────────────────────────────────────────────────────
+        VBox baseModelsBox = new VBox(8);
+        Label baseLabel = new Label("Modelos Base");
+        baseLabel.setStyle("-fx-font-size: 12px; -fx-font-weight: bold; -fx-text-fill: #2c3e50;");
+
+        ensembleBaseModelChecks = new ArrayList<>();
+        String[] baseNames = {"Regresión Lineal", "Regresión Múltiple", "Random Forest"};
+        for (String name : baseNames) {
+            CheckBox cb = new CheckBox(name);
+            cb.setSelected(true);
+            cb.setStyle("-fx-font-size: 12px; -fx-text-fill: #2c3e50;");
+            ensembleBaseModelChecks.add(cb);
+            baseModelsBox.getChildren().add(cb);
+        }
+
+        Label baseHint = new Label("Selecciona al menos 2 modelos para el stacking.");
+        baseHint.setStyle("-fx-font-size: 10px; -fx-text-fill: #7f8c8d;");
+        baseHint.setWrapText(true);
+        baseModelsBox.getChildren().addAll(baseLabel, baseHint);
+        // Reorder: label first, then checkboxes, then hint
+        baseModelsBox.getChildren().clear();
+        baseModelsBox.getChildren().add(baseLabel);
+        for (CheckBox cb : ensembleBaseModelChecks) {
+            baseModelsBox.getChildren().add(cb);
+        }
+        baseModelsBox.getChildren().add(baseHint);
+
+        // ── Meta-Learner ────────────────────────────────────────────────────
+        VBox metaBox = new VBox(6);
+        Label metaLabel = new Label("Meta-Learner");
+        metaLabel.setStyle("-fx-font-size: 12px; -fx-font-weight: bold; -fx-text-fill: #2c3e50;");
+
+        ensembleMetaLearnerCombo = new ComboBox<>();
+        ensembleMetaLearnerCombo.getItems().addAll(
+                "Ridge (recomendado)",
+                "Promedio Ponderado por R²"
+        );
+        ensembleMetaLearnerCombo.setValue("Ridge (recomendado)");
+        ensembleMetaLearnerCombo.setMaxWidth(Double.MAX_VALUE);
+        ensembleMetaLearnerCombo.setStyle("-fx-font-size: 12px;");
+
+        Label metaHint = new Label("Ridge: aprende pesos por regresión regularizada. Promedio Ponderado: pesos iguales a R² de cada modelo base.");
+        metaHint.setStyle("-fx-font-size: 10px; -fx-text-fill: #7f8c8d;");
+        metaHint.setWrapText(true);
+
+        metaBox.getChildren().addAll(metaLabel, ensembleMetaLearnerCombo, metaHint);
+
+        // ── Usar compras ────────────────────────────────────────────────────
+        HBox comprasRow = new HBox(10);
+        comprasRow.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
+        comprasRow.setStyle("-fx-padding: 8; -fx-background-color: #fef9e7; -fx-background-radius: 6;");
+
+        ensembleUseComprasCheck = new CheckBox("Incluir datos de compras (usado por Regresión Múltiple en el ensemble)");
+        ensembleUseComprasCheck.setSelected(true);
+        ensembleUseComprasCheck.setStyle("-fx-font-size: 12px; -fx-text-fill: #2c3e50;");
+        ensembleUseComprasCheck.setWrapText(true);
+
+        comprasRow.getChildren().add(ensembleUseComprasCheck);
+
+        card.getChildren().addAll(title, note, new Separator(), baseModelsBox,
+                new Separator(), metaBox, new Separator(), comprasRow);
+        return card;
+    }
+
+    /**
+     * Card de hiperparámetros para XGBoost.
+     */
+    private VBox createXGBoostParamsCard() {
+        VBox card = new VBox(14);
+        card.getStyleClass().add("param-card");
+
+        Label title = new Label("⚙️ Parámetros XGBoost");
+        title.getStyleClass().add("param-card-title");
+
+        Label note = new Label("Configura el boosting y la regularización del modelo");
+        note.setStyle("-fx-font-size: 11px; -fx-text-fill: #95a5a6; -fx-font-style: italic;");
+        note.setWrapText(true);
+
+        // ── n_estimators ─────────────────────────────────────────
+        VBox nEstBox = new VBox(6);
+        HBox nEstHeader = new HBox(8);
+        nEstHeader.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
+        Label nEstLabel = new Label("Número de árboles (n_estimators)");
+        nEstLabel.setStyle("-fx-font-size: 12px; -fx-font-weight: bold; -fx-text-fill: #2c3e50;");
+        Region nEstSpacer = new Region();
+        HBox.setHgrow(nEstSpacer, Priority.ALWAYS);
+        Label nEstValueLbl = new Label("100");
+        nEstValueLbl.setStyle("-fx-font-size: 12px; -fx-font-weight: bold; -fx-text-fill: #e67e22;");
+        nEstHeader.getChildren().addAll(nEstLabel, nEstSpacer, nEstValueLbl);
+
+        xgboostNEstimatorsSlider = new Slider(50, 500, 100);
+        xgboostNEstimatorsSlider.setMajorTickUnit(50);
+        xgboostNEstimatorsSlider.setBlockIncrement(10);
+        xgboostNEstimatorsSlider.setSnapToTicks(false);
+        xgboostNEstimatorsSlider.valueProperty().addListener((obs, old, nv) ->
+            nEstValueLbl.setText(String.valueOf((int) nv.doubleValue()))
+        );
+
+        HBox nEstLabels = new HBox();
+        Label nEstMin = new Label("50 (mínimo)");
+        nEstMin.setStyle("-fx-font-size: 10px; -fx-text-fill: #95a5a6;");
+        Region nEstSp2 = new Region();
+        HBox.setHgrow(nEstSp2, Priority.ALWAYS);
+        Label nEstMax = new Label("500 (máximo)");
+        nEstMax.setStyle("-fx-font-size: 10px; -fx-text-fill: #95a5a6;");
+        nEstLabels.getChildren().addAll(nEstMin, nEstSp2, nEstMax);
+        nEstBox.getChildren().addAll(nEstHeader, xgboostNEstimatorsSlider, nEstLabels);
+
+        // ── max_depth ─────────────────────────────────────────────
+        VBox depthBox = new VBox(6);
+        Label depthLabel = new Label("Profundidad máxima (max_depth)");
+        depthLabel.setStyle("-fx-font-size: 12px; -fx-font-weight: bold; -fx-text-fill: #2c3e50;");
+
+        xgboostMaxDepthCombo = new ComboBox<>();
+        xgboostMaxDepthCombo.getItems().addAll("3", "4", "5", "6", "8", "10");
+        xgboostMaxDepthCombo.setValue("6");
+        xgboostMaxDepthCombo.setMaxWidth(Double.MAX_VALUE);
+        xgboostMaxDepthCombo.setStyle("-fx-font-size: 12px;");
+
+        Label depthHint = new Label("Valores bajos evitan overfitting; valores altos capturan más complejidad.");
+        depthHint.setStyle("-fx-font-size: 10px; -fx-text-fill: #7f8c8d;");
+        depthHint.setWrapText(true);
+        depthBox.getChildren().addAll(depthLabel, xgboostMaxDepthCombo, depthHint);
+
+        // ── learning_rate ──────────────────────────────────────────
+        VBox lrBox = new VBox(6);
+        HBox lrHeader = new HBox(8);
+        lrHeader.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
+        Label lrLabel = new Label("Tasa de aprendizaje (learning_rate)");
+        lrLabel.setStyle("-fx-font-size: 12px; -fx-font-weight: bold; -fx-text-fill: #2c3e50;");
+        Region lrSpacer = new Region();
+        HBox.setHgrow(lrSpacer, Priority.ALWAYS);
+        Label lrValueLbl = new Label("0.10");
+        lrValueLbl.setStyle("-fx-font-size: 12px; -fx-font-weight: bold; -fx-text-fill: #3498db;");
+        lrHeader.getChildren().addAll(lrLabel, lrSpacer, lrValueLbl);
+
+        xgboostLearningRateSlider = new Slider(0.01, 0.30, 0.10);
+        xgboostLearningRateSlider.setBlockIncrement(0.01);
+        xgboostLearningRateSlider.valueProperty().addListener((obs, old, nv) ->
+            lrValueLbl.setText(String.format("%.2f", nv.doubleValue()))
+        );
+
+        HBox lrLabels = new HBox();
+        Label lrMin = new Label("0.01");
+        lrMin.setStyle("-fx-font-size: 10px; -fx-text-fill: #95a5a6;");
+        Region lrSp2 = new Region();
+        HBox.setHgrow(lrSp2, Priority.ALWAYS);
+        Label lrMax = new Label("0.30");
+        lrMax.setStyle("-fx-font-size: 10px; -fx-text-fill: #95a5a6;");
+        lrLabels.getChildren().addAll(lrMin, lrSp2, lrMax);
+        lrBox.getChildren().addAll(lrHeader, xgboostLearningRateSlider, lrLabels);
+
+        // ── subsample ──────────────────────────────────────────────
+        VBox ssBox = new VBox(6);
+        HBox ssHeader = new HBox(8);
+        ssHeader.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
+        Label ssLabel = new Label("Submuestreo por árbol (subsample)");
+        ssLabel.setStyle("-fx-font-size: 12px; -fx-font-weight: bold; -fx-text-fill: #2c3e50;");
+        Region ssSpacer = new Region();
+        HBox.setHgrow(ssSpacer, Priority.ALWAYS);
+        Label ssValueLbl = new Label("0.80");
+        ssValueLbl.setStyle("-fx-font-size: 12px; -fx-font-weight: bold; -fx-text-fill: #2ecc71;");
+        ssHeader.getChildren().addAll(ssLabel, ssSpacer, ssValueLbl);
+
+        xgboostSubsampleSlider = new Slider(0.50, 1.00, 0.80);
+        xgboostSubsampleSlider.setBlockIncrement(0.05);
+        xgboostSubsampleSlider.valueProperty().addListener((obs, old, nv) ->
+            ssValueLbl.setText(String.format("%.2f", nv.doubleValue()))
+        );
+
+        HBox ssLabels = new HBox();
+        Label ssMin = new Label("0.50");
+        ssMin.setStyle("-fx-font-size: 10px; -fx-text-fill: #95a5a6;");
+        Region ssSp2 = new Region();
+        HBox.setHgrow(ssSp2, Priority.ALWAYS);
+        Label ssMax = new Label("1.00");
+        ssMax.setStyle("-fx-font-size: 10px; -fx-text-fill: #95a5a6;");
+        ssLabels.getChildren().addAll(ssMin, ssSp2, ssMax);
+        ssBox.getChildren().addAll(ssHeader, xgboostSubsampleSlider, ssLabels);
+
+        card.getChildren().addAll(title, note, new Separator(),
+                nEstBox, new Separator(), depthBox, new Separator(),
+                lrBox, new Separator(), ssBox);
+        return card;
+    }
+
+    /**
+     * Card de hiperparámetros para Prophet.
+     */
+    private VBox createProphetParamsCard() {
+        VBox card = new VBox(14);
+        card.getStyleClass().add("param-card");
+
+        Label title = new Label("⚙️ Parámetros Prophet");
+        title.getStyleClass().add("param-card-title");
+
+        Label note = new Label("Configura la flexibilidad de la tendencia y las estacionalidades");
+        note.setStyle("-fx-font-size: 11px; -fx-text-fill: #95a5a6; -fx-font-style: italic;");
+        note.setWrapText(true);
+
+        // ── changepoint_prior_scale ────────────────────────────────
+        VBox cpBox = new VBox(6);
+        HBox cpHeader = new HBox(8);
+        cpHeader.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
+        Label cpLabel = new Label("Flexibilidad de tendencia (changepoint_prior_scale)");
+        cpLabel.setStyle("-fx-font-size: 12px; -fx-font-weight: bold; -fx-text-fill: #2c3e50;");
+        cpLabel.setWrapText(true);
+        Region cpSpacer = new Region();
+        HBox.setHgrow(cpSpacer, Priority.ALWAYS);
+        Label cpValueLbl = new Label("0.05");
+        cpValueLbl.setStyle("-fx-font-size: 12px; -fx-font-weight: bold; -fx-text-fill: #9b59b6;");
+        cpHeader.getChildren().addAll(cpLabel, cpSpacer, cpValueLbl);
+
+        prophetChangepointSlider = new Slider(0.01, 0.50, 0.05);
+        prophetChangepointSlider.setBlockIncrement(0.01);
+        prophetChangepointSlider.valueProperty().addListener((obs, old, nv) ->
+            cpValueLbl.setText(String.format("%.2f", nv.doubleValue()))
+        );
+
+        HBox cpLabels = new HBox();
+        Label cpMin = new Label("0.01 (tendencia rígida)");
+        cpMin.setStyle("-fx-font-size: 10px; -fx-text-fill: #95a5a6;");
+        Region cpSp2 = new Region();
+        HBox.setHgrow(cpSp2, Priority.ALWAYS);
+        Label cpMax = new Label("0.50 (muy flexible)");
+        cpMax.setStyle("-fx-font-size: 10px; -fx-text-fill: #95a5a6;");
+        cpLabels.getChildren().addAll(cpMin, cpSp2, cpMax);
+
+        Label cpHint = new Label("Valores bajos = tendencia suave; valores altos = tendencia reactiva a cambios bruscos.");
+        cpHint.setStyle("-fx-font-size: 10px; -fx-text-fill: #7f8c8d;");
+        cpHint.setWrapText(true);
+
+        cpBox.getChildren().addAll(cpHeader, prophetChangepointSlider, cpLabels, cpHint);
+
+        // ── Estacionalidades ──────────────────────────────────────
+        VBox seasonBox = new VBox(8);
+        Label seasonLabel = new Label("Estacionalidades");
+        seasonLabel.setStyle("-fx-font-size: 12px; -fx-font-weight: bold; -fx-text-fill: #2c3e50;");
+
+        prophetYearlySeasonalityCheck = new CheckBox("Estacionalidad anual (patrón mensual del año)");
+        prophetYearlySeasonalityCheck.setSelected(true);
+        prophetYearlySeasonalityCheck.setStyle("-fx-font-size: 12px; -fx-text-fill: #2c3e50;");
+
+        prophetWeeklySeasonalityCheck = new CheckBox("Estacionalidad semanal (patrón día de la semana)");
+        prophetWeeklySeasonalityCheck.setSelected(true);
+        prophetWeeklySeasonalityCheck.setStyle("-fx-font-size: 12px; -fx-text-fill: #2c3e50;");
+
+        Label seasonHint = new Label("Activa las que correspondan a tu negocio. Desactívalas si los datos no tienen ese patrón.");
+        seasonHint.setStyle("-fx-font-size: 10px; -fx-text-fill: #7f8c8d;");
+        seasonHint.setWrapText(true);
+
+        seasonBox.getChildren().addAll(seasonLabel,
+                prophetYearlySeasonalityCheck,
+                prophetWeeklySeasonalityCheck,
+                seasonHint);
+
+        card.getChildren().addAll(title, note, new Separator(), cpBox, new Separator(), seasonBox);
+        return card;
+    }
+
+    /**
      * Obtiene las variables según el modelo seleccionado
      */
     private List<String> getVariablesForModel(String modelName) {
@@ -769,6 +1108,16 @@ public class PredictiveController {
             case "Regresión Múltiple" -> List.of(
                     "Ventas Históricas", "Datos de Compras", "Lags (1/7/14/30d)",
                     "Tendencia Temporal", "Estacionalidad", "Día de la Semana"
+            );
+            case "Modelo Ensemble" -> List.of(
+                    "Ventas Históricas", "Lags Temporales", "Tendencia",
+                    "Datos de Compras", "Estacionalidad", "Patrones No-Lineales"
+            );
+            case "XGBoost" -> List.of(
+                    "Ventas diarias", "Lags (1d,7d,14d,30d)", "Medias móviles", "Tendencia"
+            );
+            case "Prophet" -> List.of(
+                    "Ventas diarias", "Estacionalidad anual", "Estacionalidad semanal", "Tendencia"
             );
             default -> List.of("Variable Base", "Variable Tiempo");
         };
@@ -1406,6 +1755,22 @@ public class PredictiveController {
         logTransformCheck = null;
         autoTuneCheck = null;
 
+        // Limpiar controles de Ensemble
+        ensembleBaseModelChecks = null;
+        ensembleMetaLearnerCombo = null;
+        ensembleUseComprasCheck = null;
+
+        // Limpiar controles de XGBoost
+        xgboostNEstimatorsSlider = null;
+        xgboostMaxDepthCombo = null;
+        xgboostLearningRateSlider = null;
+        xgboostSubsampleSlider = null;
+
+        // Limpiar controles de Prophet
+        prophetChangepointSlider = null;
+        prophetYearlySeasonalityCheck = null;
+        prophetWeeklySeasonalityCheck = null;
+
         System.out.println("✓ Configuración de Fase 2 limpiada");
     }
 
@@ -1504,6 +1869,62 @@ public class PredictiveController {
                         hyperparams.put("auto_tune",
                                 autoTuneCheck == null || autoTuneCheck.isSelected());
 
+                        request.setHyperparameters(hyperparams);
+                    }
+
+                    // Hiperparámetros para Ensemble
+                    if ("Modelo Ensemble".equals(selectedModel.title())) {
+                        Map<String, Object> hyperparams = new HashMap<>();
+
+                        // Modelos base seleccionados
+                        if (ensembleBaseModelChecks != null) {
+                            List<String> baseModels = new ArrayList<>();
+                            for (CheckBox cb : ensembleBaseModelChecks) {
+                                if (cb.isSelected()) {
+                                    String apiName = switch (cb.getText()) {
+                                        case "Regresión Lineal" -> "linear";
+                                        case "Regresión Múltiple" -> "multiple_regression";
+                                        case "Random Forest" -> "random_forest";
+                                        default -> cb.getText();
+                                    };
+                                    baseModels.add(apiName);
+                                }
+                            }
+                            if (!baseModels.isEmpty()) {
+                                hyperparams.put("base_models", baseModels);
+                            }
+                        }
+
+                        // Meta-learner
+                        if (ensembleMetaLearnerCombo != null) {
+                            String mlVal = ensembleMetaLearnerCombo.getValue() != null
+                                    && ensembleMetaLearnerCombo.getValue().contains("Promedio")
+                                    ? "weighted_avg" : "ridge";
+                            hyperparams.put("meta_learner", mlVal);
+                        }
+
+                        request.setHyperparameters(hyperparams);
+                    }
+
+                    // Hiperparámetros para XGBoost
+                    if ("XGBoost".equals(selectedModel.title()) && xgboostNEstimatorsSlider != null) {
+                        Map<String, Object> hyperparams = new HashMap<>();
+                        hyperparams.put("n_estimators", (int) xgboostNEstimatorsSlider.getValue());
+                        hyperparams.put("max_depth", Integer.parseInt(xgboostMaxDepthCombo.getValue()));
+                        hyperparams.put("learning_rate",
+                                Math.round(xgboostLearningRateSlider.getValue() * 1000.0) / 1000.0);
+                        hyperparams.put("subsample",
+                                Math.round(xgboostSubsampleSlider.getValue() * 100.0) / 100.0);
+                        request.setHyperparameters(hyperparams);
+                    }
+
+                    // Hiperparámetros para Prophet
+                    if ("Prophet".equals(selectedModel.title()) && prophetChangepointSlider != null) {
+                        Map<String, Object> hyperparams = new HashMap<>();
+                        hyperparams.put("changepoint_prior_scale",
+                                Math.round(prophetChangepointSlider.getValue() * 1000.0) / 1000.0);
+                        hyperparams.put("yearly_seasonality", prophetYearlySeasonalityCheck.isSelected());
+                        hyperparams.put("weekly_seasonality", prophetWeeklySeasonalityCheck.isSelected());
                         request.setHyperparameters(hyperparams);
                     }
 
@@ -1947,8 +2368,10 @@ public class PredictiveController {
             e.printStackTrace();
         }
 
-        // Chart 4: Importancia de Features (solo para Regresión Múltiple)
-        if ("Regresión Múltiple".equals(selectedModel != null ? selectedModel.title() : "")
+        // Chart 4: Importancia de Features (Regresión Múltiple, Ensemble y XGBoost)
+        String selectedTitle = selectedModel != null ? selectedModel.title() : "";
+        if (("Regresión Múltiple".equals(selectedTitle) || "Modelo Ensemble".equals(selectedTitle)
+                || "XGBoost".equals(selectedTitle))
                 && lastTrainResponse != null
                 && lastTrainResponse.getMetrics() != null) {
             Object featureImpObj = lastTrainResponse.getMetrics().get("feature_importance");

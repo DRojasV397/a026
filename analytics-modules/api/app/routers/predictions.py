@@ -430,6 +430,24 @@ async def get_model_types(
                 "name": "Random Forest",
                 "description": "Ensemble de arboles de decision",
                 "use_case": "Patrones complejos no lineales (RF-02.03)"
+            },
+            {
+                "id": "ensemble",
+                "name": "Modelo Ensemble",
+                "description": "Stacking de modelos base con meta-learner Ridge o promedio ponderado",
+                "use_case": "Maximo rendimiento combinando tendencia, lags y no-linealidad"
+            },
+            {
+                "id": "xgboost",
+                "name": "XGBoost",
+                "description": "Gradient Boosting con regularizacion L1/L2 y lags automaticos",
+                "use_case": "Relaciones no lineales complejas con alta precisión"
+            },
+            {
+                "id": "prophet",
+                "name": "Prophet",
+                "description": "Modelo de Facebook para series de negocio con estacionalidad multiple",
+                "use_case": "Negocios con patrones estacionales anuales y semanales claros"
             }
         ],
         "r2_threshold": 0.7,

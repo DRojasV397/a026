@@ -11,6 +11,8 @@ from .sarima_model import SARIMAModel
 from .random_forest import RandomForestModel
 from .xgboost_model import XGBoostModel, XGBoostConfig, TimeSeriesXGBoost
 from .kmeans_clustering import KMeansClustering, ClusteringConfig, ClusteringResult, ClusterInfo
+from .ensemble_model import EnsembleModel, EnsembleConfig, WeightedAvgMetaLearner
+from .prophet_model import ProphetModel
 
 __all__ = [
     'BaseModel',
@@ -29,5 +31,9 @@ __all__ = [
     'KMeansClustering',
     'ClusteringConfig',
     'ClusteringResult',
-    'ClusterInfo'
+    'ClusterInfo',
+    'EnsembleModel',
+    'EnsembleConfig',
+    'WeightedAvgMetaLearner',
+    'ProphetModel',
 ]

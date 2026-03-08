@@ -438,6 +438,9 @@ class TimeSeriesXGBoost(XGBoostModel):
         # Ordenar por fecha
         df = df.sort_values(self.date_column)
 
+        # Guardar historial para forecast con lags reales
+        self._historical_df = df[[self.date_column, self.config.target_column]].copy()
+
         # Crear features
         df_features = self._create_time_features(df, fit=True)
 
@@ -496,7 +499,11 @@ class TimeSeriesXGBoost(XGBoostModel):
         upper_bounds = []
 
         # Para cada fecha futura, predecir y usar el valor para la siguiente
-        current_data = historical_data.copy() if historical_data is not None else None
+        current_data = (
+            historical_data.copy() if historical_data is not None
+            else self._historical_df.copy() if getattr(self, '_historical_df', None) is not None
+            else None
+        )
 
         for date in future_dates:
             # Crear features para esta fecha
@@ -543,3 +550,49 @@ class TimeSeriesXGBoost(XGBoostModel):
             confidence_level=0.95,
             model_type="XGBoost"
         )
+
+    def save(self, filepath: str) -> None:
+        """Guarda el modelo en disco incluyendo el historial."""
+        import pickle
+        model_data = {
+            "model": self.model,
+            "config": self.config,
+            "metrics": self.metrics,
+            "feature_names": self.feature_names,
+            "is_fitted": self.is_fitted,
+            "status": self.status,
+            "created_at": self.created_at,
+            "trained_at": self.trained_at,
+            "training_data_info": self.training_data_info,
+            "date_column": self.date_column,
+            "lags": self.lags,
+            "rolling_windows": self.rolling_windows,
+            "last_date": self.last_date,
+            "last_values": self.last_values,
+            "_historical_df": getattr(self, '_historical_df', None),
+        }
+        with open(filepath, 'wb') as f:
+            pickle.dump(model_data, f)
+        logger.info(f"TimeSeriesXGBoost guardado en {filepath}")
+
+    def load(self, filepath: str) -> None:
+        """Carga el modelo desde disco restaurando el historial."""
+        import pickle
+        with open(filepath, 'rb') as f:
+            model_data = pickle.load(f)
+        self.model = model_data["model"]
+        self.config = model_data["config"]
+        self.metrics = model_data["metrics"]
+        self.feature_names = model_data["feature_names"]
+        self.is_fitted = model_data["is_fitted"]
+        self.status = model_data["status"]
+        self.created_at = model_data["created_at"]
+        self.trained_at = model_data["trained_at"]
+        self.training_data_info = model_data.get("training_data_info", {})
+        self.date_column = model_data.get("date_column", self.date_column)
+        self.lags = model_data.get("lags", self.lags)
+        self.rolling_windows = model_data.get("rolling_windows", self.rolling_windows)
+        self.last_date = model_data.get("last_date", self.last_date)
+        self.last_values = model_data.get("last_values", self.last_values)
+        self._historical_df = model_data.get("_historical_df", None)
+        logger.info(f"TimeSeriesXGBoost cargado desde {filepath}")

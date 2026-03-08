@@ -26,6 +26,8 @@ class ModelType(str, Enum):
     RANDOM_FOREST = "random_forest"
     XGBOOST = "xgboost"
     KMEANS = "kmeans"
+    ENSEMBLE = "ensemble"
+    PROPHET = "prophet"
 
 
 class ModelStatus(str, Enum):

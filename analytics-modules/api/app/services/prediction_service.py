@@ -93,7 +93,7 @@ class PredictionService:
             Tipo de modelo (ej: random_forest)
         """
         # Tipos de modelo conocidos (ordenados por longitud descendente para match correcto)
-        known_types = ['multiple_regression', 'random_forest', 'linear', 'sarima', 'arima']
+        known_types = ['multiple_regression', 'random_forest', 'ensemble', 'xgboost', 'prophet', 'linear', 'sarima', 'arima']
 
         for model_type in known_types:
             if model_key.startswith(model_type + '_'):
@@ -277,10 +277,12 @@ class PredictionService:
                 "issues": issues
             }
 
-        # Para regresion multiple, obtener datos de compras como variable exogena
+        # Para regresion multiple y ensemble, obtener datos de compras
         compras_df = None
         hp = hyperparameters or {}
         if model_type == 'multiple_regression' and hp.get('use_compras', True):
+            compras_df = self.get_compras_data(fecha_inicio, fecha_fin, user_id=user_id)
+        elif model_type == 'ensemble':
             compras_df = self.get_compras_data(fecha_inicio, fecha_fin, user_id=user_id)
 
         # Crear modelo segun tipo
@@ -288,7 +290,8 @@ class PredictionService:
 
         try:
             # Todos los modelos usan train_from_dataframe
-            if model_type in ['arima', 'sarima', 'linear', 'random_forest', 'multiple_regression']:
+            if model_type in ['arima', 'sarima', 'linear', 'random_forest',
+                               'multiple_regression', 'ensemble', 'xgboost', 'prophet']:
                 metrics = model.train_from_dataframe(df)
             else:
                 raise ValueError(f"Tipo de modelo no soportado: {model_type}")
@@ -394,6 +397,23 @@ class PredictionService:
                 compras_data=compras_data,
                 **filtered_params
             )
+        elif model_type == 'ensemble':
+            from app.analytics.models.ensemble_model import EnsembleModel, EnsembleConfig
+            valid_keys = {'base_models', 'meta_learner', 'split_ratio'}
+            filtered_params = {k: v for k, v in params.items() if k in valid_keys}
+            config = EnsembleConfig(**filtered_params)
+            return EnsembleModel(config, compras_data=compras_data)
+        elif model_type == 'xgboost':
+            from app.analytics.models.xgboost_model import TimeSeriesXGBoost
+            valid_keys = {'n_estimators', 'max_depth', 'learning_rate', 'subsample',
+                          'colsample_bytree', 'min_child_weight', 'reg_alpha', 'reg_lambda'}
+            filtered_params = {k: v for k, v in params.items() if k in valid_keys}
+            return TimeSeriesXGBoost(target_column='total', date_column='fecha', **filtered_params)
+        elif model_type == 'prophet':
+            from app.analytics.models.prophet_model import ProphetModel
+            valid_keys = {'changepoint_prior_scale', 'yearly_seasonality', 'weekly_seasonality'}
+            filtered_params = {k: v for k, v in params.items() if k in valid_keys}
+            return ProphetModel(target_column='total', date_column='fecha', **filtered_params)
         else:
             raise ValueError(f"Tipo de modelo no soportado: {model_type}")
 
