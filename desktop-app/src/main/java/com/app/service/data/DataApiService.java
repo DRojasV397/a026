@@ -17,6 +17,7 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.file.Files;
 import java.time.Duration;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -346,6 +347,52 @@ public class DataApiService {
                 })
                 .exceptionally(ex -> {
                     logger.error("Error al obtener catálogo de productos: {}", ex.getMessage());
+                    return null;
+                });
+    }
+
+    /**
+     * Obtiene el historial de transacciones (ventas y/o compras) del usuario.
+     * GET /data/historicos?tipo={tipo}&fecha_inicio={from}&fecha_fin={to}
+     *
+     * @param tipo  "todos", "ventas" o "compras" (null → todos)
+     * @param from  Fecha de inicio del rango (null → sin límite)
+     * @param to    Fecha de fin del rango (null → sin límite)
+     */
+    public CompletableFuture<HistoricoListDTO> getHistoricos(String tipo, LocalDate from, LocalDate to) {
+        StringBuilder url = new StringBuilder(ApiConfig.getDataHistoricosUrl());
+        boolean first = true;
+
+        if (tipo != null && !tipo.isBlank() && !tipo.equalsIgnoreCase("todos")) {
+            url.append(first ? "?" : "&").append("tipo=").append(tipo.toLowerCase());
+            first = false;
+        }
+        if (from != null) {
+            url.append(first ? "?" : "&").append("fecha_inicio=").append(from);
+            first = false;
+        }
+        if (to != null) {
+            url.append(first ? "?" : "&").append("fecha_fin=").append(to);
+        }
+
+        HttpRequest httpRequest = HttpRequest.newBuilder()
+                .uri(URI.create(url.toString()))
+                .header("Authorization", "Bearer " + UserSession.getAccessToken())
+                .timeout(Duration.ofSeconds(30))
+                .GET()
+                .build();
+
+        return httpClient.sendAsync(httpRequest, HttpResponse.BodyHandlers.ofString())
+                .thenApply(response -> {
+                    logger.info("Historicos response HTTP {}", response.statusCode());
+                    if (response.statusCode() == 200) {
+                        return gson.fromJson(response.body(), HistoricoListDTO.class);
+                    }
+                    logger.warn("Historicos failed - HTTP {}: {}", response.statusCode(), response.body());
+                    return null;
+                })
+                .exceptionally(ex -> {
+                    logger.error("Error al obtener históricos: {}", ex.getMessage());
                     return null;
                 });
     }

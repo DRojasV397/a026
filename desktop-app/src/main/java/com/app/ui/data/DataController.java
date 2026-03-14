@@ -33,6 +33,7 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.function.BiFunction;
+import java.util.stream.Collectors;
 
 public class DataController {
 
@@ -878,30 +879,77 @@ public class DataController {
 
     @FXML
     private void onApplyFilters() {
-        // TODO: reemplazar por dataService.query(tipo, desde, hasta, search)
-        //       retorna List<List<String>> o Page<DataRowDTO>
         String tipo   = cmbDataType.getValue();
         LocalDate from = dpHistoryFrom.getValue();
         LocalDate to   = dpHistoryTo.getValue();
-        String search  = txtHistorySearch.getText();
+        String search  = txtHistorySearch.getText().trim().toLowerCase();
 
-        System.out.printf("[DATA] Consulta histórica: tipo=%s, desde=%s, hasta=%s, buscar='%s'%n",
-                tipo, from, to, search);
+        // Estado de carga
+        btnApplyFilters.setDisable(true);
+        btnApplyFilters.setText("Cargando...");
+        historyEmptyState.setVisible(false);
+        historyEmptyState.setManaged(false);
 
-        // Mock: cargamos datos de ejemplo
-        List<ObservableList<String>> mockRows = getMockHistoryRows();
+        dataApiService.getHistoricos(tipo, from, to)
+                .thenAccept(response -> Platform.runLater(() -> {
+                    btnApplyFilters.setDisable(false);
+                    btnApplyFilters.setText("Aplicar filtros");
 
-        boolean empty = mockRows.isEmpty();
+                    if (response == null) {
+                        showError("Error de conexión", "No se pudieron cargar los históricos.\nVerifica que el backend esté activo.");
+                        renderHistoryRows(List.of(), tipo, from, to);
+                        return;
+                    }
+
+                    List<HistoricoItemDTO> items = response.getItems();
+
+                    // Filtro client-side por nombre de producto
+                    if (!search.isEmpty()) {
+                        items = items.stream()
+                                .filter(item -> item.getProducto().toLowerCase().contains(search))
+                                .collect(Collectors.toList());
+                    }
+
+                    List<ObservableList<String>> rows = new ArrayList<>();
+                    for (HistoricoItemDTO item : items) {
+                        rows.add(FXCollections.observableArrayList(
+                                item.getFechaFormatted(),
+                                item.getProducto(),
+                                item.getPrecioFormatted(),
+                                item.getCantidadFormatted(),
+                                item.getTotalFormatted(),
+                                item.getTipo()
+                        ));
+                    }
+
+                    renderHistoryRows(rows, tipo, from, to);
+                }))
+                .exceptionally(ex -> {
+                    Platform.runLater(() -> {
+                        btnApplyFilters.setDisable(false);
+                        btnApplyFilters.setText("Aplicar filtros");
+                        showError("Error de conexión", "No se pudo conectar con el servidor.");
+                        renderHistoryRows(List.of(), tipo, from, to);
+                    });
+                    return null;
+                });
+    }
+
+    private void renderHistoryRows(List<ObservableList<String>> rows, String tipo, LocalDate from, LocalDate to) {
+        boolean empty = rows.isEmpty();
         historyEmptyState.setVisible(empty);
         historyEmptyState.setManaged(empty);
         dataTable.setVisible(!empty);
 
-        dataTable.setItems(FXCollections.observableArrayList(mockRows));
+        dataTable.setItems(FXCollections.observableArrayList(rows));
 
-        lblRecordCount.setText(mockRows.size() + " registros");
-        lblStatRange.setText("\uD83D\uDCC5  Per\u00EDodo: " + from + " → " + to);
-        lblStatTotal.setText("\uD83D\uDCCB  Total: " + mockRows.size() + " filas");
-        lblStatAvg.setText("\uD83D\uDCCA  Tipo: " + tipo);
+        String fromStr = from != null ? from.toString() : "—";
+        String toStr   = to   != null ? to.toString()   : "—";
+
+        lblRecordCount.setText(rows.size() + " registros");
+        lblStatRange.setText("\uD83D\uDCC5  Per\u00EDodo: " + fromStr + " \u2192 " + toStr);
+        lblStatTotal.setText("\uD83D\uDCCB  Total: " + rows.size() + " filas");
+        lblStatAvg.setText("\uD83D\uDCCA  Tipo: " + (tipo != null ? tipo : "Todos"));
     }
 
     @FXML
@@ -1270,6 +1318,8 @@ public class DataController {
         historyInitialized = true;
         setupHistoryTable();
         populateHistoryFilters();
+        // Carga automática al abrir el tab por primera vez
+        Platform.runLater(this::onApplyFilters);
     }
 
     private void initValidationTabIfNeeded() {
@@ -1343,19 +1393,6 @@ public class DataController {
                 new UploadedFileDTO(3L, "ventas_diciembre_2025.xlsx", "XLSX", "VENTAS",
                         LocalDateTime.now().minusDays(30),
                         "ERROR", 1800L, -1, "Ana Mart\u00EDnez")
-        );
-    }
-
-    /**
-     * TODO: sustituir por dataService.query(filtros) → List<DataRowDTO>
-     */
-    private List<ObservableList<String>> getMockHistoryRows() {
-        return List.of(
-                FXCollections.observableArrayList("01/01/2026","Producto A","$150.00","10","$1,500.00","VENTA"),
-                FXCollections.observableArrayList("05/01/2026","Producto B","$80.50","5","$402.50","COMPRA"),
-                FXCollections.observableArrayList("10/01/2026","Servicio C","$2,000.00","1","$2,000.00","VENTA"),
-                FXCollections.observableArrayList("15/01/2026","Producto A","$150.00","20","$3,000.00","VENTA"),
-                FXCollections.observableArrayList("20/01/2026","Producto D","$45.00","100","$4,500.00","COMPRA")
         );
     }
 

@@ -119,6 +119,76 @@
 }
 
 /* ============================================
+   PERIOD SELECTOR
+   ============================================ */
+
+.period-selector-row {
+    -fx-padding: 0 0 12 0;
+}
+
+.period-btn {
+    -fx-background-color: white;
+    -fx-border-color: #D1D5DB;
+    -fx-border-width: 1px;
+    -fx-border-radius: 8px;
+    -fx-background-radius: 8px;
+    -fx-padding: 7 18;
+    -fx-font-size: 13px;
+    -fx-font-weight: 600;
+    -fx-text-fill: #374151;
+    -fx-cursor: hand;
+}
+
+.period-btn:hover {
+    -fx-background-color: #F3F4F6;
+    -fx-border-color: #9CA3AF;
+}
+
+.period-btn-active {
+    -fx-background-color: #3B8EA5;
+    -fx-border-color: #3B8EA5;
+    -fx-text-fill: white;
+}
+
+.period-btn-active:hover {
+    -fx-background-color: #2d7088;
+    -fx-border-color: #2d7088;
+}
+
+/* ============================================
+   KPI CARD (indicadores automáticos)
+   ============================================ */
+
+.kpi-card {
+    -fx-background-color: white;
+    -fx-background-radius: 12px;
+    -fx-border-color: #E5E7EB;
+    -fx-border-width: 1px;
+    -fx-border-radius: 12px;
+    -fx-padding: 20px;
+    -fx-pref-width: 240px;
+    -fx-min-width: 200px;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.04), 4, 0, 0, 1);
+}
+
+.kpi-card:hover {
+    -fx-border-color: #D1D5DB;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.08), 6, 0, 0, 2);
+}
+
+.kpi-label {
+    -fx-font-size: 13px;
+    -fx-font-weight: 600;
+    -fx-text-fill: #6B7280;
+}
+
+.kpi-value {
+    -fx-font-size: 26px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #111827;
+}
+
+/* ============================================
    INDICATOR CARD
    ============================================ */
 

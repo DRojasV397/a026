@@ -16,6 +16,9 @@ buildNumber.properties
 # Kotlin
 .kotlin
 
+# Models
+*.pkl
+
 ### IntelliJ IDEA ###
 .idea/
 *.iws

@@ -1,6 +1,7 @@
 package com.app.ui.profit;
 
 import com.app.model.profitability.CategoryProfitDTO;
+import com.app.model.profitability.IndicatorsResponseDTO;
 import com.app.model.profitability.ProductProfitDTO;
 import com.app.service.profitability.ProfitabilityService;
 import javafx.application.Platform;
@@ -14,7 +15,9 @@ import javafx.scene.control.cell.PropertyValueFactory;
 import javafx.scene.layout.*;
 import javafx.beans.property.SimpleStringProperty;
 import java.text.DecimalFormat;
+import java.time.LocalDate;
 import java.util.*;
+import java.util.function.BiConsumer;
 
 public class ProfitController {
 
@@ -116,46 +119,185 @@ public class ProfitController {
        ========================= */
 
     private void buildIndicatorsUI() {
-        VBox mainCard = new VBox(20);
-        mainCard.getStyleClass().add("main-card");
+        VBox kpiContainer = new VBox(16);
 
-        Label title = new Label("Calculadora de Indicadores Financieros");
-        title.getStyleClass().add("main-title");
+        HBox periodRow = buildPeriodSelector(0,
+                (from, to) -> loadIndicatorsForPeriod(kpiContainer, from, to));
 
-        Label subtitle = new Label("Calcula tus métricas clave");
-        subtitle.getStyleClass().add("main-subtitle");
+        Label roaRoeTitle = new Label("Indicadores Avanzados");
+        roaRoeTitle.getStyleClass().add("card-title");
+        roaRoeTitle.setStyle("-fx-padding: 16 0 0 0;");
 
-        FlowPane indicatorsGrid = new FlowPane(20, 20);
-        indicatorsGrid.getStyleClass().add("indicators-grid");
+        Label roaRoeNote = new Label(
+                "Ingresa activos totales y patrimonio para calcular ROA y ROE");
+        roaRoeNote.getStyleClass().add("main-subtitle");
 
-        VBox marginCard = createIndicatorCard(
-                "💰",
-                "Margen de Utilidad",
-                "(Utilidad Neta / Ingresos) × 100",
-                List.of("Utilidad Neta ($)", "Ingresos Totales ($)"),
-                "MARGIN"
+        FlowPane roaRoeGrid = new FlowPane(20, 20);
+        roaRoeGrid.getStyleClass().add("indicators-grid");
+        roaRoeGrid.getChildren().addAll(
+            createIndicatorCard("📊", "Retorno sobre Activos (ROA)",
+                    "(Utilidad Neta / Activos Totales) × 100",
+                    List.of("Utilidad Neta ($)", "Activos Totales ($)"), "ROA"),
+            createIndicatorCard("📈", "Rendimiento sobre Patrimonio (ROE)",
+                    "(Utilidad Neta / Patrimonio) × 100",
+                    List.of("Utilidad Neta ($)", "Patrimonio ($)"), "ROE")
         );
 
-        VBox roaCard = createIndicatorCard(
-                "📊",
-                "Retorno sobre Activos (ROA)",
-                "(Utilidad Neta / Activos Totales) × 100",
-                List.of("Utilidad Neta ($)", "Activos Totales ($)"),
-                "ROA"
-        );
+        indicatorsView.getChildren().addAll(
+                periodRow, kpiContainer, roaRoeTitle, roaRoeNote, roaRoeGrid);
 
-        VBox roeCard = createIndicatorCard(
-                "📈",
-                "Rendimiento sobre Patrimonio (ROE)",
-                "(Utilidad Neta / Patrimonio) × 100",
-                List.of("Utilidad Neta ($)", "Patrimonio ($)"),
-                "ROE"
-        );
+        // Carga inicial: último mes (índice 0)
+        LocalDate to = LocalDate.now();
+        loadIndicatorsForPeriod(kpiContainer, to.minusDays(30), to);
+    }
 
-        indicatorsGrid.getChildren().addAll(marginCard, roaCard, roeCard);
+    private void loadIndicatorsForPeriod(VBox kpiContainer, LocalDate from, LocalDate to) {
+        kpiContainer.getChildren().clear();
+        Label loading = new Label("Cargando indicadores...");
+        loading.getStyleClass().add("main-subtitle");
+        kpiContainer.getChildren().add(loading);
 
-        mainCard.getChildren().addAll(title, subtitle, indicatorsGrid);
-        indicatorsView.getChildren().add(mainCard);
+        profitabilityService.calculateIndicators(from, to, null, null).thenAccept(response -> {
+            Platform.runLater(() -> {
+                kpiContainer.getChildren().clear();
+
+                if (response == null) {
+                    Label err = new Label("⚠ Error de conexión con el servidor.");
+                    err.getStyleClass().add("main-subtitle");
+                    kpiContainer.getChildren().add(err);
+                    return;
+                }
+
+                if (!response.isSuccess()) {
+                    Label noData = new Label("Sin datos disponibles para el período seleccionado.");
+                    noData.getStyleClass().add("main-subtitle");
+                    kpiContainer.getChildren().add(noData);
+                    return;
+                }
+
+                IndicatorsResponseDTO.IndicatorsData ind = response.getIndicators();
+                IndicatorsResponseDTO.SummaryData sum = response.getSummary();
+
+                // Estado vacío: sin ventas en el período
+                if (sum != null && sum.getTotalVentas() == 0) {
+                    Label noData = new Label("Sin ventas registradas para el período seleccionado.");
+                    noData.getStyleClass().add("main-subtitle");
+                    kpiContainer.getChildren().add(noData);
+                    return;
+                }
+
+                if (sum != null && sum.getPeriodo() != null) {
+                    Label period = new Label("Período: " + sum.getPeriodo()
+                            + "  ·  " + sum.getTotalVentas() + " ventas registradas");
+                    period.getStyleClass().add("main-subtitle");
+                    kpiContainer.getChildren().add(period);
+                }
+
+                FlowPane kpiGrid = new FlowPane(16, 16);
+                kpiGrid.getStyleClass().add("indicators-grid");
+                kpiGrid.getChildren().addAll(
+                    buildKpiCard("Ingresos Totales", fmtMoney(ind.getIngresosTotales()),
+                            "Total ventas del período", "#10B981"),
+                    buildKpiCard("Costos Totales", fmtMoney(ind.getCostosTotales()),
+                            "Costo de mercancía vendida", "#EF4444"),
+                    buildKpiCard("Utilidad Bruta", fmtMoney(ind.getUtilidadBruta()),
+                            marginPill(ind.getMargenBruto()), marginColor(ind.getMargenBruto())),
+                    buildKpiCard("Margen Bruto", pct.format(ind.getMargenBruto()) + "%",
+                            marginPill(ind.getMargenBruto()), marginColor(ind.getMargenBruto())),
+                    buildKpiCard("Utilidad Neta", fmtMoney(ind.getUtilidadNeta()),
+                            marginPill(ind.getMargenNeto()), marginColor(ind.getMargenNeto())),
+                    buildKpiCard("Margen Neto", pct.format(ind.getMargenNeto()) + "%",
+                            marginPill(ind.getMargenNeto()), marginColor(ind.getMargenNeto()))
+                );
+                kpiContainer.getChildren().add(kpiGrid);
+            });
+        });
+    }
+
+    /**
+     * Construye la fila de botones de período reutilizable.
+     * @param defaultIdx  índice del botón activo por defecto (0=mes, 1=3m, 2=6m, 3=año)
+     * @param onLoad      callback invocado con (from, to) al seleccionar un período
+     */
+    private HBox buildPeriodSelector(int defaultIdx, BiConsumer<LocalDate, LocalDate> onLoad) {
+        String[] labels = {"Último mes", "3 meses", "6 meses", "1 año"};
+        int[]    days   = {30, 90, 180, 365};
+
+        HBox row = new HBox(8);
+        row.setAlignment(Pos.CENTER_LEFT);
+        row.getStyleClass().add("period-selector-row");
+
+        Button[] btns = new Button[labels.length];
+        for (int i = 0; i < labels.length; i++) {
+            Button btn = new Button(labels[i]);
+            btn.getStyleClass().add("period-btn");
+            btns[i] = btn;
+            row.getChildren().add(btn);
+        }
+
+        for (int i = 0; i < labels.length; i++) {
+            final int d = days[i];
+            final Button btn = btns[i];
+            btn.setOnAction(e -> {
+                for (Button b : btns) b.getStyleClass().remove("period-btn-active");
+                btn.getStyleClass().add("period-btn-active");
+                LocalDate to = LocalDate.now();
+                onLoad.accept(to.minusDays(d), to);
+            });
+        }
+        btns[defaultIdx].getStyleClass().add("period-btn-active");
+        return row;
+    }
+
+    private VBox buildKpiCard(String title, String value, String statusText, String color) {
+        VBox card = new VBox(8);
+        card.getStyleClass().add("kpi-card");
+
+        Label lbl = new Label(title);
+        lbl.getStyleClass().add("kpi-label");
+
+        Label val = new Label(value);
+        val.getStyleClass().add("kpi-value");
+        val.setStyle("-fx-text-fill: " + color + ";");
+
+        card.getChildren().addAll(lbl, val);
+
+        if (statusText != null && !statusText.isBlank()) {
+            Label pill = new Label(statusText);
+            pill.getStyleClass().addAll("status-pill", statusPillClass(statusText));
+            card.getChildren().add(pill);
+        }
+        return card;
+    }
+
+    private String statusPillClass(String status) {
+        return switch (status) {
+            case "Excelente" -> "pill-excellent";
+            case "Bueno"     -> "pill-good";
+            case "Regular"   -> "pill-warning";
+            case "Bajo"      -> "pill-low";
+            default          -> "pill-negative";
+        };
+    }
+
+    private String fmtMoney(double v) {
+        return (v < 0 ? "-$" : "$") + df.format(Math.abs(v));
+    }
+
+    private String marginPill(double pctVal) {
+        if (pctVal >= 20) return "Excelente";
+        if (pctVal >= 10) return "Bueno";
+        if (pctVal >= 5)  return "Regular";
+        if (pctVal >= 0)  return "Bajo";
+        return "Negativo";
+    }
+
+    private String marginColor(double pctVal) {
+        if (pctVal >= 20) return "#10B981";
+        if (pctVal >= 10) return "#3B82F6";
+        if (pctVal >= 5)  return "#F59E0B";
+        if (pctVal >= 0)  return "#F97316";
+        return "#EF4444";
     }
 
     private VBox createIndicatorCard(String emoji, String name, String formula,
@@ -369,55 +511,78 @@ public class ProfitController {
         Label title = new Label("📦 Análisis de Rentabilidad por Producto");
         title.getStyleClass().add("section-title");
 
-        Label loadingLabel = new Label("Cargando datos de rentabilidad...");
-        loadingLabel.getStyleClass().add("main-subtitle");
-        productView.getChildren().addAll(title, loadingLabel);
+        VBox contentContainer = new VBox(16);
 
-        // Cargar datos reales de la API de forma asíncrona
-        profitabilityService.getProductProfitability().thenAccept(response -> {
+        // Default: "1 año" (índice 3) para mostrar todo el histórico
+        HBox periodRow = buildPeriodSelector(3,
+                (from, to) -> loadProductProfitForPeriod(contentContainer, from, to));
+
+        productView.getChildren().addAll(title, periodRow, contentContainer);
+
+        // Carga inicial: último año
+        LocalDate to = LocalDate.now();
+        loadProductProfitForPeriod(contentContainer, to.minusDays(365), to);
+    }
+
+    private void loadProductProfitForPeriod(VBox container, LocalDate from, LocalDate to) {
+        container.getChildren().clear();
+        Label loading = new Label("Cargando datos de rentabilidad...");
+        loading.getStyleClass().add("main-subtitle");
+        container.getChildren().add(loading);
+
+        profitabilityService.getProductProfitability(from, to).thenAccept(response -> {
             Platform.runLater(() -> {
-                productView.getChildren().clear();
-                productView.getChildren().add(title);
+                container.getChildren().clear();
 
                 if (response == null || !response.isSuccess()) {
-                    Label errorLabel = new Label("⚠ No se pudieron cargar los datos. Verifique la conexión.");
-                    errorLabel.getStyleClass().add("main-subtitle");
-                    productView.getChildren().add(errorLabel);
+                    Label err = new Label("⚠ No se pudieron cargar los datos. Verifique la conexión.");
+                    err.getStyleClass().add("main-subtitle");
+                    container.getChildren().add(err);
                     return;
                 }
 
-                List<ProductProfit> productList = mapProductDTOs(response.getProductos());
+                // Filtrar solo productos con ventas en el período
+                List<com.app.model.profitability.ProductProfitDTO> conVentas =
+                        response.getProductos().stream()
+                                .filter(p -> p.getIngresos() > 0)
+                                .toList();
 
+                if (conVentas.isEmpty()) {
+                    Label noData = new Label("Sin ventas registradas para el período seleccionado.");
+                    noData.getStyleClass().add("main-subtitle");
+                    container.getChildren().add(noData);
+                    return;
+                }
+
+                List<ProductProfit> productList = mapProductDTOs(conVentas);
                 VBox tableCard = createProductTableCardWithData(productList);
 
                 HBox summaryRow = new HBox(20);
                 summaryRow.setAlignment(Pos.TOP_LEFT);
 
-                // Top 4 más rentables (mayor margen)
-                List<TopProduct> topList = response.getProductos().stream()
+                List<TopProduct> topList = conVentas.stream()
                         .sorted((a, b) -> Double.compare(b.getMargen(), a.getMargen()))
                         .limit(4)
                         .map(p -> new TopProduct(p.getNombre(), p.getMargenFormateado()))
                         .toList();
 
-                // Productos con pérdidas
-                List<TopProduct> lossList = response.getProductos().stream()
+                List<TopProduct> lossList = conVentas.stream()
                         .filter(p -> p.getUtilidad() < 0)
-                        .sorted(Comparator.comparingDouble(ProductProfitDTO::getUtilidad))
+                        .sorted(Comparator.comparingDouble(com.app.model.profitability.ProductProfitDTO::getUtilidad))
                         .limit(4)
                         .map(p -> new TopProduct(p.getNombre(), p.getUtilidadFormateada()))
                         .toList();
 
-                VBox topProducts = createSummaryTable("🏆 Top 4 Productos Más Rentables",
-                        "Margen", topList);
-                VBox attentionProducts = createAttentionTable("⚠ Productos que Requieren Atención",
-                        "Pérdida", lossList);
+                VBox topProducts = createSummaryTable(
+                        "🏆 Top 4 Productos Más Rentables", "Margen", topList);
+                VBox attentionProducts = createAttentionTable(
+                        "⚠ Productos que Requieren Atención", "Pérdida", lossList);
 
                 HBox.setHgrow(topProducts, Priority.ALWAYS);
                 HBox.setHgrow(attentionProducts, Priority.ALWAYS);
                 summaryRow.getChildren().addAll(topProducts, attentionProducts);
 
-                productView.getChildren().addAll(tableCard, summaryRow);
+                container.getChildren().addAll(tableCard, summaryRow);
             });
         });
     }
@@ -598,52 +763,76 @@ public class ProfitController {
         Label title = new Label("🗂️ Análisis de Rentabilidad por Categoría");
         title.getStyleClass().add("section-title");
 
-        Label loadingLabel = new Label("Cargando datos de categorías...");
-        loadingLabel.getStyleClass().add("main-subtitle");
-        categoryView.getChildren().addAll(title, loadingLabel);
+        VBox contentContainer = new VBox(16);
 
-        profitabilityService.getCategoryProfitability().thenAccept(response -> {
+        HBox periodRow = buildPeriodSelector(3,
+                (from, to) -> loadCategoryProfitForPeriod(contentContainer, from, to));
+
+        categoryView.getChildren().addAll(title, periodRow, contentContainer);
+
+        LocalDate to = LocalDate.now();
+        loadCategoryProfitForPeriod(contentContainer, to.minusDays(365), to);
+    }
+
+    private void loadCategoryProfitForPeriod(VBox container, LocalDate from, LocalDate to) {
+        container.getChildren().clear();
+        Label loading = new Label("Cargando datos de categorías...");
+        loading.getStyleClass().add("main-subtitle");
+        container.getChildren().add(loading);
+
+        profitabilityService.getCategoryProfitability(from, to).thenAccept(response -> {
             Platform.runLater(() -> {
-                categoryView.getChildren().clear();
-                categoryView.getChildren().add(title);
+                container.getChildren().clear();
 
                 if (response == null || !response.isSuccess()) {
-                    Label errorLabel = new Label("⚠ No se pudieron cargar los datos. Verifique la conexión.");
-                    errorLabel.getStyleClass().add("main-subtitle");
-                    categoryView.getChildren().add(errorLabel);
+                    Label err = new Label("⚠ No se pudieron cargar los datos. Verifique la conexión.");
+                    err.getStyleClass().add("main-subtitle");
+                    container.getChildren().add(err);
                     return;
                 }
 
-                List<ProductProfit> categoryList = mapCategoryDTOs(response.getCategorias());
+                // Filtrar solo categorías con ventas en el período
+                List<com.app.model.profitability.CategoryProfitDTO> conVentas =
+                        response.getCategorias().stream()
+                                .filter(c -> c.getIngresos() > 0)
+                                .toList();
 
+                if (conVentas.isEmpty()) {
+                    Label noData = new Label("Sin ventas registradas para el período seleccionado.");
+                    noData.getStyleClass().add("main-subtitle");
+                    container.getChildren().add(noData);
+                    return;
+                }
+
+                List<ProductProfit> categoryList = mapCategoryDTOs(conVentas);
                 VBox tableCard = createTableCard("Detalle de Categorías", categoryList);
 
                 HBox summaryRow = new HBox(20);
                 summaryRow.setAlignment(Pos.TOP_LEFT);
 
-                List<TopProduct> topList = response.getCategorias().stream()
+                List<TopProduct> topList = conVentas.stream()
                         .sorted((a, b) -> Double.compare(b.getMargen(), a.getMargen()))
                         .limit(4)
                         .map(c -> new TopProduct(c.getNombre(), c.getMargenFormateado()))
                         .toList();
 
-                List<TopProduct> lossList = response.getCategorias().stream()
+                List<TopProduct> lossList = conVentas.stream()
                         .filter(c -> c.getUtilidad() < 0)
-                        .sorted(Comparator.comparingDouble(CategoryProfitDTO::getUtilidad))
+                        .sorted(Comparator.comparingDouble(com.app.model.profitability.CategoryProfitDTO::getUtilidad))
                         .limit(4)
                         .map(c -> new TopProduct(c.getNombre(), c.getUtilidadFormateada()))
                         .toList();
 
-                VBox topCategories = createSummaryTable("🏆 Top 4 Categorías Más Rentables",
-                        "Margen", topList);
-                VBox attentionCategories = createAttentionTable("⚠ Categorías que Requieren Atención",
-                        "Pérdida", lossList);
+                VBox topCategories = createSummaryTable(
+                        "🏆 Top 4 Categorías Más Rentables", "Margen", topList);
+                VBox attentionCategories = createAttentionTable(
+                        "⚠ Categorías que Requieren Atención", "Pérdida", lossList);
 
                 HBox.setHgrow(topCategories, Priority.ALWAYS);
                 HBox.setHgrow(attentionCategories, Priority.ALWAYS);
                 summaryRow.getChildren().addAll(topCategories, attentionCategories);
 
-                categoryView.getChildren().addAll(tableCard, summaryRow);
+                container.getChildren().addAll(tableCard, summaryRow);
             });
         });
     }

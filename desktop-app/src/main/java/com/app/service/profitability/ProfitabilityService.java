@@ -13,6 +13,7 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
+import java.time.LocalDate;
 import java.util.concurrent.CompletableFuture;
 
 /**
@@ -47,14 +48,19 @@ public class ProfitabilityService {
     // ── Productos ─────────────────────────────────────────────────────────────
 
     /**
-     * GET /profitability/products
-     * Obtiene rentabilidad de todos los productos (último mes por defecto).
+     * GET /profitability/products[?fecha_inicio=&fecha_fin=]
+     * Obtiene rentabilidad de todos los productos para el rango dado.
      */
-    public CompletableFuture<ProductsResponseDTO> getProductProfitability() {
+    public CompletableFuture<ProductsResponseDTO> getProductProfitability(LocalDate from, LocalDate to) {
+        StringBuilder url = new StringBuilder(ApiConfig.getProfitabilityProductsUrl());
+        boolean first = true;
+        if (from != null) { url.append("?fecha_inicio=").append(from); first = false; }
+        if (to   != null) { url.append(first ? "?" : "&").append("fecha_fin=").append(to); }
+
         HttpRequest request = HttpRequest.newBuilder()
-                .uri(URI.create(ApiConfig.getProfitabilityProductsUrl()))
+                .uri(URI.create(url.toString()))
                 .header("Authorization", authHeader())
-                .timeout(Duration.ofSeconds(30))
+                .timeout(Duration.ofSeconds(60))
                 .GET()
                 .build();
 
@@ -71,6 +77,11 @@ public class ProfitabilityService {
                     logger.error("Error en getProductProfitability: {}", ex.getMessage());
                     return null;
                 });
+    }
+
+    /** Versión sin fechas — usa el default del backend (último mes). */
+    public CompletableFuture<ProductsResponseDTO> getProductProfitability() {
+        return getProductProfitability(null, null);
     }
 
     /**
@@ -103,14 +114,19 @@ public class ProfitabilityService {
     // ── Categorías ────────────────────────────────────────────────────────────
 
     /**
-     * GET /profitability/categories
-     * Obtiene rentabilidad por categoría.
+     * GET /profitability/categories[?fecha_inicio=&fecha_fin=]
+     * Obtiene rentabilidad por categoría para el rango dado.
      */
-    public CompletableFuture<CategoriesResponseDTO> getCategoryProfitability() {
+    public CompletableFuture<CategoriesResponseDTO> getCategoryProfitability(LocalDate from, LocalDate to) {
+        StringBuilder url = new StringBuilder(ApiConfig.getProfitabilityCategoriesUrl());
+        boolean first = true;
+        if (from != null) { url.append("?fecha_inicio=").append(from); first = false; }
+        if (to   != null) { url.append(first ? "?" : "&").append("fecha_fin=").append(to); }
+
         HttpRequest request = HttpRequest.newBuilder()
-                .uri(URI.create(ApiConfig.getProfitabilityCategoriesUrl()))
+                .uri(URI.create(url.toString()))
                 .header("Authorization", authHeader())
-                .timeout(Duration.ofSeconds(30))
+                .timeout(Duration.ofSeconds(60))
                 .GET()
                 .build();
 
@@ -127,6 +143,11 @@ public class ProfitabilityService {
                     logger.error("Error en getCategoryProfitability: {}", ex.getMessage());
                     return null;
                 });
+    }
+
+    /** Versión sin fechas — usa el default del backend (último mes). */
+    public CompletableFuture<CategoriesResponseDTO> getCategoryProfitability() {
+        return getCategoryProfitability(null, null);
     }
 
     // ── Ranking ───────────────────────────────────────────────────────────────
@@ -167,12 +188,16 @@ public class ProfitabilityService {
 
     /**
      * POST /profitability/indicators
-     * Calcula indicadores financieros. Opcionalmente acepta activos y patrimonio para ROA/ROE.
+     * Calcula indicadores financieros para el rango de fechas dado.
+     * Opcionalmente acepta activos y patrimonio para ROA/ROE.
      */
     public CompletableFuture<IndicatorsResponseDTO> calculateIndicators(
+            LocalDate fechaInicio, LocalDate fechaFin,
             Double activosTotales, Double patrimonio) {
 
         JsonObject body = new JsonObject();
+        if (fechaInicio != null)    body.addProperty("fecha_inicio", fechaInicio.toString());
+        if (fechaFin != null)       body.addProperty("fecha_fin", fechaFin.toString());
         if (activosTotales != null) body.addProperty("activos_totales", activosTotales);
         if (patrimonio != null)     body.addProperty("patrimonio", patrimonio);
 
@@ -199,8 +224,8 @@ public class ProfitabilityService {
                 });
     }
 
-    /** Versión sin parámetros — solo calcula ingresos y costos del último mes */
+    /** Versión sin parámetros — calcula el último mes por defecto */
     public CompletableFuture<IndicatorsResponseDTO> calculateIndicators() {
-        return calculateIndicators(null, null);
+        return calculateIndicators(null, null, null, null);
     }
 }

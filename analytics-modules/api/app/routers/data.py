@@ -5,7 +5,8 @@ Endpoints para RF-01: Gestion de Datos de Ventas y Compras.
 
 from fastapi import APIRouter, Depends, File, UploadFile, HTTPException, Query
 from sqlalchemy.orm import Session
-from typing import Optional
+from typing import Optional, List
+from datetime import date
 import logging
 
 from app.database import get_db
@@ -17,7 +18,7 @@ from app.schemas.data_upload import (
     HistorialCargaResponse
 )
 from app.middleware.auth_middleware import get_current_active_user
-from app.models import Usuario
+from app.models import Usuario, Venta, DetalleVenta, Compra, DetalleCompra, Producto
 
 logger = logging.getLogger(__name__)
 
@@ -238,6 +239,83 @@ async def delete_upload(
         raise HTTPException(status_code=404, detail="Upload no encontrado")
 
     return {"message": "Upload eliminado exitosamente"}
+
+
+@router.get("/historicos")
+async def get_historicos(
+    fecha_inicio: Optional[date] = Query(None, description="Fecha inicial (YYYY-MM-DD)"),
+    fecha_fin: Optional[date] = Query(None, description="Fecha final (YYYY-MM-DD)"),
+    tipo: Optional[str] = Query(None, description="Filtrar por tipo: todos, ventas o compras"),
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(get_current_active_user)
+):
+    """
+    Obtiene el historial de transacciones (ventas y/o compras) del usuario autenticado.
+
+    Devuelve filas planas con: fecha, producto, precioUnitario, cantidad, total, tipo.
+
+    - **fecha_inicio**: Filtrar desde esta fecha
+    - **fecha_fin**: Filtrar hasta esta fecha
+    - **tipo**: 'todos', 'ventas' o 'compras'
+    """
+    tipo_lower = (tipo or "todos").lower()
+    rows = []
+
+    if tipo_lower in ("todos", "ventas"):
+        try:
+            q = (
+                db.query(Venta.fecha, Producto.nombre, DetalleVenta.precioUnitario, DetalleVenta.cantidad)
+                .join(Venta, DetalleVenta.idVenta == Venta.idVenta)
+                .join(Producto, DetalleVenta.idProducto == Producto.idProducto)
+                .filter(Venta.creadoPor == current_user.idUsuario)
+            )
+            if fecha_inicio:
+                q = q.filter(Venta.fecha >= fecha_inicio)
+            if fecha_fin:
+                q = q.filter(Venta.fecha <= fecha_fin)
+            for fecha, nombre, precio_unit, cantidad in q.order_by(Venta.fecha.desc()).all():
+                precio = float(precio_unit or 0)
+                qty = float(cantidad or 0)
+                rows.append({
+                    "fecha": fecha.isoformat() if fecha else "",
+                    "producto": nombre or "",
+                    "precioUnitario": precio,
+                    "cantidad": qty,
+                    "total": round(precio * qty, 2),
+                    "tipo": "VENTA",
+                })
+        except Exception as e:
+            logger.error(f"Error consultando ventas históricas: {e}")
+
+    if tipo_lower in ("todos", "compras"):
+        try:
+            q = (
+                db.query(Compra.fecha, Producto.nombre, DetalleCompra.costo, DetalleCompra.cantidad, DetalleCompra.subtotal)
+                .join(Compra, DetalleCompra.idCompra == Compra.idCompra)
+                .join(Producto, DetalleCompra.idProducto == Producto.idProducto)
+                .filter(Compra.creadoPor == current_user.idUsuario)
+            )
+            if fecha_inicio:
+                q = q.filter(Compra.fecha >= fecha_inicio)
+            if fecha_fin:
+                q = q.filter(Compra.fecha <= fecha_fin)
+            for fecha, nombre, costo, cantidad, subtotal in q.order_by(Compra.fecha.desc()).all():
+                precio = float(costo or 0)
+                qty = float(cantidad or 0)
+                total = float(subtotal) if subtotal is not None else round(precio * qty, 2)
+                rows.append({
+                    "fecha": fecha.isoformat() if fecha else "",
+                    "producto": nombre or "",
+                    "precioUnitario": precio,
+                    "cantidad": qty,
+                    "total": total,
+                    "tipo": "COMPRA",
+                })
+        except Exception as e:
+            logger.error(f"Error consultando compras históricas: {e}")
+
+    rows.sort(key=lambda r: r["fecha"], reverse=True)
+    return {"items": rows, "total": len(rows)}
 
 
 @router.get("/sheets/{upload_id}")

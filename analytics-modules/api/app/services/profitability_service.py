@@ -183,25 +183,21 @@ class ProfitabilityService:
         fecha_fin: date
     ) -> Tuple[bool, List[str]]:
         """
-        Valida que existan datos completos para el analisis.
-        RN-06.01: Validacion de datos completos.
+        Valida que existan datos suficientes para el analisis.
+        Solo requiere que haya ventas; las compras son opcionales (el costo
+        se puede estimar desde costoUnitario del producto si no hay compras).
 
         Returns:
             Tuple[bool, List[str]]: (es_valido, lista_problemas)
         """
         issues = []
 
-        # Verificar ventas en el periodo
+        # Verificar ventas en el periodo (requerido)
         ventas = self.venta_repo.get_by_rango_fechas(fecha_inicio, fecha_fin)
         if not ventas:
             issues.append(f"No hay ventas registradas entre {fecha_inicio} y {fecha_fin}")
 
-        # Verificar compras en el periodo
-        compras = self.compra_repo.get_by_rango_fechas(fecha_inicio, fecha_fin)
-        if not compras:
-            issues.append(f"No hay compras registradas entre {fecha_inicio} y {fecha_fin}")
-
-        # Verificar productos
+        # Verificar productos (requerido)
         productos = self.producto_repo.get_all()
         if not productos:
             issues.append("No hay productos registrados")
@@ -233,15 +229,6 @@ class ProfitabilityService:
             fecha_fin = date.today()
         if fecha_inicio is None:
             fecha_inicio = fecha_fin - timedelta(days=30)
-
-        # Validar datos
-        valid, issues = self.validate_data_completeness(fecha_inicio, fecha_fin)
-        if not valid:
-            return {
-                "success": False,
-                "error": "Datos incompletos",
-                "issues": issues
-            }
 
         # Obtener ventas del periodo
         ventas = self.venta_repo.get_by_rango_fechas(fecha_inicio, fecha_fin)
@@ -392,7 +379,7 @@ class ProfitabilityService:
         # Obtener ventas del producto en el periodo
         ventas_query = self.db.query(
             func.sum(DetalleVenta.cantidad).label('total_cantidad'),
-            func.sum(DetalleVenta.subtotal).label('total_ingresos'),
+            func.sum(DetalleVenta.cantidad * DetalleVenta.precioUnitario).label('total_ingresos'),
             func.avg(DetalleVenta.precioUnitario).label('precio_promedio')
         ).join(
             Venta, DetalleVenta.idVenta == Venta.idVenta
@@ -406,7 +393,7 @@ class ProfitabilityService:
         compras_query = self.db.query(
             func.sum(DetalleCompra.cantidad).label('total_cantidad'),
             func.sum(DetalleCompra.subtotal).label('total_costo'),
-            func.avg(DetalleCompra.precioUnitario).label('costo_promedio')
+            func.avg(DetalleCompra.costo).label('costo_promedio')
         ).join(
             Compra, DetalleCompra.idCompra == Compra.idCompra
         ).filter(
@@ -423,8 +410,8 @@ class ProfitabilityService:
         # Calcular costo
         if compras_query.costo_promedio:
             costo_unitario = float(compras_query.costo_promedio)
-        elif producto.precioCompra:
-            costo_unitario = float(producto.precioCompra)
+        elif producto.costoUnitario:
+            costo_unitario = float(producto.costoUnitario)
         else:
             # Estimar costo como 60% del precio de venta
             costo_unitario = precio_promedio * 0.6 if precio_promedio > 0 else 0

@@ -132,6 +132,10 @@ public class ApiConfig {
         return BASE_URL + "/data/historial";
     }
 
+    public static String getDataHistoricosUrl() {
+        return BASE_URL + "/data/historicos";
+    }
+
     // ── Products Catalog ────────────────────────────────────────────────────
 
     public static String getProductosUrl() {
