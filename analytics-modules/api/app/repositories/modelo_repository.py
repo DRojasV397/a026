@@ -38,6 +38,24 @@ class ModeloRepository(BaseRepository[Modelo]):
             logger.error(f"Error al buscar modelos por tipo: {str(e)}")
             return []
 
+    def get_by_usuario(self, user_id: int) -> List[Modelo]:
+        """
+        Obtiene modelos creados por un usuario, ordenados por fecha desc.
+
+        Args:
+            user_id: ID del usuario
+
+        Returns:
+            List[Modelo]: Lista de modelos del usuario
+        """
+        try:
+            return self.db.query(Modelo).filter(
+                Modelo.creadoPor == user_id
+            ).order_by(desc(Modelo.creadoEn)).all()
+        except Exception as e:
+            logger.error(f"Error al obtener modelos por usuario: {str(e)}")
+            return []
+
     def get_recientes(self, limite: int = 10) -> List[Modelo]:
         """
         Obtiene los modelos mas recientes.

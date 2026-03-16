@@ -12,6 +12,7 @@ public class Phase2ConfigDTO {
     private LocalDate endDate;
     private List<String> selectedVariables;
     private int predictionHorizon; // en meses
+    private String modelName;
 
     // Validaciones
     private boolean hasEnoughData;
@@ -25,6 +26,7 @@ public class Phase2ConfigDTO {
         this.hasValidVariables = false;
         this.hasNoErrors = true;
         this.errorMessage = "";
+        this.modelName = "";
     }
 
     // Getters y Setters
@@ -51,6 +53,9 @@ public class Phase2ConfigDTO {
         this.predictionHorizon = predictionHorizon;
         updateValidations();
     }
+
+    public String getModelName() { return modelName; }
+    public void setModelName(String modelName) { this.modelName = modelName != null ? modelName : ""; }
 
     public int getTrainPercentage() {
         return 70; }

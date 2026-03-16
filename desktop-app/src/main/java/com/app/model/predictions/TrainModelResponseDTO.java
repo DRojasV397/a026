@@ -38,11 +38,21 @@ public class TrainModelResponseDTO {
     private List<String> issues;
 
     public boolean isSuccess() { return success; }
+    public void setSuccess(boolean success) { this.success = success; }
+
     public Integer getModelId() { return modelId; }
     public String getModelKey() { return modelKey; }
+    public void setModelKey(String modelKey) { this.modelKey = modelKey; }
+
     public String getModelType() { return modelType; }
+    public void setModelType(String modelType) { this.modelType = modelType; }
+
     public Map<String, Object> getMetrics() { return metrics; }
+    public void setMetrics(Map<String, Object> metrics) { this.metrics = metrics; }
+
     public Boolean getMeetsR2Threshold() { return meetsR2Threshold; }
+    public void setMeetsR2Threshold(Boolean meetsR2Threshold) { this.meetsR2Threshold = meetsR2Threshold; }
+
     public String getRecommendation() { return recommendation; }
     public Integer getTrainingSamples() { return trainingSamples; }
     public Integer getTestSamples() { return testSamples; }

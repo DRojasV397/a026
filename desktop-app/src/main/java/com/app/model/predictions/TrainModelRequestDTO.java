@@ -20,6 +20,9 @@ public class TrainModelRequestDTO {
     @SerializedName("hyperparameters")
     private Object hyperparameters;
 
+    @SerializedName("nombre")
+    private String nombre;
+
     public TrainModelRequestDTO(String modelType, String fechaInicio, String fechaFin) {
         this.modelType = modelType;
         this.fechaInicio = fechaInicio;
@@ -37,4 +40,7 @@ public class TrainModelRequestDTO {
 
     public Object getHyperparameters() { return hyperparameters; }
     public void setHyperparameters(Object hyperparameters) { this.hyperparameters = hyperparameters; }
+
+    public String getNombre() { return nombre; }
+    public void setNombre(String nombre) { this.nombre = nombre; }
 }

@@ -171,28 +171,36 @@ class ParametroEscenarioRepository(BaseRepository[ParametroEscenario]):
             logger.error(f"Error al obtener parametros del escenario: {str(e)}")
             return []
 
-    def get_parametro(self, id_escenario: int, parametro: str) -> Optional[ParametroEscenario]:
+    def get_parametro(self, id_escenario: int, parametro: str,
+                      producto_id: Optional[int] = None) -> Optional[ParametroEscenario]:
         """
         Obtiene un parametro especifico de un escenario.
 
         Args:
             id_escenario: ID del escenario
             parametro: Nombre del parametro
+            producto_id: ID del producto (None = parametro global)
 
         Returns:
             Optional[ParametroEscenario]: Parametro encontrado o None
         """
         try:
-            return self.db.query(ParametroEscenario).filter(
+            q = self.db.query(ParametroEscenario).filter(
                 ParametroEscenario.idEscenario == id_escenario,
                 ParametroEscenario.parametro == parametro
-            ).first()
+            )
+            if producto_id is None:
+                q = q.filter(ParametroEscenario.productoId == None)
+            else:
+                q = q.filter(ParametroEscenario.productoId == producto_id)
+            return q.first()
         except Exception as e:
             logger.error(f"Error al obtener parametro: {str(e)}")
             return None
 
     def actualizar_parametro(
-        self, id_escenario: int, parametro: str, valor_actual: float, valor_base: float = None
+        self, id_escenario: int, parametro: str, valor_actual: float,
+        valor_base: float = None, producto_id: Optional[int] = None
     ) -> bool:
         """
         Actualiza o crea un parametro de escenario.
@@ -202,13 +210,14 @@ class ParametroEscenarioRepository(BaseRepository[ParametroEscenario]):
             parametro: Nombre del parametro
             valor_actual: Valor actual/modificado
             valor_base: Valor base (opcional, si no se da usa valor_actual)
+            producto_id: ID del producto (None = parametro global, valor = override)
 
         Returns:
             bool: True si se actualizo exitosamente
         """
         try:
             from decimal import Decimal
-            param = self.get_parametro(id_escenario, parametro)
+            param = self.get_parametro(id_escenario, parametro, producto_id)
             if param:
                 param.valorActual = Decimal(str(valor_actual)) if valor_actual is not None else None
                 if valor_base is not None:
@@ -217,6 +226,7 @@ class ParametroEscenarioRepository(BaseRepository[ParametroEscenario]):
                 param = ParametroEscenario(
                     idEscenario=id_escenario,
                     parametro=parametro,
+                    productoId=producto_id,
                     valorBase=Decimal(str(valor_base)) if valor_base is not None else Decimal(str(valor_actual)),
                     valorActual=Decimal(str(valor_actual)) if valor_actual is not None else None
                 )
@@ -227,6 +237,25 @@ class ParametroEscenarioRepository(BaseRepository[ParametroEscenario]):
             self.db.rollback()
             logger.error(f"Error al actualizar parametro: {str(e)}")
             return False
+
+    def get_product_overrides(self, id_escenario: int) -> List[ParametroEscenario]:
+        """
+        Obtiene todos los overrides por producto de un escenario.
+
+        Args:
+            id_escenario: ID del escenario
+
+        Returns:
+            List[ParametroEscenario]: Parametros donde productoId IS NOT NULL
+        """
+        try:
+            return self.db.query(ParametroEscenario).filter(
+                ParametroEscenario.idEscenario == id_escenario,
+                ParametroEscenario.productoId != None
+            ).all()
+        except Exception as e:
+            logger.error(f"Error al obtener overrides por producto: {str(e)}")
+            return []
 
     def eliminar_parametros_escenario(self, id_escenario: int) -> int:
         """

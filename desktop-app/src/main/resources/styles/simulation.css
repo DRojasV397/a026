@@ -303,6 +303,26 @@
 .chart-title-icon { -fx-font-size: 16px; }
 .chart-subtitle-sim{ -fx-font-size: 12px; -fx-text-fill: #94A3B8; }
 
+/* ── Aggregation toggle (Día / Semana / Mes) ──────────────────── */
+.agg-btn-first, .agg-btn-mid, .agg-btn-last {
+    -fx-background-color: #f1f5f9;
+    -fx-text-fill: #64748b;
+    -fx-font-size: 12px;
+    -fx-padding: 5 12;
+    -fx-cursor: hand;
+    -fx-border-color: #e2e8f0;
+    -fx-border-width: 1;
+}
+.agg-btn-first { -fx-background-radius: 6 0 0 6; -fx-border-radius: 6 0 0 6; }
+.agg-btn-mid   { -fx-background-radius: 0;        -fx-border-radius: 0;        -fx-border-insets: 0 0 0 -1; }
+.agg-btn-last  { -fx-background-radius: 0 6 6 0;  -fx-border-radius: 0 6 6 0;  -fx-border-insets: 0 0 0 -1; }
+.agg-btn-first:selected, .agg-btn-mid:selected, .agg-btn-last:selected {
+    -fx-background-color: #3b82f6;
+    -fx-text-fill: white;
+    -fx-border-color: #2563eb;
+    -fx-font-weight: bold;
+}
+
 /* Gráficas (FIX #3 — colores explícitos para barras y líneas) */
 .sim-line-chart, .sim-bar-chart {
     -fx-background-color: transparent; -fx-padding: 0;
@@ -470,3 +490,45 @@
 }
 .cmp-kpi-value { -fx-font-size: 18px; -fx-font-weight: bold; }
 .cmp-kpi-label { -fx-font-size: 12px; -fx-text-fill: #64748B; }
+
+/* ═══════════════════════════════════════════════════════════════════
+   EXCEPCIONES POR PRODUCTO — búsqueda + override cards
+═══════════════════════════════════════════════════════════════════ */
+
+/* Texto de ayuda dentro de sección de formulario */
+.form-block-hint { -fx-font-size: 12px; -fx-text-fill: #94A3B8; }
+
+/* Dropdown de resultados de búsqueda */
+.search-results-dropdown {
+    -fx-background-color: white;
+    -fx-border-color: #E2E8F0; -fx-border-radius: 6; -fx-border-width: 1;
+    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.10), 10, 0, 0, 3);
+}
+
+.search-result-item {
+    -fx-padding: 8 12; -fx-cursor: hand;
+    -fx-font-size: 13px; -fx-text-fill: #1E293B;
+    -fx-background-color: white;
+}
+.search-result-item:hover { -fx-background-color: #F1F5F9; }
+
+/* Badge opcional (SKU) */
+.optional-badge {
+    -fx-background-color: #DBEAFE; -fx-text-fill: #1D4ED8;
+    -fx-padding: 2 8; -fx-background-radius: 10;
+    -fx-font-size: 11px; -fx-font-weight: bold;
+}
+
+/* Card de override por producto */
+.override-card {
+    -fx-background-color: #F8FAFC;
+    -fx-border-color: #E2E8F0; -fx-border-radius: 8; -fx-border-width: 1;
+    -fx-padding: 14;
+    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.04), 6, 0, 0, 2);
+}
+
+.override-card-header { -fx-padding: 0 0 8 0; }
+
+.override-product-name {
+    -fx-font-size: 13px; -fx-font-weight: bold; -fx-text-fill: #1E293B;
+}

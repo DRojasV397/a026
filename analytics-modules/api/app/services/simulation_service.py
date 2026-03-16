@@ -210,6 +210,217 @@ class SimulationService:
                 "error": f"Error al crear escenario: {str(e)}"
             }
 
+    def _get_base_by_period(self, horizonte_meses: int, granularidad: str) -> list:
+        """
+        Devuelve lista de (date, ventas_base, compras_base) para el horizonte de simulacion,
+        usando datos historicos reales como base para aportar varianza natural periodo a periodo.
+        """
+        from collections import defaultdict
+
+        today = date.today()
+        hist_inicio = today - timedelta(days=400)   # ~13 meses de historia
+        ventas  = self.venta_repo.get_by_rango_fechas(hist_inicio, today)
+        compras = self.compra_repo.get_by_rango_fechas(hist_inicio, today)
+
+        def as_date(d):
+            return d.date() if hasattr(d, "date") and callable(d.date) else d
+
+        if granularidad == "semanal":
+            v_by_week, c_by_week = defaultdict(float), defaultdict(float)
+            for v in ventas:
+                d = as_date(v.fecha); wk = d - timedelta(days=d.weekday())
+                v_by_week[wk] += float(v.total or 0)
+            for c in compras:
+                d = as_date(c.fecha); wk = d - timedelta(days=d.weekday())
+                c_by_week[wk] += float(c.total or 0)
+
+            hist_weeks = sorted(v_by_week.keys())
+            avg_v = float(np.mean(list(v_by_week.values()))) if v_by_week else 0
+            avg_c = float(np.mean(list(c_by_week.values()))) if c_by_week else avg_v * 0.6
+
+            result = []
+            for i in range(horizonte_meses * 4):
+                future_wk = today + timedelta(weeks=i + 1)
+                same_wk_last_yr = future_wk - timedelta(weeks=52)
+                if hist_weeks:
+                    nearest = min(hist_weeks, key=lambda w: abs((w - same_wk_last_yr).days))
+                    v_val = v_by_week.get(nearest, avg_v)
+                    c_val = c_by_week.get(nearest, avg_c)
+                else:
+                    v_val, c_val = avg_v, avg_c
+                result.append((future_wk, max(0.0, v_val), max(0.0, c_val)))
+            return result
+
+        elif granularidad == "diaria":
+            v_by_day, c_by_day = defaultdict(float), defaultdict(float)
+            for v in ventas:
+                d = as_date(v.fecha); v_by_day[d] += float(v.total or 0)
+            for c in compras:
+                d = as_date(c.fecha); c_by_day[d] += float(c.total or 0)
+
+            all_days = sorted(v_by_day.keys())
+            avg_v = float(np.mean(list(v_by_day.values()))) if v_by_day else 0
+            avg_c = float(np.mean(list(c_by_day.values()))) if c_by_day else avg_v * 0.6
+
+            result = []
+            for i in range(horizonte_meses * 30):
+                future_day = today + timedelta(days=i + 1)
+                same_day_last_yr = future_day - timedelta(days=365)
+                if all_days:
+                    nearest = min(all_days, key=lambda d2: abs((d2 - same_day_last_yr).days))
+                    v_val = v_by_day.get(nearest, avg_v)
+                    c_val = c_by_day.get(nearest, avg_c)
+                else:
+                    v_val, c_val = avg_v, avg_c
+                result.append((future_day, max(0.0, v_val), max(0.0, c_val)))
+            return result
+
+        else:  # mensual
+            v_by_month, c_by_month = defaultdict(float), defaultdict(float)
+            for v in ventas:
+                d = as_date(v.fecha); mk = date(d.year, d.month, 1)
+                v_by_month[mk] += float(v.total or 0)
+            for c in compras:
+                d = as_date(c.fecha); mk = date(d.year, d.month, 1)
+                c_by_month[mk] += float(c.total or 0)
+
+            avg_v = float(np.mean(list(v_by_month.values()))) if v_by_month else 0
+            avg_c = float(np.mean(list(c_by_month.values()))) if c_by_month else avg_v * 0.6
+
+            result = []
+            for i in range(horizonte_meses):
+                future_m = today.replace(day=1) + relativedelta(months=i)
+                hist_m   = future_m - relativedelta(years=1)
+                v_val = v_by_month.get(hist_m, avg_v)
+                c_val = c_by_month.get(hist_m, avg_c)
+                result.append((future_m, max(0.0, v_val), max(0.0, c_val)))
+            return result
+
+    def _get_product_ventas_by_period(
+        self, horizonte_meses: int, granularidad: str, product_ids: list
+    ) -> dict:
+        """
+        Devuelve un dict {producto_id: [(date, ventas_base, compras_base), ...]}
+        con datos historicos por producto para los productos indicados.
+        """
+        from collections import defaultdict
+
+        today = date.today()
+        hist_inicio = today - timedelta(days=400)
+
+        # Obtener detalles de ventas y compras filtrados por productos
+        ventas_det = (
+            self.db.query(DetalleVenta, Venta)
+            .join(Venta, DetalleVenta.idVenta == Venta.idVenta)
+            .filter(
+                DetalleVenta.idProducto.in_(product_ids),
+                Venta.fecha >= hist_inicio,
+                Venta.fecha <= today
+            )
+            .all()
+        )
+        compras_det = (
+            self.db.query(DetalleCompra, Compra)
+            .join(Compra, DetalleCompra.idCompra == Compra.idCompra)
+            .filter(
+                DetalleCompra.idProducto.in_(product_ids),
+                Compra.fecha >= hist_inicio,
+                Compra.fecha <= today
+            )
+            .all()
+        )
+
+        def as_date(d):
+            return d.date() if hasattr(d, "date") and callable(d.date) else d
+
+        # Acumular por (producto, periodo)
+        def dv_subtotal(dv):
+            return float(dv.cantidad or 0) * float(dv.precioUnitario or 0)
+
+        def dc_subtotal(dc):
+            return float(dc.subtotal or 0) or float(dc.costo or 0) * float(dc.cantidad or 0)
+
+        if granularidad == "semanal":
+            v_map = defaultdict(lambda: defaultdict(float))
+            c_map = defaultdict(lambda: defaultdict(float))
+            for dv, v in ventas_det:
+                d = as_date(v.fecha); wk = d - timedelta(days=d.weekday())
+                v_map[dv.idProducto][wk] += dv_subtotal(dv)
+            for dc, c in compras_det:
+                d = as_date(c.fecha); wk = d - timedelta(days=d.weekday())
+                c_map[dc.idProducto][wk] += dc_subtotal(dc)
+
+            result = {}
+            for pid in product_ids:
+                pv = v_map[pid]; pc = c_map[pid]
+                avg_v = float(np.mean(list(pv.values()))) if pv else 0
+                avg_c = float(np.mean(list(pc.values()))) if pc else avg_v * 0.6
+                periods = []
+                hist_weeks = sorted(pv.keys())
+                for i in range(horizonte_meses * 4):
+                    future_wk = today + timedelta(weeks=i + 1)
+                    same_wk_last_yr = future_wk - timedelta(weeks=52)
+                    if hist_weeks:
+                        nearest = min(hist_weeks, key=lambda w: abs((w - same_wk_last_yr).days))
+                        v_val = pv.get(nearest, avg_v)
+                        c_val = pc.get(nearest, avg_c)
+                    else:
+                        v_val, c_val = avg_v, avg_c
+                    periods.append((future_wk, max(0.0, v_val), max(0.0, c_val)))
+                result[pid] = periods
+            return result
+
+        elif granularidad == "diaria":
+            v_map = defaultdict(lambda: defaultdict(float))
+            c_map = defaultdict(lambda: defaultdict(float))
+            for dv, v in ventas_det:
+                d = as_date(v.fecha); v_map[dv.idProducto][d] += dv_subtotal(dv)
+            for dc, c in compras_det:
+                d = as_date(c.fecha); c_map[dc.idProducto][d] += dc_subtotal(dc)
+
+            result = {}
+            for pid in product_ids:
+                pv = v_map[pid]; pc = c_map[pid]
+                avg_v = float(np.mean(list(pv.values()))) if pv else 0
+                avg_c = float(np.mean(list(pc.values()))) if pc else avg_v * 0.6
+                all_days = sorted(pv.keys())
+                periods = []
+                for i in range(horizonte_meses * 30):
+                    future_day = today + timedelta(days=i + 1)
+                    same_day_last_yr = future_day - timedelta(days=365)
+                    if all_days:
+                        nearest = min(all_days, key=lambda d2: abs((d2 - same_day_last_yr).days))
+                        v_val = pv.get(nearest, avg_v); c_val = pc.get(nearest, avg_c)
+                    else:
+                        v_val, c_val = avg_v, avg_c
+                    periods.append((future_day, max(0.0, v_val), max(0.0, c_val)))
+                result[pid] = periods
+            return result
+
+        else:  # mensual
+            v_map = defaultdict(lambda: defaultdict(float))
+            c_map = defaultdict(lambda: defaultdict(float))
+            for dv, v in ventas_det:
+                d = as_date(v.fecha); mk = date(d.year, d.month, 1)
+                v_map[dv.idProducto][mk] += dv_subtotal(dv)
+            for dc, c in compras_det:
+                d = as_date(c.fecha); mk = date(d.year, d.month, 1)
+                c_map[dc.idProducto][mk] += dc_subtotal(dc)
+
+            result = {}
+            for pid in product_ids:
+                pv = v_map[pid]; pc = c_map[pid]
+                avg_v = float(np.mean(list(pv.values()))) if pv else 0
+                avg_c = float(np.mean(list(pc.values()))) if pc else avg_v * 0.6
+                periods = []
+                for i in range(horizonte_meses):
+                    future_m = today.replace(day=1) + relativedelta(months=i)
+                    hist_m = future_m - relativedelta(years=1)
+                    v_val = pv.get(hist_m, avg_v); c_val = pc.get(hist_m, avg_c)
+                    periods.append((future_m, max(0.0, v_val), max(0.0, c_val)))
+                result[pid] = periods
+            return result
+
     def _initialize_base_parameters(self, id_escenario: int, periodos: int):
         """Inicializa parametros base del escenario con datos historicos."""
         # Obtener datos historicos
@@ -268,6 +479,7 @@ class SimulationService:
             nombre = param.get("parametro") or param.get("nombre")
             valor_actual = param.get("valorActual") or param.get("valor")
             valor_base = param.get("valorBase")
+            producto_id = param.get("productoId") or param.get("producto_id")
 
             # RN-05.01: Validar variacion maxima para parametros de variacion
             if nombre and nombre.startswith("variacion_"):
@@ -285,9 +497,10 @@ class SimulationService:
             try:
                 valor_actual_float = float(valor_actual) if valor_actual is not None else 0.0
                 valor_base_float = float(valor_base) if valor_base is not None else None
+                producto_id_int = int(producto_id) if producto_id is not None else None
 
                 if self.parametro_repo.actualizar_parametro(
-                    id_escenario, nombre, valor_actual_float, valor_base_float
+                    id_escenario, nombre, valor_actual_float, valor_base_float, producto_id_int
                 ):
                     modificados += 1
                 else:
@@ -306,7 +519,8 @@ class SimulationService:
     def run_simulation(
         self,
         id_escenario: int,
-        guardar_resultados: bool = True
+        guardar_resultados: bool = True,
+        granularidad: str = "semanal"
     ) -> Dict[str, Any]:
         """
         Ejecuta la simulacion de un escenario.
@@ -326,53 +540,107 @@ class SimulationService:
                 "error": "Escenario no encontrado"
             }
 
-        # Obtener parametros
+        # Obtener parametros (solo globales: productoId IS NULL)
         parametros = self.parametro_repo.get_by_escenario(id_escenario)
         params_dict = {}
         for p in parametros:
-            params_dict[p.parametro] = {
-                "base": float(p.valorBase or 0),
-                "actual": float(p.valorActual or 0)
-            }
+            if p.productoId is None:
+                params_dict[p.parametro] = {
+                    "base": float(p.valorBase or 0),
+                    "actual": float(p.valorActual or 0)
+                }
 
-        # Obtener variaciones
-        var_precio = params_dict.get("variacion_precio", {}).get("actual", 0) / 100
-        var_costo = params_dict.get("variacion_costo", {}).get("actual", 0) / 100
+        # Obtener variaciones globales
+        var_precio  = params_dict.get("variacion_precio",  {}).get("actual", 0) / 100
+        var_costo   = params_dict.get("variacion_costo",   {}).get("actual", 0) / 100
         var_demanda = params_dict.get("variacion_demanda", {}).get("actual", 0) / 100
+        periodos    = int(params_dict.get("periodos_simulacion", {}).get("actual", escenario.horizonteMeses or 6))
 
-        ingresos_base = params_dict.get("ingresos_base_mensual", {}).get("base", 0)
-        costos_base = params_dict.get("costos_base_mensual", {}).get("base", 0)
-        periodos = int(params_dict.get("periodos_simulacion", {}).get("actual", escenario.horizonteMeses or 6))
+        # Cargar overrides por producto
+        overrides = self.parametro_repo.get_product_overrides(id_escenario)
+        override_map: Dict[int, Dict[str, float]] = {}
+        for o in overrides:
+            pid = o.productoId
+            if pid not in override_map:
+                override_map[pid] = {}
+            override_map[pid][o.parametro] = float(o.valorActual or 0)
+
+        # Obtener base histórica real por periodo (aporta varianza natural)
+        base_periods = self._get_base_by_period(periodos, granularidad)
+
+        # Fallback si no hay datos históricos: usar promedios planos guardados en BD
+        if not base_periods:
+            ingresos_flat = params_dict.get("ingresos_base_mensual", {}).get("base", 0)
+            costos_flat   = params_dict.get("costos_base_mensual",   {}).get("base", 0)
+            fecha_inicio  = date.today().replace(day=1)
+            base_periods  = [
+                (fecha_inicio + relativedelta(months=i), ingresos_flat, costos_flat)
+                for i in range(periodos)
+            ]
+
+        # Si hay overrides, obtener datos históricos por producto
+        product_periods: Dict[int, list] = {}
+        if override_map:
+            product_periods = self._get_product_ventas_by_period(
+                periodos, granularidad, list(override_map.keys())
+            )
 
         # Generar resultados por periodo
         resultados: List[SimulationResult] = []
-        fecha_inicio = date.today().replace(day=1)
-
         total_ingresos = 0
-        total_costos = 0
+        total_costos   = 0
         total_utilidad = 0
 
-        for i in range(periodos):
-            periodo_date = fecha_inicio + relativedelta(months=i)
+        # Factores globales (constantes; la varianza viene del dato base historico)
+        factor_ingresos_global = (1 + var_precio) * (1 + var_demanda)
+        factor_costos_global   = (1 + var_costo)  * (1 + var_demanda * 0.7)
 
-            # Aplicar variaciones
-            # Ingresos: afectados por precio y demanda
-            factor_ingresos = (1 + var_precio) * (1 + var_demanda)
-            ingresos_sim = ingresos_base * factor_ingresos
+        # Pre-calcular factores por producto override (indexados por periodo)
+        # Los factores de override se calculan período a período sumando ingresos/costos diferenciados
+        override_ingresos_by_period: Dict[int, float] = {}  # {period_idx: ingresos_override}
+        override_costos_by_period:   Dict[int, float] = {}
 
-            # Costos: afectados por costo y demanda (mas demanda = mas costos variables)
-            factor_costos = (1 + var_costo) * (1 + var_demanda * 0.7)  # 70% de los costos son variables
-            costos_sim = costos_base * factor_costos
+        if override_map:
+            for pid, ov_params in override_map.items():
+                ov_var_precio  = ov_params.get("variacion_precio",  var_precio  * 100) / 100
+                ov_var_costo   = ov_params.get("variacion_costo",   var_costo   * 100) / 100
+                ov_var_demanda = ov_params.get("variacion_demanda", var_demanda * 100) / 100
+                ov_factor_ing  = (1 + ov_var_precio) * (1 + ov_var_demanda)
+                ov_factor_cos  = (1 + ov_var_costo)  * (1 + ov_var_demanda * 0.7)
 
-            # Utilidad
+                prod_data = product_periods.get(pid, [])
+                for idx, (_, v_base, c_base) in enumerate(prod_data):
+                    override_ingresos_by_period[idx] = (
+                        override_ingresos_by_period.get(idx, 0) + v_base * ov_factor_ing
+                    )
+                    override_costos_by_period[idx] = (
+                        override_costos_by_period.get(idx, 0) + c_base * ov_factor_cos
+                    )
+
+            # Calcular base de productos con override para restarlo de la base global
+            # Asumimos que los overrides representan una fracción del total
+            # Si no hay datos de producto, mantenemos sin ajuste
+
+        for idx, (periodo_date, ingresos_base, costos_base) in enumerate(base_periods):
+            if override_map and override_ingresos_by_period:
+                # Ingresos mixtos: override products + remaining global
+                override_ing = override_ingresos_by_period.get(idx, 0)
+                override_cos = override_costos_by_period.get(idx, 0)
+                # Productos sin override: usar factores globales sobre la base restante
+                remaining_ing = max(0.0, ingresos_base - override_ing / factor_ingresos_global) * factor_ingresos_global
+                remaining_cos = max(0.0, costos_base  - override_cos  / factor_costos_global)  * factor_costos_global
+                ingresos_sim = override_ing + remaining_ing
+                costos_sim   = override_cos + remaining_cos
+            else:
+                ingresos_sim = ingresos_base * factor_ingresos_global
+                costos_sim   = costos_base   * factor_costos_global
+
             utilidad_base = ingresos_base - costos_base
-            utilidad_sim = ingresos_sim - costos_sim
+            utilidad_sim  = ingresos_sim  - costos_sim
 
-            # Margen
             margen_base = (utilidad_base / ingresos_base * 100) if ingresos_base > 0 else 0
-            margen_sim = (utilidad_sim / ingresos_sim * 100) if ingresos_sim > 0 else 0
+            margen_sim  = (utilidad_sim  / ingresos_sim  * 100) if ingresos_sim  > 0 else 0
 
-            # Crear resultados
             results_periodo = [
                 SimulationResult(
                     periodo=periodo_date,
@@ -404,13 +672,13 @@ class SimulationService:
                     valor_base=margen_base,
                     valor_simulado=margen_sim,
                     diferencia=margen_sim - margen_base,
-                    porcentaje_cambio=margen_sim - margen_base  # Para margen, diferencia absoluta
+                    porcentaje_cambio=margen_sim - margen_base
                 )
             ]
 
             resultados.extend(results_periodo)
             total_ingresos += ingresos_sim
-            total_costos += costos_sim
+            total_costos   += costos_sim
             total_utilidad += utilidad_sim
 
         # Guardar resultados si se solicita
@@ -443,7 +711,8 @@ class SimulationService:
                 "precio": f"{var_precio * 100:+.1f}%",
                 "costo": f"{var_costo * 100:+.1f}%",
                 "demanda": f"{var_demanda * 100:+.1f}%"
-            }
+            },
+            "overrides_por_producto": len(override_map)
         }
 
         return {
@@ -618,6 +887,16 @@ class SimulationService:
                         "peor_escenario": peor
                     })
 
+        # Obtener parámetros de variación por escenario (para mostrar en comparativa)
+        parametros_por_escenario = {}
+        for esc in escenarios_data:
+            params = self.parametro_repo.get_by_escenario(esc.idEscenario)
+            variaciones = {}
+            for p in params:
+                if p.productoId is None:
+                    variaciones[p.parametro] = float(p.valorActual or 0)
+            parametros_por_escenario[esc.idEscenario] = variaciones
+
         # Calcular resumen por escenario
         resumen = {}
         for esc in escenarios_data:
@@ -654,6 +933,7 @@ class SimulationService:
             ],
             "comparaciones": comparaciones,
             "resumen_por_escenario": resumen,
+            "parametros_por_escenario": parametros_por_escenario,
             "mejor_escenario": {
                 "id": mejor_general,
                 "nombre": resumen[mejor_general]["nombre"],
@@ -769,7 +1049,8 @@ class SimulationService:
                     nuevo.idEscenario,
                     param.parametro,
                     float(param.valorActual or 0),
-                    float(param.valorBase or 0)
+                    float(param.valorBase or 0),
+                    param.productoId
                 )
 
             return {

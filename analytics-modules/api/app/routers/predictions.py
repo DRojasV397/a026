@@ -38,6 +38,10 @@ class TrainModelRequest(BaseModel):
         None,
         description="Hiperparametros del modelo"
     )
+    nombre: Optional[str] = Field(
+        None,
+        description="Nombre descriptivo para identificar el modelo"
+    )
 
     class Config:
         json_schema_extra = {
@@ -48,7 +52,8 @@ class TrainModelRequest(BaseModel):
                 "hyperparameters": {
                     "n_estimators": 100,
                     "max_depth": 10
-                }
+                },
+                "nombre": "Modelo ventas Q1 2024"
             }
         }
 
@@ -149,6 +154,20 @@ class PredictionHistoryItem(BaseModel):
     confianza: Optional[float] = None
 
 
+class UserModelResponse(BaseModel):
+    """Modelo entrenado por el usuario."""
+    model_id: int
+    version_id: int
+    model_key: Optional[str] = None
+    model_type: Optional[str] = None
+    nombre: Optional[str] = None
+    precision: Optional[float] = None
+    metricas: Optional[dict] = None
+    estado: Optional[str] = None
+    fecha_entrenamiento: Optional[str] = None
+    is_loaded: bool = False
+
+
 class SalesDataRequest(BaseModel):
     """Request para obtener datos de ventas."""
     fecha_inicio: Optional[date] = None
@@ -197,7 +216,8 @@ async def train_model(
         fecha_inicio=fecha_inicio,
         fecha_fin=fecha_fin,
         hyperparameters=request.hyperparameters,
-        user_id=current_user.idUsuario
+        user_id=current_user.idUsuario,
+        nombre=request.nombre
     )
 
     return TrainModelResponse(**result)
@@ -277,6 +297,22 @@ async def list_models(
     service = PredictionService(db)
     models = service.get_trained_models()
     return [ModelInfoResponse(**m) for m in models]
+
+
+@router.get(
+    "/models/user",
+    response_model=List[UserModelResponse],
+    summary="Modelos del usuario autenticado",
+    description="Obtiene todos los modelos entrenados por el usuario actual, con su última versión activa."
+)
+async def get_user_models(
+    db: Session = Depends(get_db),
+    current_user: TokenData = Depends(get_current_user)
+):
+    """Obtiene modelos del usuario autenticado."""
+    service = PredictionService(db)
+    models = service.get_user_models(current_user.idUsuario)
+    return [UserModelResponse(**m) for m in models]
 
 
 @router.get(

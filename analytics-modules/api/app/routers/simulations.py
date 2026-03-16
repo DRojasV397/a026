@@ -30,6 +30,7 @@ class ModifyParameterItem(BaseModel):
     parametro: str = Field(..., description="Nombre del parametro")
     valorActual: float = Field(..., description="Valor actual/modificado del parametro")
     valorBase: Optional[float] = Field(None, description="Valor base del parametro (opcional)")
+    productoId: Optional[int] = Field(None, description="ID del producto (None = global, valor = override por producto)")
 
 
 class ModifyParametersRequest(BaseModel):
@@ -40,6 +41,10 @@ class ModifyParametersRequest(BaseModel):
 class RunSimulationRequest(BaseModel):
     """Request para ejecutar simulacion."""
     guardar_resultados: bool = Field(default=True, description="Guardar resultados en BD")
+    granularidad: str = Field(
+        default="semanal",
+        description="Granularidad temporal de los resultados: diaria, semanal, mensual"
+    )
 
 
 class CompareRequest(BaseModel):
@@ -151,7 +156,8 @@ async def run_simulation(
     service = SimulationService(db)
     result = service.run_simulation(
         id_escenario=id_escenario,
-        guardar_resultados=request.guardar_resultados
+        guardar_resultados=request.guardar_resultados,
+        granularidad=request.granularidad
     )
 
     if not result.get("success"):

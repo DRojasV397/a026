@@ -362,6 +362,33 @@ public class PredictionService {
     }
 
     /**
+     * Obtiene los modelos entrenados por el usuario autenticado.
+     * GET /predictions/models/user
+     */
+    public CompletableFuture<List<UserModelDTO>> getUserModels() {
+        HttpRequest httpRequest = HttpRequest.newBuilder()
+                .uri(URI.create(ApiConfig.getPredictionsUserModelsUrl()))
+                .header("Authorization", "Bearer " + UserSession.getAccessToken())
+                .timeout(Duration.ofSeconds(15))
+                .GET()
+                .build();
+
+        return httpClient.sendAsync(httpRequest, HttpResponse.BodyHandlers.ofString())
+                .thenApply(response -> {
+                    if (response.statusCode() == 200) {
+                        return gson.fromJson(response.body(),
+                                new TypeToken<List<UserModelDTO>>(){}.getType());
+                    }
+                    logger.warn("GetUserModels failed - HTTP {}", response.statusCode());
+                    return List.<UserModelDTO>of();
+                })
+                .exceptionally(ex -> {
+                    logger.error("Error al obtener modelos del usuario: {}", ex.getMessage());
+                    return List.of();
+                });
+    }
+
+    /**
      * Obtiene datos de ventas agregados para análisis.
      * POST /predictions/sales-data
      */

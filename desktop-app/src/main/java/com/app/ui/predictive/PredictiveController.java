@@ -8,6 +8,7 @@ import com.app.model.predictions.ForecastRequestDTO;
 import com.app.model.predictions.ForecastResponseDTO;
 import com.app.model.predictions.TrainModelRequestDTO;
 import com.app.model.predictions.TrainModelResponseDTO;
+import com.app.model.predictions.UserModelDTO;
 import com.app.service.alerts.WarningService;
 import com.app.service.predictions.PredictionService;
 import com.app.ui.components.cards.ResultKpiCard;
@@ -110,11 +111,17 @@ public class PredictiveController {
 
     private List<StackPane> phases;
 
+    @FXML private VBox savedModelsSection;
+    @FXML private FlowPane savedModelsContainer;
+    @FXML private Label savedModelsEmptyLabel;
+
     private int currentPhaseIndex = 0;
     private PredictiveModelDTO selectedModel;
+    private UserModelDTO selectedSavedModel;
     private boolean validPhase2 = false;
     private boolean validPhase3 = false;
     private final List<VBox> modelCards = new ArrayList<>();
+    private final List<VBox> savedModelCards = new ArrayList<>();
 
     private RotateTransition loadingRotation;
 
@@ -132,6 +139,7 @@ public class PredictiveController {
         updatePhaseView();
 
         loadModels();
+        loadUserModels();
         clearDetailPanel();
         updateFooterState();
     }
@@ -248,6 +256,123 @@ public class PredictiveController {
         }
     }
 
+    private void loadUserModels() {
+        if (savedModelsContainer == null || savedModelsSection == null) return;
+        predictionService.getUserModels()
+                .thenAccept(models -> Platform.runLater(() -> {
+                    savedModelCards.clear();
+                    savedModelsContainer.getChildren().clear();
+                    if (models == null || models.isEmpty()) {
+                        if (savedModelsEmptyLabel != null) {
+                            savedModelsEmptyLabel.setVisible(true);
+                            savedModelsEmptyLabel.setManaged(true);
+                        }
+                        savedModelsContainer.setVisible(false);
+                        savedModelsContainer.setManaged(false);
+                    } else {
+                        if (savedModelsEmptyLabel != null) {
+                            savedModelsEmptyLabel.setVisible(false);
+                            savedModelsEmptyLabel.setManaged(false);
+                        }
+                        savedModelsContainer.setVisible(true);
+                        savedModelsContainer.setManaged(true);
+                        for (UserModelDTO model : models) {
+                            VBox card = createSavedModelCard(model);
+                            savedModelCards.add(card);
+                            savedModelsContainer.getChildren().add(card);
+                        }
+                    }
+                }))
+                .exceptionally(ex -> {
+                    System.out.println("Error cargando modelos del usuario: " + ex.getMessage());
+                    return null;
+                });
+    }
+
+    private VBox createSavedModelCard(UserModelDTO model) {
+        VBox card = new VBox(10);
+        card.getStyleClass().add("model-card");
+        card.setMaxWidth(280);
+
+        String displayName = (model.getNombre() != null && !model.getNombre().isEmpty())
+                ? model.getNombre()
+                : model.getModelType();
+        Label nameLabel = new Label(displayName);
+        nameLabel.getStyleClass().add("model-title");
+        nameLabel.setWrapText(true);
+
+        Label typeLabel = new Label("Tipo: " + (model.getModelType() != null ? model.getModelType() : "N/A"));
+        typeLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: #7f8c8d;");
+
+        String r2Text = model.getPrecision() > 0
+                ? String.format("R² = %.4f", model.getPrecision())
+                : "R² = N/A";
+        Label r2Label = new Label(r2Text);
+        r2Label.setStyle("-fx-font-size: 12px; -fx-font-weight: bold; -fx-text-fill: #27ae60;");
+
+        String fecha = model.getFechaEntrenamiento() != null
+                ? model.getFechaEntrenamiento().substring(0, Math.min(10, model.getFechaEntrenamiento().length()))
+                : "—";
+        Label fechaLabel = new Label("Entrenado: " + fecha);
+        fechaLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: #95a5a6;");
+
+        // Badge de estado
+        Label estadoBadge = new Label(model.getEstado() != null ? model.getEstado() : "Activo");
+        estadoBadge.setStyle("-fx-background-color: #e8f8f5; -fx-text-fill: #27ae60; "
+                + "-fx-padding: 2 8; -fx-background-radius: 10; -fx-font-size: 10px;");
+
+        Button useBtn = new Button("Usar este modelo");
+        useBtn.setMaxWidth(Double.MAX_VALUE);
+        useBtn.getStyleClass().add("select-button");
+        useBtn.setOnAction(e -> {
+            selectSavedModel(model, card, useBtn);
+            e.consume();
+        });
+        card.setOnMouseClicked(e -> selectSavedModel(model, card, useBtn));
+
+        card.getChildren().addAll(nameLabel, typeLabel, r2Label, fechaLabel, estadoBadge,
+                new Separator(), useBtn);
+        return card;
+    }
+
+    private void selectSavedModel(UserModelDTO model, VBox card, Button btn) {
+        selectedSavedModel = model;
+        selectedModel = findModelDTOByType(model.getModelType());
+
+        savedModelCards.forEach(c -> c.getStyleClass().remove("selected"));
+        card.getStyleClass().add("selected");
+        btn.setText("Seleccionado");
+
+        // Deseleccionar nuevos modelos
+        modelCards.forEach(c -> {
+            c.getStyleClass().remove("selected");
+            Button selectBtn = (Button) c.lookup(".select-button");
+            if (selectBtn != null) selectBtn.setText("Seleccionar");
+        });
+
+        updateFooterState();
+    }
+
+    private PredictiveModelDTO findModelDTOByType(String modelType) {
+        if (modelType == null) return null;
+        for (PredictiveModelDTO dto : getMockPredictiveModels()) {
+            if (modelType.equals(getApiModelType(dto.title()))) {
+                return dto;
+            }
+        }
+        return getMockPredictiveModels().get(0);
+    }
+
+    private TrainModelResponseDTO buildTrainResponseFromSavedModel(UserModelDTO saved) {
+        TrainModelResponseDTO response = new TrainModelResponseDTO();
+        response.setSuccess(true);
+        response.setModelKey(saved.getModelKey());
+        response.setModelType(saved.getModelType());
+        response.setMetrics(saved.getMetricas());
+        response.setMeetsR2Threshold(saved.getPrecision() >= 0.5);
+        return response;
+    }
+
     /* =========================
        CARD UI
        ========================= */
@@ -328,11 +453,19 @@ public class PredictiveController {
                 !selectedModel.title().equals(model.title()));
 
         selectedModel = model;
+        selectedSavedModel = null; // limpiar selección de modelo guardado
 
         modelCards.forEach(card -> card.getStyleClass().remove("selected"));
         modelCards.forEach(card ->
                 ((Button) card.lookup(".select-button")).setText("Seleccionar")
         );
+
+        // Deseleccionar saved model cards
+        savedModelCards.forEach(c -> {
+            c.getStyleClass().remove("selected");
+            Button btn = (Button) c.lookup(".select-button");
+            if (btn != null) btn.setText("Usar este modelo");
+        });
 
         selectedCard.getStyleClass().add("selected");
         button.setText("Seleccionado");
@@ -445,13 +578,24 @@ public class PredictiveController {
 
 
     private void goToNextPhase() {
+        // Saltar directo a Fase 4 si hay un modelo guardado seleccionado
+        if (currentPhaseIndex == 0 && selectedSavedModel != null) {
+            lastTrainResponse = buildTrainResponseFromSavedModel(selectedSavedModel);
+            currentPhaseIndex = 3;
+            updatePhases();
+            updatePhaseView();
+            updateFooterState();
+            showPhase4Results();
+            return;
+        }
+
         if (currentPhaseIndex < phases.size() - 1) {
             currentPhaseIndex++;
             updatePhases();
             updatePhaseView();
             updateFooterState();
 
-            if (currentPhaseIndex == 1) { // se soliicta la fase 2 y aún no es valida la información seleccionada
+            if (currentPhaseIndex == 1) { // se solicita la fase 2 y aún no es valida la información seleccionada
                 if (phase2Config == null || !validPhase2) {
                     buildPhase2UI(); // Primera vez
                 }
@@ -484,8 +628,8 @@ public class PredictiveController {
 
     private boolean canProceed() {
         return switch (currentPhaseIndex) {
-            case 0 -> selectedModel != null; // Fase 1
-            case 1 -> validPhase2;                  // Fase 2 (ejemplo)
+            case 0 -> selectedModel != null || selectedSavedModel != null; // Fase 1
+            case 1 -> validPhase2;                  // Fase 2
             case 2 -> validPhase3;                  // Fase 3
             case 3 -> true;                  // Fase 4
             default -> true;
@@ -541,6 +685,10 @@ public class PredictiveController {
 
         if (selectedModel == null) return;
 
+        // 0. NOMBRE DEL MODELO
+        VBox nameCard = createModelNameCard();
+        parametersContainer.getChildren().add(nameCard);
+
         // 1. RANGO DE FECHAS
         VBox dateRangeCard = createDateRangeCard();
         parametersContainer.getChildren().add(dateRangeCard);
@@ -578,6 +726,31 @@ public class PredictiveController {
 
         // 6. CARGAR SIDEBAR
         buildPhase2Sidebar();
+    }
+
+    /**
+     * 0. NOMBRE DEL MODELO (opcional)
+     */
+    private VBox createModelNameCard() {
+        VBox card = new VBox(10);
+        card.getStyleClass().add("param-card");
+
+        Label title = new Label("Nombre del Modelo (opcional)");
+        title.getStyleClass().add("param-card-title");
+
+        Label note = new Label("Asigna un nombre descriptivo para identificar este modelo más tarde.");
+        note.setStyle("-fx-font-size: 11px; -fx-text-fill: #95a5a6; -fx-font-style: italic;");
+        note.setWrapText(true);
+
+        TextField nameField = new TextField();
+        nameField.setPromptText("Ej: Modelo ventas Q1 2024");
+        nameField.setMaxWidth(Double.MAX_VALUE);
+        nameField.textProperty().addListener((obs, old, newVal) ->
+            phase2Config.setModelName(newVal.trim())
+        );
+
+        card.getChildren().addAll(title, note, nameField);
+        return card;
     }
 
     /**
@@ -1831,6 +2004,11 @@ public class PredictiveController {
 
                     TrainModelRequestDTO request = new TrainModelRequestDTO(modelType, fechaInicio, fechaFin);
 
+                    // Agregar nombre si fue especificado
+                    if (phase2Config.getModelName() != null && !phase2Config.getModelName().isEmpty()) {
+                        request.setNombre(phase2Config.getModelName());
+                    }
+
                     // Agregar hiperparámetros configurados para Regresión Múltiple
                     if ("Regresión Múltiple".equals(selectedModel.title())) {
                         Map<String, Object> hyperparams = new HashMap<>();
@@ -1991,6 +2169,9 @@ public class PredictiveController {
 
         validPhase3 = true;
         updateFooterState();
+
+        // Recargar lista de modelos del usuario para reflejar el nuevo modelo
+        loadUserModels();
     }
 
     /**
@@ -2203,6 +2384,11 @@ public class PredictiveController {
         modelInfoContainer.getChildren().clear();
 
         Map<String, String> info = new LinkedHashMap<>();
+        // Si viene de modelo guardado, mostrar su nombre
+        if (selectedSavedModel != null && selectedSavedModel.getNombre() != null
+                && !selectedSavedModel.getNombre().isEmpty()) {
+            info.put("Nombre", selectedSavedModel.getNombre());
+        }
         info.put("Modelo", selectedModel != null ? selectedModel.title() : "N/A");
         info.put("Tipo API", lastTrainResponse.getModelType() != null
                 ? lastTrainResponse.getModelType() : "N/A");

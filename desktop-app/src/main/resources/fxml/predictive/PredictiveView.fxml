@@ -77,8 +77,23 @@
                     <!-- ================= FASE 1 ================= -->
                     <VBox fx:id="phase1Content" spacing="16">
 
-                        <Label text="Seleccionar modelo predictivo"
-                               styleClass="section-title"/>
+                        <!-- Mis Modelos Guardados -->
+                        <VBox fx:id="savedModelsSection" spacing="12">
+                            <Label text="Mis Modelos Guardados" styleClass="section-title"/>
+                            <Label text="Selecciona un modelo previamente entrenado para usarlo directamente."
+                                   wrapText="true"
+                                   style="-fx-font-size: 12px; -fx-text-fill: #7f8c8d;"/>
+                            <FlowPane fx:id="savedModelsContainer" hgap="16" vgap="16"
+                                      prefWrapLength="620" visible="false" managed="false"/>
+                            <Label fx:id="savedModelsEmptyLabel"
+                                   text="Aún no tienes modelos entrenados. Entrena uno nuevo abajo."
+                                   visible="true" managed="true"
+                                   style="-fx-text-fill: #95a5a6; -fx-font-style: italic; -fx-font-size: 12px;"/>
+                        </VBox>
+
+                        <Separator/>
+
+                        <Label text="Entrenar Nuevo Modelo" styleClass="section-title"/>
 
                         <HBox spacing="10" alignment="TOP_LEFT">
 

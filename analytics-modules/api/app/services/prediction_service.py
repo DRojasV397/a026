@@ -248,7 +248,8 @@ class PredictionService:
         fecha_inicio: Optional[datetime] = None,
         fecha_fin: Optional[datetime] = None,
         hyperparameters: Optional[Dict[str, Any]] = None,
-        user_id: Optional[int] = None
+        user_id: Optional[int] = None,
+        nombre: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         Entrena un modelo predictivo.
@@ -304,7 +305,7 @@ class PredictionService:
             self._trained_models[model_key] = model
 
             # Guardar en BD y registrar idVersion para asociar predicciones
-            version_db = self._save_model_to_db(model, model_key, metrics)
+            version_db = self._save_model_to_db(model, model_key, metrics, user_id=user_id, nombre=nombre)
             self._trained_model_ids[model_key] = version_db.idVersion if version_db else None
 
             # Guardar modelo en disco
@@ -421,7 +422,9 @@ class PredictionService:
         self,
         model: BaseModel,
         model_key: str,
-        metrics: ModelMetrics
+        metrics: ModelMetrics,
+        user_id: Optional[int] = None,
+        nombre: Optional[str] = None
     ) -> Optional[VersionModelo]:
         """
         Guarda Modelo y VersionModelo en la BD.
@@ -431,7 +434,10 @@ class PredictionService:
             modelo = Modelo(
                 tipoModelo=model.model_type.value,
                 objetivo=f"Prediccion de ventas - {model_key}",
-                creadoEn=datetime.now()
+                creadoEn=datetime.now(),
+                creadoPor=user_id,
+                modelKey=model_key,
+                nombre=nombre
             )
             modelo = self.modelo_repo.create(modelo)
 
@@ -543,9 +549,17 @@ class PredictionService:
         model_key: Optional[str] = None,
         model_type: Optional[str] = None
     ) -> Optional[BaseModel]:
-        """Obtiene un modelo entrenado."""
+        """Obtiene un modelo entrenado. Auto-carga desde disco si no está en RAM."""
         if model_key and model_key in self._trained_models:
             return self._trained_models[model_key]
+
+        # Auto-cargar desde disco si no está en memoria
+        if model_key and model_key not in self._trained_models:
+            model_path = os.path.join(self.MODELS_DIR, f"{model_key}.pkl")
+            if os.path.exists(model_path):
+                result = self.load_model(model_key)
+                if result.get("success"):
+                    return self._trained_models.get(model_key)
 
         # Buscar por tipo
         if model_type:
@@ -826,6 +840,46 @@ class PredictionService:
                 })
 
         return models
+
+    def get_user_models(self, user_id: int) -> List[Dict[str, Any]]:
+        """
+        Obtiene los modelos entrenados por un usuario, con su última versión.
+
+        Args:
+            user_id: ID del usuario
+
+        Returns:
+            Lista de dicts con info del modelo y versión
+        """
+        try:
+            modelos = self.modelo_repo.get_by_usuario(user_id)
+            result = []
+            for modelo in modelos:
+                version = self.version_repo.get_ultima_version(modelo.idModelo)
+                if version is None:
+                    continue
+                metricas = None
+                if version.metricas:
+                    try:
+                        metricas = json.loads(version.metricas)
+                    except Exception:
+                        metricas = None
+                result.append({
+                    "model_id": modelo.idModelo,
+                    "version_id": version.idVersion,
+                    "model_key": modelo.modelKey,
+                    "model_type": modelo.tipoModelo,
+                    "nombre": modelo.nombre,
+                    "precision": float(version.precision) if version.precision is not None else None,
+                    "metricas": metricas,
+                    "estado": version.estado,
+                    "fecha_entrenamiento": version.fechaEntrenamiento.isoformat() if version.fechaEntrenamiento else None,
+                    "is_loaded": modelo.modelKey in self._trained_models if modelo.modelKey else False
+                })
+            return result
+        except Exception as e:
+            logger.error(f"Error obteniendo modelos del usuario: {str(e)}")
+            return []
 
     def delete_model(self, model_key: str) -> Dict[str, Any]:
         """

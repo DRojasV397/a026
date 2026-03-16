@@ -18,9 +18,13 @@ class Modelo(Base):
     tipoModelo = Column(String(40), nullable=False)
     objetivo = Column(String(120), nullable=True)
     creadoEn = Column(DateTime, default=datetime.now)
+    creadoPor = Column(Integer, ForeignKey('Usuario.idUsuario'), nullable=True)
+    modelKey = Column(String(120), nullable=True)
+    nombre = Column(String(150), nullable=True)
 
     # Relaciones
     versiones = relationship("VersionModelo", back_populates="modelo", cascade="all, delete-orphan")
+    creador = relationship("Usuario", foreign_keys=[creadoPor])
 
     def __repr__(self):
         return f"<Modelo(id={self.idModelo}, tipo={self.tipoModelo})>"
@@ -100,8 +104,10 @@ class ParametroEscenario(Base):
 
     __tablename__ = 'ParametroEscenario'
 
-    idEscenario = Column(Integer, ForeignKey('Escenario.idEscenario'), primary_key=True)
-    parametro = Column(String(60), primary_key=True)
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    idEscenario = Column(Integer, ForeignKey('Escenario.idEscenario'), nullable=False, index=True)
+    parametro = Column(String(60), nullable=False)
+    productoId = Column(Integer, ForeignKey('Producto.idProducto'), nullable=True)
     valorBase = Column(DECIMAL(18, 2), nullable=True)
     valorActual = Column(DECIMAL(18, 2), nullable=True)
 
@@ -109,7 +115,7 @@ class ParametroEscenario(Base):
     escenario = relationship("Escenario", back_populates="parametros")
 
     def __repr__(self):
-        return f"<ParametroEscenario(escenario={self.idEscenario}, parametro={self.parametro})>"
+        return f"<ParametroEscenario(escenario={self.idEscenario}, parametro={self.parametro}, producto={self.productoId})>"
 
 
 class ResultadoEscenario(Base):

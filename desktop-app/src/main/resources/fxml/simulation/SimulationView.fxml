@@ -97,6 +97,10 @@
                                                 </HBox>
                                             </VBox>
                                             <VBox spacing="6" HBox.hgrow="ALWAYS">
+                                                <Label text="Resolución" styleClass="form-label"/>
+                                                <ComboBox fx:id="cmbGranularidad" styleClass="form-combo" maxWidth="Infinity"/>
+                                            </VBox>
+                                            <VBox spacing="6" HBox.hgrow="ALWAYS">
                                                 <Label text="Escenario base *" styleClass="form-label"/>
                                                 <ComboBox fx:id="cmbBaseScenario" styleClass="form-combo" maxWidth="Infinity"/>
                                             </VBox>
@@ -133,6 +137,20 @@
                                         <padding><Insets top="4" right="4" bottom="4" left="4"/></padding>
                                     </VBox>
                                 </ScrollPane>
+
+                                <!-- Excepciones por producto -->
+                                <VBox spacing="10">
+                                    <Label text="Excepciones por producto" styleClass="form-label"/>
+                                    <Label text="Agrega productos para aplicarles variaciones distintas a las globales."
+                                           styleClass="form-block-hint" wrapText="true"/>
+                                    <HBox spacing="8" alignment="CENTER_LEFT">
+                                        <TextField fx:id="txtProductSearch"
+                                                   promptText="Buscar producto por nombre o SKU…"
+                                                   styleClass="form-input" HBox.hgrow="ALWAYS"/>
+                                    </HBox>
+                                    <VBox fx:id="productSearchResults" styleClass="search-results-dropdown" spacing="0"/>
+                                    <VBox fx:id="overridesContainer" spacing="12"/>
+                                </VBox>
                             </VBox>
                         </VBox>
 
@@ -191,11 +209,18 @@
 
                     <!-- Gráfica principal -->
                     <VBox styleClass="chart-card-sim" spacing="12">
-                        <VBox spacing="3" styleClass="chart-header-sim">
-                            <Label text="Proyección: Escenario base vs Simulado" styleClass="chart-title-sim"/>
-                            <Label text="Comparación de tendencias en el período seleccionado"
-                                   styleClass="chart-subtitle-sim"/>
-                        </VBox>
+                        <HBox alignment="CENTER_LEFT" spacing="12">
+                            <VBox spacing="3" styleClass="chart-header-sim" HBox.hgrow="ALWAYS">
+                                <Label text="Proyección: Escenario base vs Simulado" styleClass="chart-title-sim"/>
+                                <Label text="Comparación de tendencias en el período seleccionado"
+                                       styleClass="chart-subtitle-sim"/>
+                            </VBox>
+                            <HBox spacing="0" alignment="CENTER">
+                                <ToggleButton fx:id="tglAggDay"   text="Día"    styleClass="agg-btn-first"/>
+                                <ToggleButton fx:id="tglAggWeek"  text="Semana" styleClass="agg-btn-mid"/>
+                                <ToggleButton fx:id="tglAggMonth" text="Mes"    styleClass="agg-btn-last"/>
+                            </HBox>
+                        </HBox>
                         <LineChart fx:id="comparisonChart" animated="false" legendVisible="true"
                                    prefHeight="280" styleClass="sim-line-chart">
                             <xAxis><CategoryAxis label="Período"/></xAxis>

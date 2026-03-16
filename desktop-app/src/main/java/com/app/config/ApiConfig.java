@@ -94,6 +94,10 @@ public class ApiConfig {
         return BASE_URL + "/predictions/sales-data";
     }
 
+    public static String getPredictionsUserModelsUrl() {
+        return BASE_URL + "/predictions/models/user";
+    }
+
     // ── Data Management Module ──────────────────────────────────────────────
 
     public static String getDataUploadUrl() {
@@ -140,6 +144,36 @@ public class ApiConfig {
 
     public static String getProductosUrl() {
         return BASE_URL + "/productos/";
+    }
+
+    // ── Simulation Module ────────────────────────────────────────────────────
+
+    public static String getSimulationCreateUrl() {
+        return BASE_URL + "/simulation/create";
+    }
+
+    public static String getSimulationScenariosUrl() {
+        return BASE_URL + "/simulation/scenarios";
+    }
+
+    public static String getSimulationRunUrl(int id) {
+        return BASE_URL + "/simulation/" + id + "/run";
+    }
+
+    public static String getSimulationParametersUrl(int id) {
+        return BASE_URL + "/simulation/" + id + "/parameters";
+    }
+
+    public static String getSimulationDeleteUrl(int id) {
+        return BASE_URL + "/simulation/" + id;
+    }
+
+    public static String getSimulationResultsUrl(int id) {
+        return BASE_URL + "/simulation/" + id + "/results";
+    }
+
+    public static String getSimulationCompareUrl() {
+        return BASE_URL + "/simulation/compare";
     }
 
     // ── Profitability Module ─────────────────────────────────────────────────
