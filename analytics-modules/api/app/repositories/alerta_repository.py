@@ -5,7 +5,7 @@ Repositorio para modelo de Alerta.
 from typing import Optional, List
 from sqlalchemy.orm import Session
 from sqlalchemy import desc, func, case
-from datetime import datetime
+from datetime import datetime, date
 import logging
 
 from app.models import Alerta
@@ -22,27 +22,42 @@ class AlertaRepository(BaseRepository[Alerta]):
 
     def get_activas(self, limite: int = 10) -> List[Alerta]:
         """
-        Obtiene alertas activas (maximo 10 segun RN-04.05).
+        Obtiene alertas activas/leidas (hasta `limite`) más las resueltas de HOY.
+
+        Las RESUELTA del día se devuelven para que los KPIs del dashboard
+        muestren el conteo correcto aunque la app se reinicie.  El predicate
+        isActiveVisible en el frontend las oculta de la lista visible.
 
         Args:
-            limite: Numero maximo de alertas
+            limite: Número máximo de alertas Activa/Leida a devolver
 
         Returns:
-            List[Alerta]: Lista de alertas activas
+            List[Alerta]: Activas + Leidas (<=limite) + Resueltas de hoy
         """
         try:
-            # Usar CASE para ordenar por importancia (Alta=1, Media=2, Baja=3)
             importancia_order = case(
                 (Alerta.importancia == 'Alta', 1),
                 (Alerta.importancia == 'Media', 2),
                 else_=3
             )
-            return self.db.query(Alerta).filter(
-                Alerta.estado == 'Activa'
+
+            # Activas y Leidas priorizadas (limitadas por config)
+            activas = self.db.query(Alerta).filter(
+                Alerta.estado.in_(['Activa', 'Leida'])
             ).order_by(
                 importancia_order,
                 desc(Alerta.creadaEn)
             ).limit(limite).all()
+
+            # Resueltas de HOY (sin límite, solo para KPIs)
+            hoy_inicio = datetime.combine(date.today(), datetime.min.time())
+            resueltas_hoy = self.db.query(Alerta).filter(
+                Alerta.estado == 'Resuelta',
+                Alerta.creadaEn >= hoy_inicio
+            ).order_by(desc(Alerta.creadaEn)).all()
+
+            return activas + resueltas_hoy
+
         except Exception as e:
             logger.error(f"Error al obtener alertas activas: {str(e)}")
             return []

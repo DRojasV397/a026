@@ -10,6 +10,8 @@ import javafx.stage.Modality;
 import javafx.stage.Stage;
 import javafx.stage.StageStyle;
 
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Objects;
 import java.util.function.Consumer;
 
@@ -33,6 +35,14 @@ public class SceneManager {
     }
 
     private static NavigationGuard navigationGuard;
+
+    /**
+     * Caché de vistas por ruta.
+     * Evita que el controller se re-instancie en cada cambio de módulo,
+     * preservando el estado interno (alertas resueltas, tabs seleccionados, etc.).
+     * Se limpia al hacer logout (resetToLogin).
+     */
+    private static final Map<AppRoute, Parent> viewCache = new HashMap<>();
 
     public static void setNavigationGuard(NavigationGuard guard) {
         navigationGuard = guard;
@@ -100,10 +110,21 @@ public class SceneManager {
         // ────────────────────────────────────────────────────────
 
         try {
-            FXMLLoader loader = new FXMLLoader(
-                    SceneManager.class.getResource(fxmlPath)
-            );
-            Parent content = loader.load();
+            Parent content;
+
+            if (route != null && viewCache.containsKey(route)) {
+                // Vista ya cargada: reutilizar el nodo (el controller conserva su estado)
+                content = viewCache.get(route);
+            } else {
+                // Primera carga: crear nuevo controller
+                FXMLLoader loader = new FXMLLoader(
+                        SceneManager.class.getResource(fxmlPath)
+                );
+                content = loader.load();
+                if (route != null) {
+                    viewCache.put(route, content);
+                }
+            }
 
             baseController.setContent(content);
 
@@ -184,6 +205,7 @@ public class SceneManager {
         baseController = null;
         navigationGuard = null;
         onRouteChanged = null;
+        viewCache.clear();  // Liberar todos los controllers cacheados
 
         // Cargar la escena de login desde cero
         showLogin();

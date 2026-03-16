@@ -6,15 +6,16 @@ RF-04: Generacion de alertas basadas en anomalias y predicciones.
 import numpy as np
 from typing import Optional, Dict, Any, List
 from datetime import datetime, date, timedelta
+from pathlib import Path
 from sqlalchemy.orm import Session
-from sqlalchemy import func
+from sqlalchemy import func, desc
 from dataclasses import dataclass
 from decimal import Decimal
 from enum import Enum
 import logging
 import json
 
-from app.models import Alerta, Prediccion, Venta, DetalleVenta
+from app.models import Alerta, Prediccion, Venta, DetalleVenta, Compra, DetalleCompra, Producto, VersionModelo
 from app.repositories import VentaRepository
 from app.repositories.alerta_repository import AlertaRepository
 from app.repositories.prediccion_repository import PrediccionRepository
@@ -50,17 +51,23 @@ class AlertStatus(str, Enum):
 @dataclass
 class AlertConfig:
     """Configuracion de umbrales de alertas."""
-    risk_threshold: float = 15.0  # RN-04.01: Caida > 15%
-    opportunity_threshold: float = 20.0  # RN-04.02: Subida > 20%
-    anomaly_rate_threshold: float = 5.0  # RN-04.03: > 5% anomalias
-    max_active_alerts: int = 10  # RN-04.05: Max 10 alertas simultaneas
+    risk_threshold: float = 15.0          # RN-04.01: Caida > 15%
+    opportunity_threshold: float = 20.0   # RN-04.02: Subida > 20%
+    anomaly_rate_threshold: float = 5.0   # RN-04.03: > 5% anomalias
+    max_active_alerts: int = 10           # RN-04.05: Max 10 alertas simultaneas
+    margen_minimo: float = 20.0           # Margen bruto minimo esperado (%)
+    precio_cambio_threshold: float = 10.0 # % de cambio en precios de compra para alerta
+    min_confidence: float = 70.0          # Nivel minimo de confianza para mostrar alertas (%)
 
     def to_dict(self) -> Dict[str, Any]:
         return {
             "risk_threshold": self.risk_threshold,
             "opportunity_threshold": self.opportunity_threshold,
             "anomaly_rate_threshold": self.anomaly_rate_threshold,
-            "max_active_alerts": self.max_active_alerts
+            "max_active_alerts": self.max_active_alerts,
+            "margen_minimo": self.margen_minimo,
+            "precio_cambio_threshold": self.precio_cambio_threshold,
+            "min_confidence": self.min_confidence
         }
 
 
@@ -78,6 +85,9 @@ class AlertService:
     # RN-04.05: Maximo alertas simultaneas
     MAX_ACTIVE_ALERTS = 10
 
+    # Archivo de persistencia de configuracion (analytics-modules/api/alert_config.json)
+    _CONFIG_FILE: Path = Path(__file__).parent.parent.parent / "alert_config.json"
+
     def __init__(self, db: Session):
         self.db = db
         self.alerta_repo = AlertaRepository(db)
@@ -85,24 +95,55 @@ class AlertService:
         self.venta_repo = VentaRepository(db)
         self.detector = AnomalyDetector()
         self.config = AlertConfig()
+        self._load_config()
+
+    # ─────────────────────────────────────────────────────────────────────────
+    #  CONFIG PERSISTENCE
+    # ─────────────────────────────────────────────────────────────────────────
+
+    def _load_config(self) -> None:
+        """Carga configuracion desde alert_config.json si existe."""
+        try:
+            if self._CONFIG_FILE.exists():
+                data = json.loads(self._CONFIG_FILE.read_text(encoding="utf-8"))
+                if "risk_threshold"          in data: self.config.risk_threshold          = float(data["risk_threshold"])
+                if "opportunity_threshold"   in data: self.config.opportunity_threshold   = float(data["opportunity_threshold"])
+                if "anomaly_rate_threshold"  in data: self.config.anomaly_rate_threshold  = float(data["anomaly_rate_threshold"])
+                if "max_active_alerts"       in data: self.config.max_active_alerts       = int(data["max_active_alerts"])
+                if "margen_minimo"           in data: self.config.margen_minimo           = float(data["margen_minimo"])
+                if "precio_cambio_threshold" in data: self.config.precio_cambio_threshold = float(data["precio_cambio_threshold"])
+                if "min_confidence"          in data: self.config.min_confidence          = float(data["min_confidence"])
+                # Sincronizar detector con umbrales cargados
+                self.detector.set_thresholds(
+                    risk_threshold=self.config.risk_threshold,
+                    opportunity_threshold=self.config.opportunity_threshold
+                )
+        except Exception as e:
+            logger.warning(f"No se pudo cargar alert_config.json: {e}")
+
+    def _save_config(self) -> None:
+        """Persiste configuracion actual en alert_config.json."""
+        try:
+            self._CONFIG_FILE.write_text(
+                json.dumps(self.config.to_dict(), indent=2, ensure_ascii=False),
+                encoding="utf-8"
+            )
+        except Exception as e:
+            logger.warning(f"No se pudo guardar alert_config.json: {e}")
 
     def configure_thresholds(
         self,
         risk_threshold: Optional[float] = None,
         opportunity_threshold: Optional[float] = None,
-        anomaly_rate_threshold: Optional[float] = None
+        anomaly_rate_threshold: Optional[float] = None,
+        max_active_alerts: Optional[int] = None,
+        margen_minimo: Optional[float] = None,
+        precio_cambio_threshold: Optional[float] = None,
+        min_confidence: Optional[float] = None
     ) -> Dict[str, Any]:
         """
         Configura umbrales de alertas.
         RF-04.04: Permitir configuracion de umbrales.
-
-        Args:
-            risk_threshold: Umbral de riesgo (%)
-            opportunity_threshold: Umbral de oportunidad (%)
-            anomaly_rate_threshold: Umbral de tasa de anomalias (%)
-
-        Returns:
-            Dict con configuracion actualizada
         """
         if risk_threshold is not None:
             self.config.risk_threshold = risk_threshold
@@ -114,6 +155,20 @@ class AlertService:
 
         if anomaly_rate_threshold is not None:
             self.config.anomaly_rate_threshold = anomaly_rate_threshold
+
+        if max_active_alerts is not None:
+            self.config.max_active_alerts = max_active_alerts
+
+        if margen_minimo is not None:
+            self.config.margen_minimo = margen_minimo
+
+        if precio_cambio_threshold is not None:
+            self.config.precio_cambio_threshold = precio_cambio_threshold
+
+        if min_confidence is not None:
+            self.config.min_confidence = max(0.0, min(100.0, min_confidence))
+
+        self._save_config()
 
         return {
             "success": True,
@@ -196,8 +251,8 @@ class AlertService:
         # RN-04.06: Priorizar por impacto
         alertas_generadas = self._prioritize_alerts(alertas_generadas)
 
-        # RN-04.05: Limitar a 10 alertas activas
-        alertas_generadas = alertas_generadas[:self.MAX_ACTIVE_ALERTS]
+        # RN-04.05: Limitar segun config.max_active_alerts
+        alertas_generadas = alertas_generadas[:self.config.max_active_alerts]
 
         return {
             "success": True,
@@ -269,6 +324,7 @@ class AlertService:
     ) -> Optional[Alerta]:
         """Crea alerta por tasa de anomalias alta (RN-04.03)."""
         try:
+            best_precision = self._get_best_model_precision() / 100.0
             alerta = Alerta(
                 idPred=1,
                 tipo=AlertType.ANOMALIA.value,
@@ -276,7 +332,7 @@ class AlertService:
                 metrica="tasa_anomalias",
                 valorActual=Decimal(str(round(anomaly_rate, 2))),
                 valorEsperado=Decimal(str(self.config.anomaly_rate_threshold)),
-                nivelConfianza=Decimal("0.95"),
+                nivelConfianza=Decimal(str(round(best_precision, 4))),
                 estado=AlertStatus.ACTIVA.value,
                 creadaEn=datetime.now()
             )
@@ -325,6 +381,9 @@ class AlertService:
 
     def _alert_to_dict(self, alerta: Alerta) -> Dict[str, Any]:
         """Convierte alerta a diccionario."""
+        # nivelConfianza se almacena como DECIMAL(5,4) en fracción 0-1 (ej. 0.90 = 90%)
+        # Se multiplica por 100 para devolver porcentaje al frontend
+        nivel_conf_pct = round(float(alerta.nivelConfianza) * 100, 1) if alerta.nivelConfianza else 0.0
         return {
             "id_alerta": alerta.idAlerta,
             "tipo": alerta.tipo,
@@ -332,22 +391,394 @@ class AlertService:
             "metrica": alerta.metrica,
             "valor_actual": float(alerta.valorActual) if alerta.valorActual else 0,
             "valor_esperado": float(alerta.valorEsperado) if alerta.valorEsperado else 0,
-            "nivel_confianza": float(alerta.nivelConfianza) if alerta.nivelConfianza else 0,
+            "nivel_confianza": nivel_conf_pct,
             "estado": alerta.estado,
             "creada_en": alerta.creadaEn.isoformat() if alerta.creadaEn else None
+        }
+
+    def _get_best_model_precision(self) -> float:
+        """
+        Obtiene la precisión (R²×100) del mejor modelo predictivo activo.
+
+        Consulta VersionModelo ordenado por precision DESC y retorna el valor
+        como porcentaje (0-100). Si no hay modelos entrenados, retorna 75.0
+        como valor conservador por defecto.
+        """
+        try:
+            best = self.db.query(VersionModelo).filter(
+                VersionModelo.estado == 'Activo',
+                VersionModelo.precision.isnot(None)
+            ).order_by(desc(VersionModelo.precision)).first()
+            if best and best.precision:
+                # precision almacenada en DECIMAL(5,4) como fracción 0-1
+                precision_pct = float(best.precision) * 100
+                # Limitar a rango razonable [50, 99] para evitar extremos
+                return max(50.0, min(99.0, precision_pct))
+        except Exception as e:
+            logger.warning(f"No se pudo obtener precision del mejor modelo: {e}")
+        return 75.0
+
+    # ─────────────────────────────────────────────────────────────────────────
+    #  HELPER: PERSISTIR ALERTA
+    # ─────────────────────────────────────────────────────────────────────────
+
+    def _existe_alerta_reciente(self, metrica: str) -> bool:
+        """
+        Retorna True si ya existe alguna alerta con esa métrica creada HOY
+        (sin importar el estado — incluye Activa, Leida, Resuelta, Ignorada).
+        Evita re-crear alertas que el usuario ya resolvió en la misma sesión.
+        """
+        try:
+            hoy_inicio = datetime.combine(date.today(), datetime.min.time())
+            count = self.db.query(func.count(Alerta.idAlerta)).filter(
+                Alerta.metrica == metrica,
+                Alerta.creadaEn >= hoy_inicio
+            ).scalar()
+            return (count or 0) > 0
+        except Exception:
+            return False
+
+    def _persistir_alerta(
+        self,
+        tipo: str,
+        importancia: str,
+        metrica: str,
+        valor_actual: float,
+        valor_esperado: float,
+        confianza: float
+    ) -> Optional[Alerta]:
+        """
+        Persiste una alerta en la BD si no existe ya una para la misma métrica
+        creada HOY (independientemente del estado).  Usa idPred=1 como placeholder.
+
+        Omite la alerta si su nivel de confianza (confianza×100) es menor al
+        umbral mínimo configurado (config.min_confidence).
+        """
+        # confianza es fracción 0-1; min_confidence es porcentaje 0-100
+        if (confianza * 100) < self.config.min_confidence:
+            logger.debug(
+                f"Alerta omitida ({metrica}): confianza {confianza*100:.1f}% "
+                f"< umbral minimo {self.config.min_confidence:.0f}%"
+            )
+            return None
+
+        if self._existe_alerta_reciente(metrica):
+            return None  # Ya existe hoy: no duplicar
+        try:
+            alerta = Alerta(
+                idPred=1,
+                tipo=tipo,
+                importancia=importancia,
+                metrica=metrica[:40],
+                valorActual=Decimal(str(round(valor_actual, 2))),
+                valorEsperado=Decimal(str(round(valor_esperado, 2))),
+                nivelConfianza=Decimal(str(round(confianza, 4))),
+                estado=AlertStatus.ACTIVA.value,
+                creadaEn=datetime.now()
+            )
+            self.db.add(alerta)
+            self.db.commit()
+            self.db.refresh(alerta)
+            return alerta
+        except Exception as e:
+            self.db.rollback()
+            logger.error(f"Error al persistir alerta ({tipo}/{metrica}): {str(e)}")
+            return None
+
+    # ─────────────────────────────────────────────────────────────────────────
+    #  EVALUACIÓN: VENTAS (umbral vs histórico)
+    # ─────────────────────────────────────────────────────────────────────────
+
+    def _evaluar_alertas_ventas(self, fecha_fin: date) -> List[Alerta]:
+        """
+        Compara promedio diario de ventas de los últimos 30d vs los 90d anteriores.
+        Genera RIESGO si la caída supera risk_threshold, OPORTUNIDAD si la subida
+        supera opportunity_threshold.
+        """
+        reciente_inicio = fecha_fin - timedelta(days=29)
+        historico_fin   = reciente_inicio - timedelta(days=1)
+        historico_inicio = historico_fin - timedelta(days=89)
+
+        suma_reciente = self.db.query(func.sum(Venta.total)).filter(
+            Venta.fecha >= reciente_inicio,
+            Venta.fecha <= fecha_fin
+        ).scalar()
+
+        suma_historico = self.db.query(func.sum(Venta.total)).filter(
+            Venta.fecha >= historico_inicio,
+            Venta.fecha <= historico_fin
+        ).scalar()
+
+        suma_reciente  = float(suma_reciente  or 0)
+        suma_historico = float(suma_historico or 0)
+
+        if suma_historico == 0:
+            return []
+
+        avg_reciente  = suma_reciente  / 30.0
+        avg_historico = suma_historico / 90.0
+
+        if avg_historico == 0:
+            return []
+
+        cambio_pct = ((avg_reciente - avg_historico) / avg_historico) * 100
+
+        best_precision = self._get_best_model_precision() / 100.0
+
+        alertas = []
+        if cambio_pct <= -self.config.risk_threshold:
+            alerta = self._persistir_alerta(
+                tipo=AlertType.RIESGO.value,
+                importancia=AlertImportance.ALTA.value,
+                metrica="ventas_periodo",
+                valor_actual=avg_reciente,
+                valor_esperado=avg_historico,
+                confianza=best_precision
+            )
+            if alerta:
+                alertas.append(alerta)
+        elif cambio_pct >= self.config.opportunity_threshold:
+            alerta = self._persistir_alerta(
+                tipo=AlertType.OPORTUNIDAD.value,
+                importancia=AlertImportance.MEDIA.value,
+                metrica="ventas_periodo",
+                valor_actual=avg_reciente,
+                valor_esperado=avg_historico,
+                confianza=best_precision * 0.95  # Oportunidades ligeramente menos confiables
+            )
+            if alerta:
+                alertas.append(alerta)
+
+        return alertas
+
+    # ─────────────────────────────────────────────────────────────────────────
+    #  EVALUACIÓN: MARGEN BRUTO
+    # ─────────────────────────────────────────────────────────────────────────
+
+    def _evaluar_alertas_margen(
+        self, fecha_inicio: date, fecha_fin: date
+    ) -> List[Alerta]:
+        """
+        Calcula el margen bruto del período (ingresos - costos) / ingresos.
+        Genera RIESGO si margen < margen_minimo, OPORTUNIDAD si margen > 40%.
+        Requiere que Producto.costoUnitario esté poblado.
+        """
+        result = self.db.query(
+            func.sum(DetalleVenta.cantidad * DetalleVenta.precioUnitario).label("ingresos"),
+            func.sum(DetalleVenta.cantidad * Producto.costoUnitario).label("costos")
+        ).join(Venta, DetalleVenta.idVenta == Venta.idVenta
+        ).join(Producto, DetalleVenta.idProducto == Producto.idProducto
+        ).filter(
+            Venta.fecha >= fecha_inicio,
+            Venta.fecha <= fecha_fin,
+            Producto.costoUnitario.isnot(None)
+        ).first()
+
+        if not result or not result.ingresos or float(result.ingresos) == 0:
+            return []
+
+        ingresos = float(result.ingresos)
+        costos   = float(result.costos or 0)
+        margen   = ((ingresos - costos) / ingresos) * 100
+
+        best_precision = self._get_best_model_precision() / 100.0
+
+        alertas = []
+        if margen < self.config.margen_minimo:
+            importancia = (
+                AlertImportance.ALTA.value
+                if margen < self.config.margen_minimo * 0.75
+                else AlertImportance.MEDIA.value
+            )
+            alerta = self._persistir_alerta(
+                tipo=AlertType.RIESGO.value,
+                importancia=importancia,
+                metrica="margen_bruto",
+                valor_actual=margen,
+                valor_esperado=self.config.margen_minimo,
+                confianza=best_precision
+            )
+            if alerta:
+                alertas.append(alerta)
+        elif margen > 40.0:
+            alerta = self._persistir_alerta(
+                tipo=AlertType.OPORTUNIDAD.value,
+                importancia=AlertImportance.MEDIA.value,
+                metrica="margen_bruto",
+                valor_actual=margen,
+                valor_esperado=self.config.margen_minimo,
+                confianza=best_precision * 0.95
+            )
+            if alerta:
+                alertas.append(alerta)
+
+        return alertas
+
+    # ─────────────────────────────────────────────────────────────────────────
+    #  EVALUACIÓN: PRECIOS DE COMPRA (alzas / bajas)
+    # ─────────────────────────────────────────────────────────────────────────
+
+    def _evaluar_alertas_precios_compras(self, fecha_fin: date) -> List[Alerta]:
+        """
+        Compara el costo promedio por unidad de cada producto en los últimos 30d
+        vs los 30d anteriores. Genera RIESGO para alzas y OPORTUNIDAD para bajas
+        que superen precio_cambio_threshold. Limita a las 3 más impactantes.
+        """
+        periodo_dias    = 30
+        reciente_fin    = fecha_fin
+        reciente_inicio = fecha_fin  - timedelta(days=periodo_dias - 1)
+        anterior_fin    = reciente_inicio - timedelta(days=1)
+        anterior_inicio = anterior_fin    - timedelta(days=periodo_dias - 1)
+
+        def _costos_por_producto(d_inicio, d_fin):
+            rows = self.db.query(
+                DetalleCompra.idProducto,
+                Producto.nombre,
+                func.avg(DetalleCompra.costo).label("avg_costo"),
+                func.sum(DetalleCompra.cantidad).label("total_cant")
+            ).join(Compra, DetalleCompra.idCompra == Compra.idCompra
+            ).join(Producto, DetalleCompra.idProducto == Producto.idProducto
+            ).filter(
+                Compra.fecha >= d_inicio,
+                Compra.fecha <= d_fin
+            ).group_by(DetalleCompra.idProducto, Producto.nombre).all()
+            return {r.idProducto: r for r in rows}
+
+        costos_rec = _costos_por_producto(reciente_inicio, reciente_fin)
+        costos_ant = _costos_por_producto(anterior_inicio, anterior_fin)
+
+        cambios = []
+        for id_prod, rec in costos_rec.items():
+            if id_prod not in costos_ant:
+                continue
+            ant = costos_ant[id_prod]
+            avg_rec = float(rec.avg_costo or 0)
+            avg_ant = float(ant.avg_costo or 0)
+            if avg_ant == 0:
+                continue
+            cambio_pct = ((avg_rec - avg_ant) / avg_ant) * 100
+            if abs(cambio_pct) >= self.config.precio_cambio_threshold:
+                cambios.append({
+                    "nombre":     rec.nombre or f"Producto {id_prod}",
+                    "cambio_pct": cambio_pct,
+                    "avg_rec":    avg_rec,
+                    "avg_ant":    avg_ant,
+                    "volumen":    float(rec.total_cant or 1)
+                })
+
+        # Priorizar por impacto económico (|cambio%| × volumen)
+        cambios.sort(key=lambda x: abs(x["cambio_pct"]) * x["volumen"], reverse=True)
+        cambios = cambios[:3]
+
+        best_precision = self._get_best_model_precision() / 100.0
+
+        alertas = []
+        for c in cambios:
+            nombre_corto = c["nombre"][:30]
+            metrica = f"precio: {nombre_corto}"[:40]
+            tipo = AlertType.RIESGO.value if c["cambio_pct"] > 0 else AlertType.OPORTUNIDAD.value
+            importancia = AlertImportance.MEDIA.value if c["cambio_pct"] > 0 else AlertImportance.BAJA.value
+            alerta = self._persistir_alerta(
+                tipo=tipo,
+                importancia=importancia,
+                metrica=metrica,
+                valor_actual=c["avg_rec"],
+                valor_esperado=c["avg_ant"],
+                confianza=best_precision * 0.95
+            )
+            if alerta:
+                alertas.append(alerta)
+
+        return alertas
+
+    # ─────────────────────────────────────────────────────────────────────────
+    #  EVALUACIÓN INTEGRAL (combina todos los tipos)
+    # ─────────────────────────────────────────────────────────────────────────
+
+    def evaluate_all_alerts(
+        self,
+        fecha_inicio: Optional[date] = None,
+        fecha_fin: Optional[date] = None
+    ) -> Dict[str, Any]:
+        """
+        Ejecuta todas las evaluaciones de alertas en secuencia:
+        1. Anomalías en ventas (AnomalyDetector)
+        2. Umbral de ventas recientes vs histórico
+        3. Margen bruto del período
+        4. Alzas/bajas en precios de compra
+        """
+        if fecha_fin is None:
+            fecha_fin = date.today()
+        if fecha_inicio is None:
+            fecha_inicio = fecha_fin - timedelta(days=90)
+
+        resultados: Dict[str, Any] = {}
+
+        # 1. Anomalías en ventas
+        try:
+            r = self.analyze_sales_for_alerts(fecha_inicio, fecha_fin)
+            resultados["anomalias"] = {
+                "success": r.get("success", False),
+                "alertas_generadas": r.get("alertas_generadas", 0)
+            }
+        except Exception as e:
+            logger.error(f"Error en anomalias: {e}")
+            resultados["anomalias"] = {"success": False, "error": str(e)}
+
+        # 2. Ventas vs histórico
+        try:
+            alertas = self._evaluar_alertas_ventas(fecha_fin)
+            resultados["ventas"] = {"success": True, "alertas_generadas": len(alertas)}
+        except Exception as e:
+            logger.error(f"Error en ventas: {e}")
+            resultados["ventas"] = {"success": False, "error": str(e)}
+
+        # 3. Margen bruto
+        try:
+            alertas = self._evaluar_alertas_margen(fecha_inicio, fecha_fin)
+            resultados["margen"] = {"success": True, "alertas_generadas": len(alertas)}
+        except Exception as e:
+            logger.error(f"Error en margen: {e}")
+            resultados["margen"] = {"success": False, "error": str(e)}
+
+        # 4. Precios de compra
+        try:
+            alertas = self._evaluar_alertas_precios_compras(fecha_fin)
+            resultados["precios_compra"] = {"success": True, "alertas_generadas": len(alertas)}
+        except Exception as e:
+            logger.error(f"Error en precios_compra: {e}")
+            resultados["precios_compra"] = {"success": False, "error": str(e)}
+
+        total = sum(v.get("alertas_generadas", 0) for v in resultados.values())
+
+        return {
+            "success": True,
+            "periodo": {
+                "inicio": fecha_inicio.isoformat(),
+                "fin":    fecha_fin.isoformat()
+            },
+            "evaluaciones": resultados,
+            "total_alertas_generadas": total
         }
 
     def get_active_alerts(self) -> Dict[str, Any]:
         """
         Obtiene alertas activas.
-        RN-04.05: Maximo 10 alertas simultaneas.
+        RN-04.05: Maximo alertas simultaneas segun config.
+        Solo incluye alertas con nivel de confianza >= min_confidence.
         """
-        alertas = self.alerta_repo.get_activas(limite=self.MAX_ACTIVE_ALERTS)
+        limite = self.config.max_active_alerts
+        alertas = self.alerta_repo.get_activas(limite=limite)
+
+        # Filtrar por umbral minimo de confianza
+        if self.config.min_confidence > 0:
+            min_frac = self.config.min_confidence / 100.0
+            alertas = [a for a in alertas if float(a.nivelConfianza or 0) >= min_frac]
 
         return {
             "success": True,
             "total": len(alertas),
-            "max_permitidas": self.MAX_ACTIVE_ALERTS,
+            "max_permitidas": limite,
             "alertas": [self._alert_to_dict(a) for a in alertas],
             "por_tipo": self.alerta_repo.contar_por_tipo(),
             "por_importancia": self.alerta_repo.contar_por_importancia()
@@ -380,6 +811,11 @@ class AlertService:
         # Filtrar por importancia si se especifica
         if importancia:
             alertas = [a for a in alertas if a.importancia == importancia]
+
+        # Filtrar por umbral minimo de confianza
+        if self.config.min_confidence > 0:
+            min_frac = self.config.min_confidence / 100.0
+            alertas = [a for a in alertas if float(a.nivelConfianza or 0) >= min_frac]
 
         return {
             "success": True,

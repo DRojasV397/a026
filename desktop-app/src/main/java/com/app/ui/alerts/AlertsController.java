@@ -3,14 +3,18 @@ package com.app.ui.alerts;
 import com.app.model.alerts.AlertDTO;
 import com.app.service.alerts.AlertApiService;
 import com.app.ui.components.AnimatedToggleSwitch;
+import javafx.animation.PauseTransition;
 import javafx.application.Platform;
 import javafx.collections.FXCollections;
+import javafx.util.Duration;
 import javafx.collections.ObservableList;
 import javafx.collections.transformation.FilteredList;
 import javafx.concurrent.Task;
 import javafx.fxml.FXML;
+import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
+import javafx.scene.Scene;
 import javafx.scene.canvas.Canvas;
 import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.control.*;
@@ -24,6 +28,8 @@ import javafx.scene.shape.Circle;
 import javafx.scene.text.Font;
 import javafx.scene.text.FontWeight;
 import javafx.scene.text.TextAlignment;
+import javafx.stage.Modality;
+import javafx.stage.Stage;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -48,6 +54,7 @@ public class AlertsController {
 
     // ── Alertas Activas — barra superior ──────────────────────────────────────
     @FXML private TextField  txtActiveSearch;
+    @FXML private Button     btnRefreshAlerts;
     @FXML private Button     btnMarkAllRead;
     @FXML private Button     btnExportActive;
 
@@ -86,12 +93,15 @@ public class AlertsController {
     @FXML private TextField  txtThresholdSalesDrop;
     @FXML private TextField  txtThresholdAnomaly;
     @FXML private TextField  txtMaxAlerts;
+    @FXML private TextField  txtThresholdMargen;
+    @FXML private TextField  txtThresholdPrecioCambio;
     @FXML private ComboBox<String> cmbConfidenceLevel;
     @FXML private AnimatedToggleSwitch  tglEmailNotif;
     @FXML private AnimatedToggleSwitch  tglDashNotif;
     @FXML private AnimatedToggleSwitch tglAlertsActive;
     @FXML private Button btnSaveConfig;
     @FXML private Button btnResetConfig;
+    @FXML private Label  lblConfigStatus;
     @FXML private VBox   thresholdRulesList;
 
     // ── Estado interno ────────────────────────────────────────────────────────
@@ -135,19 +145,30 @@ public class AlertsController {
         Platform.runLater(this::loadActiveSectionData);
     }
 
+    /**
+     * Carga el estado actual de alertas desde la BD sin ejecutar ningún análisis.
+     * Solo muestra lo que ya existe (Activa, Leida y Resuelta de hoy para KPIs).
+     * El análisis se lanza explícitamente con el botón "Actualizar".
+     */
     private void loadActiveSectionData() {
-        alertApiService.getActiveAlerts().thenAccept(alertas -> {
-            Platform.runLater(() -> {
-                allActiveAlerts = FXCollections.observableArrayList(alertas);
-                filteredActive  = new FilteredList<>(allActiveAlerts, p -> true);
-                renderActiveAlerts();
-                updateSidebarKpis(allActiveAlerts,
-                        lblKpiActive, lblKpiAttended, lblKpiResolved, lblKpiPending);
-                drawDonutChart(canvasDonut, allActiveAlerts);
-                buildBarChart(barChartContainer, allActiveAlerts);
-                buildQuickActions();
-            });
-        });
+        alertApiService.getActiveAlerts()
+                .thenAccept(alertas -> Platform.runLater(() -> applyActiveAlerts(alertas)))
+                .exceptionally(ex -> {
+                    Platform.runLater(() -> applyActiveAlerts(List.of()));
+                    return null;
+                });
+    }
+
+    /** Aplica una lista de alertas al estado de la sección activa. */
+    private void applyActiveAlerts(java.util.List<AlertDTO> alertas) {
+        allActiveAlerts = FXCollections.observableArrayList(alertas);
+        filteredActive  = new FilteredList<>(allActiveAlerts, this::isActiveVisible);
+        renderActiveAlerts();
+        updateSidebarKpis(allActiveAlerts,
+                lblKpiActive, lblKpiAttended, lblKpiResolved, lblKpiPending);
+        drawDonutChart(canvasDonut, allActiveAlerts);
+        buildBarChart(barChartContainer, allActiveAlerts);
+        buildQuickActions();
     }
 
     // ═════════════════════════════════════════════════════════════════════════
@@ -161,10 +182,12 @@ public class AlertsController {
 
         if (txtActiveSearch  != null) txtActiveSearch.setPromptText("\uD83D\uDD0D  Buscar alerta...");
         if (txtHistorySearch != null) txtHistorySearch.setPromptText("\uD83D\uDD0D  Buscar en el hist\u00F3rico...");
+        if (btnRefreshAlerts != null) btnRefreshAlerts.setText("Actualizar");
         if (btnMarkAllRead   != null) btnMarkAllRead.setText("Marcar todas como le\u00EDdas");
         if (btnExportActive  != null) btnExportActive.setText("Exportar");
         if (btnExportHistory != null) btnExportHistory.setText("Exportar");
-        if (lblActiveEmpty   != null) lblActiveEmpty.setText("No hay alertas activas en este momento.");
+        if (lblActiveEmpty   != null) lblActiveEmpty.setText(
+                "No hay alertas activas. Haz clic en \u00ABActualizar\u00BB para ejecutar un an\u00E1lisis.");
         if (lblHistoryEmpty  != null) lblHistoryEmpty.setText("No se encontraron alertas en el hist\u00F3rico.");
     }
 
@@ -172,16 +195,24 @@ public class AlertsController {
     //  BÚSQUEDA EN TIEMPO REAL
     // ═════════════════════════════════════════════════════════════════════════
 
+    /** Predicate base para alertas activas: excluye resueltas e ignoradas. */
+    private boolean isActiveVisible(AlertDTO a) {
+        return !"RESUELTA".equals(a.status()) && !"IGNORADA".equals(a.status());
+    }
+
     private void setupSearchListeners() {
         if (txtActiveSearch != null) {
             txtActiveSearch.textProperty().addListener((obs, o, newVal) -> {
                 if (filteredActive == null) return;
                 String term = newVal == null ? "" : newVal.trim().toLowerCase();
-                filteredActive.setPredicate(a -> term.isEmpty()
-                        || a.title().toLowerCase().contains(term)
-                        || a.description().toLowerCase().contains(term)
-                        || a.affectedMetric().toLowerCase().contains(term)
-                        || a.type().toLowerCase().contains(term));
+                filteredActive.setPredicate(a -> {
+                    if (!isActiveVisible(a)) return false;
+                    return term.isEmpty()
+                            || a.title().toLowerCase().contains(term)
+                            || a.description().toLowerCase().contains(term)
+                            || a.affectedMetric().toLowerCase().contains(term)
+                            || a.type().toLowerCase().contains(term);
+                });
                 renderActiveAlerts();
             });
         }
@@ -581,26 +612,326 @@ public class AlertsController {
     }
 
     // ═════════════════════════════════════════════════════════════════════════
-    //  ACCIONES — ALERTAS ACTIVAS
+    //  ACCIONES — ALERTAS ACTIVAS  /  MODAL DE DETALLE
     // ═════════════════════════════════════════════════════════════════════════
 
     private void onViewAlertDetail(AlertDTO alert) {
-        System.out.printf("[ALERTS] Ver detalle → id=%d, tipo=%s, titulo='%s'%n",
-                alert.id(), alert.type(), alert.title());
-        // TODO: abrir modal de detalle con valores actual/esperado, historial, etc.
+        Stage modal = new Stage();
+        modal.initModality(Modality.APPLICATION_MODAL);
+        modal.setResizable(false);
+        modal.setTitle(alert.title());
+
+        // ── Root ─────────────────────────────────────────────────────────────
+        VBox root = new VBox(0);
+        root.getStyleClass().add("adm-root");
+
+        // ── Header: franja de color + bloque de título ────────────────────────
+        HBox header = new HBox(0);
+        header.getStyleClass().add("adm-header");
+
+        // Franja lateral de color según tipo/severidad
+        VBox stripe = new VBox();
+        stripe.setMinWidth(6);
+        stripe.setMaxWidth(6);
+        stripe.setStyle("-fx-background-color: " + alert.colorHex() + "; -fx-min-height: 74;");
+
+        VBox titleBlock = new VBox(8);
+        titleBlock.getStyleClass().add("adm-title-block");
+        HBox.setHgrow(titleBlock, Priority.ALWAYS);
+
+        Label lblTitle = new Label(alert.title());
+        lblTitle.getStyleClass().add("adm-title");
+        lblTitle.setWrapText(true);
+        lblTitle.setMaxWidth(400);
+
+        HBox badges = new HBox(6);
+        badges.setAlignment(Pos.CENTER_LEFT);
+
+        Label severityBadge = new Label(alert.severityLabel());
+        severityBadge.getStyleClass().addAll("alert-severity-badge", "badge-" + alert.type().toLowerCase());
+
+        Label typeBadge = new Label(alert.type());
+        typeBadge.getStyleClass().addAll("alert-type-badge", "badge-" + alert.type().toLowerCase());
+
+        String statusText = switch (alert.status()) {
+            case "ACTIVA"   -> "● Activa";
+            case "LEIDA"    -> "● Atendida";
+            case "RESUELTA" -> "✓ Resuelta";
+            default         -> alert.status();
+        };
+        Label statusBadge = new Label(statusText);
+        statusBadge.getStyleClass().addAll("adm-status-chip",
+                "adm-status-" + alert.status().toLowerCase());
+
+        badges.getChildren().addAll(severityBadge, typeBadge, statusBadge);
+        titleBlock.getChildren().addAll(lblTitle, badges);
+        header.getChildren().addAll(stripe, titleBlock);
+
+        // ── Separador ─────────────────────────────────────────────────────────
+        Separator sep1 = new Separator();
+
+        // ── Cuerpo ────────────────────────────────────────────────────────────
+        VBox body = new VBox(14);
+        body.getStyleClass().add("adm-body");
+
+        // Métrica afectada
+        Label lblMetricSec = new Label("MÉTRICA AFECTADA");
+        lblMetricSec.getStyleClass().add("adm-section-label");
+
+        HBox metricRow = new HBox(8);
+        metricRow.setAlignment(Pos.CENTER_LEFT);
+        Label metricIcon = new Label("📊");
+        Label lblMetric = new Label(alert.affectedMetric());
+        lblMetric.getStyleClass().add("adm-metric-chip");
+        metricRow.getChildren().addAll(metricIcon, lblMetric);
+
+        // Valores (Actual / Esperado / Desviación)
+        Label lblValuesSec = new Label("VALORES");
+        lblValuesSec.getStyleClass().add("adm-section-label");
+
+        String fmtActual    = formatAlertValue(alert.currentValue(),  alert.affectedMetric());
+        String fmtEsperado  = formatAlertValue(alert.expectedValue(), alert.affectedMetric());
+        String fmtDesviacion = String.format("%+.1f%%", alert.deviationPercent());
+        String desvColor     = alert.deviationPercent() < 0 ? "#A03C48" : "#2E7D5A";
+
+        HBox valuesRow = new HBox(10);
+        valuesRow.setAlignment(Pos.CENTER_LEFT);
+
+        VBox cardActual    = buildValueCard("Actual",     fmtActual,    "#1E293B");
+        VBox cardEsperado  = buildValueCard("Esperado",   fmtEsperado,  "#64748B");
+        VBox cardDesviacion = buildValueCard("Desviación", fmtDesviacion, desvColor);
+        HBox.setHgrow(cardActual,     Priority.ALWAYS);
+        HBox.setHgrow(cardEsperado,   Priority.ALWAYS);
+        HBox.setHgrow(cardDesviacion, Priority.ALWAYS);
+        valuesRow.getChildren().addAll(cardActual, cardEsperado, cardDesviacion);
+
+        // Descripción
+        Label lblDescSec = new Label("DESCRIPCIÓN");
+        lblDescSec.getStyleClass().add("adm-section-label");
+        Label lblDesc = new Label(alert.description());
+        lblDesc.getStyleClass().add("adm-desc-text");
+        lblDesc.setWrapText(true);
+        lblDesc.setMaxWidth(444);
+
+        // Fila: Confianza + Fecha
+        HBox metaRow = new HBox(20);
+        metaRow.setAlignment(Pos.TOP_LEFT);
+
+        // Barra de confianza
+        VBox confBox = new VBox(5);
+        HBox.setHgrow(confBox, Priority.ALWAYS);
+        Label lblConfSec = new Label("NIVEL DE CONFIANZA");
+        lblConfSec.getStyleClass().add("adm-section-label");
+
+        HBox confBarRow = new HBox(10);
+        confBarRow.setAlignment(Pos.CENTER_LEFT);
+
+        StackPane confTrack = new StackPane();
+        confTrack.getStyleClass().add("adm-conf-track");
+        confTrack.setMinHeight(8);
+        confTrack.setMaxHeight(8);
+        confTrack.setPrefWidth(180);
+        HBox.setHgrow(confTrack, Priority.ALWAYS);
+
+        Region confFill = new Region();
+        confFill.getStyleClass().add("adm-conf-fill");
+        confFill.setMinHeight(8);
+        confFill.setMaxHeight(8);
+        StackPane.setAlignment(confFill, Pos.CENTER_LEFT);
+        confFill.setPrefWidth(180 * (alert.confidenceLevel() / 100.0));
+        confTrack.getChildren().add(confFill);
+        confTrack.widthProperty().addListener((obs, o, w) ->
+                confFill.setPrefWidth(w.doubleValue() * (alert.confidenceLevel() / 100.0)));
+
+        Label lblConfPct = new Label(String.format("%.0f%%", alert.confidenceLevel()));
+        lblConfPct.getStyleClass().add("adm-conf-label");
+        confBarRow.getChildren().addAll(confTrack, lblConfPct);
+        confBox.getChildren().addAll(lblConfSec, confBarRow);
+
+        // Fecha de creación
+        VBox dateBox = new VBox(5);
+        Label lblDateSec = new Label("CREADA");
+        lblDateSec.getStyleClass().add("adm-section-label");
+        Label lblDateVal = new Label(alert.createdAt().format(FMT));
+        lblDateVal.getStyleClass().add("adm-date-value");
+        dateBox.getChildren().addAll(lblDateSec, lblDateVal);
+
+        metaRow.getChildren().addAll(confBox, dateBox);
+
+        body.getChildren().addAll(
+                lblMetricSec, metricRow,
+                lblValuesSec, valuesRow,
+                lblDescSec, lblDesc,
+                metaRow);
+
+        // Bloque de resolución (solo si ya está resuelta)
+        if ("RESUELTA".equals(alert.status()) && alert.resolvedAt() != null) {
+            Separator sepR = new Separator();
+            sepR.setPadding(new Insets(0, 0, 0, 0));
+
+            HBox resolvedBox = new HBox(10);
+            resolvedBox.getStyleClass().add("adm-resolved-box");
+            resolvedBox.setAlignment(Pos.CENTER_LEFT);
+
+            Label ico = new Label("✓");
+            ico.getStyleClass().add("adm-resolved-icon");
+
+            VBox resolvedInfo = new VBox(2);
+            String byStr = (alert.resolvedBy() != null && !alert.resolvedBy().isBlank())
+                    ? " por " + alert.resolvedBy() : "";
+            Label lblBy = new Label("Resuelta" + byStr);
+            lblBy.getStyleClass().add("adm-resolved-by");
+            Label lblAt = new Label(alert.resolvedAt().format(FMT));
+            lblAt.getStyleClass().add("adm-resolved-date");
+            resolvedInfo.getChildren().addAll(lblBy, lblAt);
+            resolvedBox.getChildren().addAll(ico, resolvedInfo);
+
+            body.getChildren().addAll(sepR, resolvedBox);
+        }
+
+        // ── Separador footer ─────────────────────────────────────────────────
+        Separator sep2 = new Separator();
+
+        // ── Footer ────────────────────────────────────────────────────────────
+        HBox footer = new HBox(10);
+        footer.getStyleClass().add("adm-footer");
+        footer.setAlignment(Pos.CENTER_RIGHT);
+
+        Region spacer = new Region();
+        HBox.setHgrow(spacer, Priority.ALWAYS);
+
+        Button btnClose = new Button("Cerrar");
+        btnClose.getStyleClass().add("adm-btn-close");
+        btnClose.setOnAction(e -> modal.close());
+
+        footer.getChildren().addAll(spacer, btnClose);
+
+        // Botón Resolver (solo si la alerta está activa o leída)
+        if ("ACTIVA".equals(alert.status()) || "LEIDA".equals(alert.status())) {
+            Button btnResolve = new Button("✓  Resolver");
+            btnResolve.getStyleClass().add("adm-btn-resolve");
+            btnResolve.setOnAction(e -> {
+                modal.close();
+                onResolveAlert(alert);
+            });
+            footer.getChildren().add(btnResolve);
+        }
+
+        // ── Ensamblar y mostrar ───────────────────────────────────────────────
+        root.getChildren().addAll(header, sep1, body, sep2, footer);
+
+        Scene scene = new Scene(root);
+        var cssUrl = getClass().getResource("/styles/alerts_section.css");
+        if (cssUrl != null) scene.getStylesheets().add(cssUrl.toExternalForm());
+        var mainCss = getClass().getResource("/styles/main.css");
+        if (mainCss != null) scene.getStylesheets().add(mainCss.toExternalForm());
+
+        modal.setScene(scene);
+
+        try {
+            var iconStream = getClass().getResourceAsStream("/images/app-icon.png");
+            if (iconStream != null) modal.getIcons().add(new Image(iconStream));
+        } catch (Exception ignored) {}
+
+        modal.showAndWait();
+    }
+
+    /** Tarjeta de un valor numérico con etiqueta debajo. */
+    private VBox buildValueCard(String label, String value, String valueColor) {
+        VBox card = new VBox(4);
+        card.getStyleClass().add("adm-value-card");
+        card.setAlignment(Pos.CENTER);
+
+        Label lblValue = new Label(value);
+        lblValue.getStyleClass().add("adm-value-number");
+        lblValue.setStyle("-fx-text-fill: " + valueColor + ";");
+
+        Label lblLabel = new Label(label);
+        lblLabel.getStyleClass().add("adm-value-label");
+
+        card.getChildren().addAll(lblValue, lblLabel);
+        return card;
+    }
+
+    /**
+     * Formatea un valor numérico según el tipo de métrica.
+     * Porcentaje si la métrica contiene "margen", "tasa" o "confianza";
+     * moneda con separador de miles si el valor ≥ 1 000;
+     * entero simple en caso contrario.
+     */
+    private String formatAlertValue(double value, String metric) {
+        String m = (metric == null ? "" : metric).toLowerCase();
+        if (m.contains("margen") || m.contains("tasa") || m.contains("confianza")) {
+            return String.format("%.1f%%", value);
+        }
+        if (Math.abs(value) >= 1_000) {
+            return String.format("$%,.0f", value);
+        }
+        if (value == Math.floor(value) && !Double.isInfinite(value)) {
+            return String.valueOf((int) value);
+        }
+        return String.format("%.2f", value);
     }
 
     private void onResolveAlert(AlertDTO alert) {
-        alertApiService.changeStatus(alert.id(), "Resuelta").thenAccept(ok -> {
-            if (ok) {
-                Platform.runLater(() -> {
-                    allActiveAlerts.removeIf(a -> a.id() == alert.id());
+        alertApiService.changeStatus(alert.id(), "Resuelta")
+                .thenAccept(ok -> Platform.runLater(() -> {
+                    if (ok) {
+                        // Reemplazar en la lista con estado RESUELTA; el predicate la ocultará
+                        AlertDTO resuelta = new AlertDTO(
+                                alert.id(), alert.type(), alert.severity(), alert.impactLevel(),
+                                alert.title(), alert.description(), alert.affectedMetric(),
+                                alert.currentValue(), alert.expectedValue(), alert.deviationPercent(),
+                                alert.confidenceLevel(), "RESUELTA", alert.createdAt(),
+                                LocalDateTime.now(), null, true);
+                        allActiveAlerts.replaceAll(a -> a.id() == alert.id() ? resuelta : a);
+                    } else {
+                        // Fallo en la API: quitar de la lista igual para no confundir al usuario
+                        allActiveAlerts.removeIf(a -> a.id() == alert.id());
+                    }
                     renderActiveAlerts();
                     updateSidebarKpis(allActiveAlerts,
                             lblKpiActive, lblKpiAttended, lblKpiResolved, lblKpiPending);
+                    drawDonutChart(canvasDonut, allActiveAlerts);
+                    buildBarChart(barChartContainer, allActiveAlerts);
+                }))
+                .exceptionally(ex -> {
+                    Platform.runLater(() -> {
+                        allActiveAlerts.removeIf(a -> a.id() == alert.id());
+                        renderActiveAlerts();
+                        updateSidebarKpis(allActiveAlerts,
+                                lblKpiActive, lblKpiAttended, lblKpiResolved, lblKpiPending);
+                    });
+                    return null;
                 });
-            }
-        });
+    }
+
+    @FXML
+    private void onRefreshAlerts() {
+        // Ejecuta el análisis completo y recarga la lista.
+        // Es el único punto de entrada para generar nuevas alertas.
+        if (btnRefreshAlerts != null) {
+            btnRefreshAlerts.setDisable(true);
+            btnRefreshAlerts.setText("Analizando...");
+        }
+        alertApiService.analyzeAndGenerate()
+                .thenCompose(ok -> alertApiService.getActiveAlerts())
+                .thenAccept(alertas -> Platform.runLater(() -> {
+                    applyActiveAlerts(alertas);
+                    if (btnRefreshAlerts != null) {
+                        btnRefreshAlerts.setDisable(false);
+                        btnRefreshAlerts.setText("Actualizar");
+                    }
+                }))
+                .exceptionally(ex -> {
+                    Platform.runLater(() -> {
+                        if (btnRefreshAlerts != null) {
+                            btnRefreshAlerts.setDisable(false);
+                            btnRefreshAlerts.setText("Actualizar");
+                        }
+                    });
+                    return null;
+                });
     }
 
     @FXML
@@ -667,43 +998,75 @@ public class AlertsController {
         if (configInitialized) return;
         configInitialized = true;
 
+        // Inicializar ComboBox y toggles primero (no dependen de la API)
         Platform.runLater(() -> {
-            // ── Valores por defecto ───────────────────────────────────────────
-            if (txtThresholdSalesDrop != null) txtThresholdSalesDrop.setText("15");
-            if (txtThresholdAnomaly  != null) txtThresholdAnomaly.setText("5");
-            if (txtMaxAlerts         != null) txtMaxAlerts.setText("10");
-
             if (cmbConfidenceLevel != null) {
                 cmbConfidenceLevel.getItems().addAll("70%", "80%", "85%", "90%", "95%");
                 cmbConfidenceLevel.getSelectionModel().select("80%");
             }
-
-            // ── Estado inicial de toggles ─────────────────────────────────────
             if (tglEmailNotif   != null) tglEmailNotif.setSelected(true);
             if (tglDashNotif    != null) tglDashNotif.setSelected(true);
             if (tglAlertsActive != null) tglAlertsActive.setSelected(true);
 
-            // ── Listeners de toggles ──────────────────────────────────────────
             if (tglEmailNotif != null)
-                tglEmailNotif.selectedProperty().addListener((obs, oldVal, active) -> {
-                    System.out.printf("[CONFIG] Notificación email → %s%n", active ? "activada" : "desactivada");
-                    // TODO: configService.setEmailNotif(active)
-                });
-
+                tglEmailNotif.selectedProperty().addListener((obs, o, active) ->
+                        System.out.printf("[CONFIG] Notificación email → %s%n", active ? "activada" : "desactivada"));
             if (tglDashNotif != null)
-                tglDashNotif.selectedProperty().addListener((obs, oldVal, active) -> {
-                    System.out.printf("[CONFIG] Notificación dashboard → %s%n", active ? "activada" : "desactivada");
-                    // TODO: configService.setDashboardNotif(active)
-                });
-
+                tglDashNotif.selectedProperty().addListener((obs, o, active) ->
+                        System.out.printf("[CONFIG] Notificación dashboard → %s%n", active ? "activada" : "desactivada"));
             if (tglAlertsActive != null)
-                tglAlertsActive.selectedProperty().addListener((obs, oldVal, active) -> {
-                    System.out.printf("[CONFIG] Sistema de alertas → %s%n", active ? "activado" : "pausado");
-                    // TODO: configService.setAlertsEnabled(active)
-                });
-
-            buildThresholdRules();
+                tglAlertsActive.selectedProperty().addListener((obs, o, active) ->
+                        System.out.printf("[CONFIG] Sistema de alertas → %s%n", active ? "activado" : "pausado"));
         });
+
+        // Cargar valores reales desde la API
+        alertApiService.getConfig().thenAccept(cfg -> Platform.runLater(() -> {
+            applyConfigToForm(cfg);
+            buildThresholdRules();
+        })).exceptionally(ex -> {
+            // Fallback a valores por defecto si falla la API
+            Platform.runLater(() -> {
+                applyConfigToForm(Map.of());
+                buildThresholdRules();
+            });
+            return null;
+        });
+    }
+
+    /** Aplica los valores del mapa de config a los campos del formulario. */
+    private void applyConfigToForm(Map<String, Double> cfg) {
+        if (txtThresholdSalesDrop   != null) txtThresholdSalesDrop.setText(
+                fmtThreshold(cfg.getOrDefault("risk_threshold",          15.0)));
+        if (txtThresholdAnomaly     != null) txtThresholdAnomaly.setText(
+                fmtThreshold(cfg.getOrDefault("anomaly_rate_threshold",   5.0)));
+        if (txtMaxAlerts            != null) txtMaxAlerts.setText(
+                fmtThreshold(cfg.getOrDefault("max_active_alerts",       10.0)));
+        if (txtThresholdMargen      != null) txtThresholdMargen.setText(
+                fmtThreshold(cfg.getOrDefault("margen_minimo",           20.0)));
+        if (txtThresholdPrecioCambio != null) txtThresholdPrecioCambio.setText(
+                fmtThreshold(cfg.getOrDefault("precio_cambio_threshold", 10.0)));
+
+        // Seleccionar el nivel de confianza mínimo en el combo
+        if (cmbConfidenceLevel != null && !cmbConfidenceLevel.getItems().isEmpty()) {
+            double minConf = cfg.getOrDefault("min_confidence", 70.0);
+            String target = String.format("%.0f%%", minConf);
+            if (!cmbConfidenceLevel.getItems().contains(target)) {
+                // Si el valor exacto no está en la lista, seleccionar el más cercano
+                target = cmbConfidenceLevel.getItems().stream()
+                        .min((a, b) -> {
+                            double da = Math.abs(Double.parseDouble(a.replace("%","")) - minConf);
+                            double db = Math.abs(Double.parseDouble(b.replace("%","")) - minConf);
+                            return Double.compare(da, db);
+                        })
+                        .orElse("70%");
+            }
+            cmbConfidenceLevel.getSelectionModel().select(target);
+        }
+    }
+
+    private String fmtThreshold(double value) {
+        // Mostrar sin decimales si es entero, con 1 decimal si no
+        return value == Math.floor(value) ? String.valueOf((int) value) : String.valueOf(value);
     }
 
     /** Construye la lista de reglas de umbral configuradas */
@@ -771,32 +1134,80 @@ public class AlertsController {
 
     @FXML
     private void onSaveConfig() {
-        Double riskThreshold = null;
-        Double anomalyThreshold = null;
+        Double  riskThreshold    = parseField(txtThresholdSalesDrop);
+        Double  anomalyThreshold = parseField(txtThresholdAnomaly);
+        Double  margenMinimo     = parseField(txtThresholdMargen);
+        Double  precioCambio     = parseField(txtThresholdPrecioCambio);
+        Integer maxAlerts        = (txtMaxAlerts != null && !txtMaxAlerts.getText().isBlank())
+                ? parseMaxAlerts(txtMaxAlerts.getText().trim()) : null;
 
-        try {
-            if (txtThresholdSalesDrop != null && !txtThresholdSalesDrop.getText().isBlank())
-                riskThreshold = Double.parseDouble(txtThresholdSalesDrop.getText().trim()) / 100.0;
-        } catch (NumberFormatException ignored) {}
+        // Leer nivel de confianza mínimo del ComboBox (ej. "80%" → 80.0)
+        Double minConfidence = null;
+        if (cmbConfidenceLevel != null && cmbConfidenceLevel.getValue() != null) {
+            try {
+                minConfidence = Double.parseDouble(
+                        cmbConfidenceLevel.getValue().replace("%", "").trim());
+            } catch (NumberFormatException ignored) {}
+        }
 
-        try {
-            if (txtThresholdAnomaly != null && !txtThresholdAnomaly.getText().isBlank())
-                anomalyThreshold = Double.parseDouble(txtThresholdAnomaly.getText().trim()) / 100.0;
-        } catch (NumberFormatException ignored) {}
+        if (btnSaveConfig != null) btnSaveConfig.setDisable(true);
+        showConfigStatus("\u23F3 Guardando...", true);
 
-        alertApiService.saveConfig(riskThreshold, null, anomalyThreshold)
+        alertApiService.saveConfig(riskThreshold, null, anomalyThreshold, maxAlerts, margenMinimo, precioCambio, minConfidence)
                 .thenAccept(ok -> Platform.runLater(() -> {
-                    if (ok) System.out.println("[CONFIG] Configuración guardada exitosamente");
-                    else    System.err.println("[CONFIG] Error al guardar configuración");
-                }));
+                    if (btnSaveConfig != null) btnSaveConfig.setDisable(false);
+                    if (ok) showConfigStatus("\u2714 Configuraci\u00F3n guardada correctamente.", true);
+                    else    showConfigStatus("\u2716 No se pudo guardar. Verifica la conexi\u00F3n.", false);
+                }))
+                .exceptionally(ex -> {
+                    Platform.runLater(() -> {
+                        if (btnSaveConfig != null) btnSaveConfig.setDisable(false);
+                        showConfigStatus("\u2716 Error inesperado al guardar.", false);
+                    });
+                    return null;
+                });
+    }
+
+    /**
+     * Muestra un mensaje de estado junto a los botones de configuración.
+     * Se oculta automáticamente después de 4 segundos si el mensaje es de éxito.
+     */
+    private void showConfigStatus(String message, boolean isOk) {
+        if (lblConfigStatus == null) return;
+        lblConfigStatus.setText(message);
+        lblConfigStatus.getStyleClass().removeAll("alrt-config-status-ok", "alrt-config-status-err");
+        lblConfigStatus.getStyleClass().add(isOk ? "alrt-config-status-ok" : "alrt-config-status-err");
+        lblConfigStatus.setVisible(true);
+        lblConfigStatus.setManaged(true);
+
+        // Auto-ocultar mensajes de éxito; los errores permanecen hasta nueva acción
+        if (isOk) {
+            PauseTransition pause = new PauseTransition(Duration.seconds(4));
+            pause.setOnFinished(e -> {
+                lblConfigStatus.setVisible(false);
+                lblConfigStatus.setManaged(false);
+            });
+            pause.play();
+        }
+    }
+
+    /** Parsea un TextField a Double. Retorna null si está vacío o no es número. */
+    private Double parseField(TextField field) {
+        if (field == null || field.getText().isBlank()) return null;
+        try { return Double.parseDouble(field.getText().trim()); }
+        catch (NumberFormatException e) { return null; }
+    }
+
+    /** Parsea una cadena a Integer. Retorna null si no es número entero válido. */
+    private Integer parseMaxAlerts(String text) {
+        try { return Integer.parseInt(text); }
+        catch (NumberFormatException e) { return null; }
     }
 
     @FXML
     private void onResetConfig() {
-        System.out.println("[CONFIG] Restablecer valores por defecto");
-        // TODO: configService.resetToDefaults() → luego recargar initConfigIfNeeded()
-        configInitialized = false;
-        initConfigIfNeeded();
+        // Restablecer valores por defecto en formulario sin llamar a la API
+        applyConfigToForm(Map.of());
     }
 
     @FXML

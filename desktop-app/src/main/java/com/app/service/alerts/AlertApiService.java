@@ -6,6 +6,9 @@ import com.app.model.alerts.AlertDTO;
 import com.app.model.alerts.AlertsListResponseDTO;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
+
+import java.util.HashMap;
+import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -185,16 +188,59 @@ public class AlertApiService {
     }
 
     /**
+     * GET /alerts/config
+     * Carga la configuración actual de umbrales. Retorna Map<String, Double> con los valores.
+     */
+    public CompletableFuture<Map<String, Double>> getConfig() {
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(ApiConfig.getAlertsConfigUrl()))
+                .header("Authorization", authHeader())
+                .timeout(Duration.ofSeconds(10))
+                .GET()
+                .build();
+
+        return httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofString())
+                .thenApply(response -> {
+                    if (response.statusCode() == 200) {
+                        JsonObject body = gson.fromJson(response.body(), JsonObject.class);
+                        if (body != null && body.has("success") && body.get("success").getAsBoolean()
+                                && body.has("config")) {
+                            JsonObject cfg = body.getAsJsonObject("config");
+                            Map<String, Double> result = new HashMap<>();
+                            cfg.entrySet().forEach(e -> {
+                                if (e.getValue().isJsonPrimitive())
+                                    result.put(e.getKey(), e.getValue().getAsDouble());
+                            });
+                            return result;
+                        }
+                    }
+                    return Map.<String, Double>of();
+                })
+                .exceptionally(ex -> {
+                    logger.error("Error en getConfig: {}", ex.getMessage());
+                    return Map.of();
+                });
+    }
+
+    /**
      * POST /alerts/config
-     * Configura umbrales de alertas.
+     * Configura umbrales de alertas. Los valores son en porcentaje (ej: 15 para 15%).
      */
     public CompletableFuture<Boolean> saveConfig(Double riskThreshold,
                                                   Double opportunityThreshold,
-                                                  Double anomalyThreshold) {
+                                                  Double anomalyThreshold,
+                                                  Integer maxActiveAlerts,
+                                                  Double margenMinimo,
+                                                  Double precioCambioThreshold,
+                                                  Double minConfidence) {
         JsonObject body = new JsonObject();
-        if (riskThreshold != null)        body.addProperty("risk_threshold", riskThreshold);
-        if (opportunityThreshold != null) body.addProperty("opportunity_threshold", opportunityThreshold);
-        if (anomalyThreshold != null)     body.addProperty("anomaly_rate_threshold", anomalyThreshold);
+        if (riskThreshold != null)          body.addProperty("risk_threshold",          riskThreshold);
+        if (opportunityThreshold != null)   body.addProperty("opportunity_threshold",   opportunityThreshold);
+        if (anomalyThreshold != null)       body.addProperty("anomaly_rate_threshold",  anomalyThreshold);
+        if (maxActiveAlerts != null)        body.addProperty("max_active_alerts",       maxActiveAlerts);
+        if (margenMinimo != null)           body.addProperty("margen_minimo",           margenMinimo);
+        if (precioCambioThreshold != null)  body.addProperty("precio_cambio_threshold", precioCambioThreshold);
+        if (minConfidence != null)          body.addProperty("min_confidence",          minConfidence);
 
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create(ApiConfig.getAlertsConfigUrl()))

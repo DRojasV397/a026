@@ -32,6 +32,10 @@ class ConfigureThresholdsRequest(BaseModel):
     risk_threshold: Optional[float] = Field(None, ge=1, le=50, description="Umbral de riesgo (%)")
     opportunity_threshold: Optional[float] = Field(None, ge=1, le=100, description="Umbral de oportunidad (%)")
     anomaly_rate_threshold: Optional[float] = Field(None, ge=1, le=20, description="Umbral de tasa de anomalias (%)")
+    max_active_alerts: Optional[int] = Field(None, ge=1, le=50, description="Maximo de alertas activas simultaneas")
+    margen_minimo: Optional[float] = Field(None, ge=0, le=100, description="Margen bruto minimo esperado (%)")
+    precio_cambio_threshold: Optional[float] = Field(None, ge=1, le=50, description="Umbral de cambio en precios de compra (%)")
+    min_confidence: Optional[float] = Field(None, ge=0, le=100, description="Nivel minimo de confianza para mostrar alertas (%)")
 
 
 class ChangeStatusRequest(BaseModel):
@@ -174,7 +178,11 @@ async def configure_thresholds(
     return service.configure_thresholds(
         risk_threshold=request.risk_threshold,
         opportunity_threshold=request.opportunity_threshold,
-        anomaly_rate_threshold=request.anomaly_rate_threshold
+        anomaly_rate_threshold=request.anomaly_rate_threshold,
+        max_active_alerts=request.max_active_alerts,
+        margen_minimo=request.margen_minimo,
+        precio_cambio_threshold=request.precio_cambio_threshold,
+        min_confidence=request.min_confidence
     )
 
 
@@ -201,27 +209,19 @@ async def analyze_and_generate_alerts(
     RF-04.01: Analiza datos y genera alertas automaticas.
 
     Detecta:
-    - Outliers (valores atipicos)
-    - Cambios repentinos (caidas/subidas)
-    - Rupturas de tendencia
-    - Tasas de anomalias altas (RN-04.03)
+    - Outliers / anomalias en ventas diarias (AnomalyDetector)
+    - Caidas o subidas de ventas vs historico (umbral 15% / 20%)
+    - Margen bruto por debajo del minimo configurado (default 20%)
+    - Alzas o bajas en precios de compra por producto (default > 10%)
 
-    Las alertas generadas incluyen:
-    - Nivel de confianza (RN-04.04)
-    - Prioridad por impacto (RN-04.06)
+    Las alertas generadas incluyen nivel de confianza y son priorizadas
+    por impacto economico (RN-04.06).
     """
     service = AlertService(db)
-    result = service.analyze_sales_for_alerts(
+    result = service.evaluate_all_alerts(
         fecha_inicio=fecha_inicio,
         fecha_fin=fecha_fin
     )
-
-    if not result.get("success"):
-        raise HTTPException(
-            status_code=400,
-            detail=result.get("error", "Error al analizar datos")
-        )
-
     return result
 
 
@@ -252,7 +252,7 @@ async def get_alert(
             "metrica": alerta.metrica,
             "valor_actual": float(alerta.valorActual) if alerta.valorActual else 0,
             "valor_esperado": float(alerta.valorEsperado) if alerta.valorEsperado else 0,
-            "nivel_confianza": float(alerta.nivelConfianza) if alerta.nivelConfianza else 0,
+            "nivel_confianza": round(float(alerta.nivelConfianza) * 100, 1) if alerta.nivelConfianza else 0.0,
             "estado": alerta.estado,
             "creada_en": alerta.creadaEn.isoformat() if alerta.creadaEn else None
         }

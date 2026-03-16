@@ -44,6 +44,9 @@
                         <TextField fx:id="txtActiveSearch"
                                    styleClass="alrt-search-input"
                                    HBox.hgrow="ALWAYS"/>
+                        <Button fx:id="btnRefreshAlerts"
+                                styleClass="btn-alrt-secondary"
+                                onAction="#onRefreshAlerts"/>
                         <Button fx:id="btnMarkAllRead"
                                 styleClass="btn-alrt-secondary"
                                 onAction="#onMarkAllRead"/>
@@ -267,6 +270,23 @@
                                        styleClass="alrt-form-hint"/>
                             </VBox>
                         </HBox>
+
+                        <HBox spacing="16">
+                            <VBox spacing="6" HBox.hgrow="ALWAYS">
+                                <Label text="Margen bruto mínimo (%)" styleClass="alrt-form-label"/>
+                                <TextField fx:id="txtThresholdMargen"
+                                           styleClass="alrt-form-input" promptText="20"/>
+                                <Label text="Genera alerta cuando el margen bruto caiga por debajo de este valor."
+                                       styleClass="alrt-form-hint"/>
+                            </VBox>
+                            <VBox spacing="6" HBox.hgrow="ALWAYS">
+                                <Label text="Cambio en precio de compra (%)" styleClass="alrt-form-label"/>
+                                <TextField fx:id="txtThresholdPrecioCambio"
+                                           styleClass="alrt-form-input" promptText="10"/>
+                                <Label text="Genera alerta cuando el costo de compra varíe más de este porcentaje."
+                                       styleClass="alrt-form-hint"/>
+                            </VBox>
+                        </HBox>
                     </VBox>
 
                     <!-- Card: Reglas de umbral -->
@@ -283,8 +303,12 @@
                         <VBox fx:id="thresholdRulesList" spacing="8"/>
                     </VBox>
 
-                    <!-- Botones guardar / restablecer -->
-                    <HBox spacing="12" alignment="CENTER_RIGHT">
+                    <!-- Botones guardar / restablecer + feedback -->
+                    <HBox spacing="12" alignment="CENTER_LEFT">
+                        <Label fx:id="lblConfigStatus"
+                               styleClass="alrt-config-status"
+                               visible="false" managed="false"
+                               HBox.hgrow="ALWAYS" wrapText="false"/>
                         <Button fx:id="btnResetConfig"
                                 text="Restablecer valores"
                                 styleClass="btn-alrt-secondary"
