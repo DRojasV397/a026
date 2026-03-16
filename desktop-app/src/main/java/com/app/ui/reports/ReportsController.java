@@ -1,9 +1,13 @@
 package com.app.ui.reports;
 
+import com.app.core.session.UserSession;
 import com.app.model.reports.ExecutionLogDTO;
 import com.app.model.reports.ReportDTO;
 import com.app.model.reports.ReportTypeDTO;
 import com.app.model.reports.ScheduledReportDTO;
+import com.app.service.reports.ReportGeneratorService;
+import com.app.service.reports.ReportRegistryService;
+import com.app.service.reports.ReportScheduler;
 import com.app.service.reports.ReportsService;
 import com.app.ui.components.AnimatedToggleSwitch;
 import javafx.application.Platform;
@@ -16,13 +20,17 @@ import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 import javafx.scene.layout.*;
 
+import java.awt.Desktop;
+import java.io.File;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.atomic.AtomicLong;
 
 public class ReportsController {
 
@@ -83,21 +91,28 @@ public class ReportsController {
     private List<Button>    allTabs;
     private List<VBox>      allSections;
     private int             activeTabIndex    = 0;
-    private String          selectedFormat    = "PDF";     // PDF | EXCEL
+    private String          selectedFormat    = "PDF";
     private ReportTypeDTO   selectedReportType = null;
     private List<ReportTypeDTO> cachedReportTypes;
 
-    // ── Servicio ──────────────────────────────────────────────────────────────
-    private final ReportsService reportsService = new ReportsService();
+    // ── Servicios ─────────────────────────────────────────────────────────────
+    private final ReportsService          reportsService = new ReportsService();
+    private final ReportGeneratorService  generator      = new ReportGeneratorService();
+    private final ReportRegistryService   registry       = new ReportRegistryService();
+    private final ReportScheduler         scheduler      = ReportScheduler.getInstance();
 
-    // Lista observable para filtrado en tiempo real
+    // ── Listas observables ────────────────────────────────────────────────────
     private ObservableList<ReportDTO>   allSavedReports;
     private FilteredList<ReportDTO>     filteredReports;
+    private final List<ExecutionLogDTO> executionLogs = new ArrayList<>();
+    private final AtomicLong            nextLogId     = new AtomicLong(1);
 
     private static final DateTimeFormatter FMT_DISPLAY =
             DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm", new Locale("es", "MX"));
     private static final DateTimeFormatter FMT_DATE =
             DateTimeFormatter.ofPattern("dd MMM yyyy", new Locale("es", "MX"));
+    private static final DateTimeFormatter FMT_DATERANGE =
+            DateTimeFormatter.ofPattern("dd/MM/yyyy");
 
     // ─────────────────────────────────────────────────────────────────────────
     @FXML
@@ -105,10 +120,9 @@ public class ReportsController {
         allTabs     = List.of(tabGenerate, tabSaved, tabSchedule);
         allSections = List.of(sectionGenerate, sectionSaved, sectionSchedule);
 
-        setAllTexts(); // renombrar el bloque de textos a método propio
+        setAllTexts();
 
-        // Cargar tipos de reporte desde la API
-        cachedReportTypes = getMockReportTypes(); // fallback mientras carga
+        cachedReportTypes = getMockReportTypes();
         loadReportTypes(cachedReportTypes);
 
         dpTo.setValue(LocalDate.now());
@@ -122,21 +136,20 @@ public class ReportsController {
             }
         }));
 
-        // El resto se difiere al siguiente pulso del hilo UI
+        // Inicializar datos persistentes y scheduler
         Platform.runLater(() -> {
-            loadSavedReports(getMockSavedReports());
-            loadScheduledReports(getMockScheduledReports());
-            loadExecutionHistory(getMockExecutionHistory());
+            loadSavedReports(registry.loadAll());
+            loadScheduledReports(scheduler.loadSchedules());
+            loadExecutionHistory(executionLogs);
+            scheduler.start(generator, reportsService, registry, this::onScheduledReportGenerated);
         });
     }
 
     private void setAllTexts() {
-        // ── Tabs ──────────────────────────────────────────────────────────────────
         tabGenerate.setText("Generar Reporte");
         tabSaved.setText("Reportes Guardados");
         tabSchedule.setText("Programaci\u00F3n");
 
-        // ── Sección: Generar Reporte ──────────────────────────────────────────────
         lblTypesTitle.setText("Tipo de Reporte");
         lblSelectTypeHint.setText("Selecciona un tipo de reporte\npara configurar y generar");
         lblReportName.setText("Nombre del Reporte");
@@ -148,11 +161,9 @@ public class ReportsController {
         lblExcelFormat.setText("Excel");
         btnGenerate.setText("Generar Reporte");
 
-        // ── Sección: Reportes Guardados ───────────────────────────────────────────
         txtSearch.setPromptText("\uD83D\uDD0D  Buscar reporte por nombre, tipo o usuario...");
         lblSavedEmpty.setText("No se encontraron reportes.\nGenera tu primer reporte en la pesta\u00F1a anterior.");
 
-        // ── Sección: Programación ─────────────────────────────────────────────────
         lblScheduleTitle.setText("Reportes Programados");
         btnNewSchedule.setText("+ Nueva Programaci\u00F3n");
         lblScheduleEmpty.setText("No hay reportes programados.\nCrea una programaci\u00F3n para automatizar la generaci\u00F3n.");
@@ -178,11 +189,9 @@ public class ReportsController {
         card.getStyleClass().add("report-type-card");
         card.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
 
-        // Icono
         ImageView icon = loadIcon(type.iconPath(), 32, 32);
         icon.getStyleClass().add("report-type-icon");
 
-        // Textos
         VBox texts = new VBox(3);
         Label name = new Label(type.name());
         name.getStyleClass().add("report-type-name");
@@ -193,54 +202,38 @@ public class ReportsController {
         HBox.setHgrow(texts, Priority.ALWAYS);
 
         card.getChildren().addAll(icon, texts);
-
-        // Click: selecciona este tipo
         card.setOnMouseClicked(e -> onReportTypeSelected(type, card));
-
         return card;
     }
 
     private void onReportTypeSelected(ReportTypeDTO type, HBox selectedCard) {
-        // Limpiar selección anterior
         reportTypeList.getChildren().forEach(n ->
                 n.getStyleClass().remove("report-type-card-selected"));
-
-        // Marcar la nueva selección
         selectedCard.getStyleClass().add("report-type-card-selected");
         selectedReportType = type;
 
-        // Mostrar el formulario de configuración
         configEmptyState.setVisible(false);
         configEmptyState.setManaged(false);
         configForm.setVisible(true);
         configForm.setManaged(true);
 
-        // Actualizar textos de configuración con el tipo seleccionado
         lblConfigTitle.setText("Configuraci\u00F3n: " + type.name());
         txtReportName.setText(type.name() + " - " +
                 DateTimeFormatter.ofPattern("dd/MM/yyyy").format(LocalDate.now()));
 
-        // Cargar sub-tipos según el tipo seleccionado
-        // TODO: reemplazar por subTypeService.findByReportType(type.id())
         loadSubTypes(type.id());
     }
 
-    /**
-     * Carga los sub-tipos disponibles para el tipo de reporte seleccionado.
-     * TODO: reemplazar por consulta a BD: subTypeService.findByReportType(typeId)
-     */
     private void loadSubTypes(String typeId) {
         cmbSubType.getItems().clear();
 
         List<String> subTypes = switch (typeId) {
-            case "ventas" -> List.of("Agrupado por d\u00EDa", "Agrupado por semana", "Agrupado por mes");
-            case "compras" -> List.of("Agrupado por d\u00EDa", "Agrupado por semana", "Agrupado por mes");
-            case "rentabilidad" -> List.of("Rentabilidad mensual");
-            case "productos" -> List.of("Top 10 productos", "Top 20 productos", "Top 50 productos");
-            // Compatibilidad con IDs legacy del mock
-            case "PREDICTIVE" -> List.of("Proyecci\u00F3n de ventas", "Predicci\u00F3n de demanda");
-            case "PROFIT" -> List.of("Rentabilidad general", "Rentabilidad por producto");
-            default -> List.of("Reporte completo");
+            case "ventas"       -> List.of("Agrupado por d\u00EDa", "Agrupado por semana", "Agrupado por mes");
+            case "compras"      -> List.of("Agrupado por d\u00EDa", "Agrupado por semana", "Agrupado por mes");
+            case "rentabilidad" -> List.of("Informe completo (mensual + categoría + producto)",
+                                             "Solo mensual", "Solo por categoría", "Solo por producto (top 50)");
+            case "productos"    -> List.of("Top 10 productos", "Top 20 productos", "Top 50 productos");
+            default             -> List.of("Reporte completo");
         };
 
         cmbSubType.getItems().addAll(subTypes);
@@ -267,7 +260,6 @@ public class ReportsController {
 
     @FXML
     private void onGenerateReport() {
-        // Validaciones
         if (selectedReportType == null) {
             showStatus("Selecciona un tipo de reporte.", false);
             return;
@@ -285,28 +277,75 @@ public class ReportsController {
             return;
         }
 
-        // Estado de carga
         btnGenerate.setDisable(true);
         showStatus("Generando reporte...", true);
 
-        String apiFormato = selectedFormat.equals("EXCEL") ? "excel" : "json";
-        String apiTipo    = selectedReportType.id(); // ya viene en formato API ("ventas", etc.)
+        String tipo          = selectedReportType.id();
+        String name          = txtReportName.getText().trim();
+        String subtype       = cmbSubType.getValue() != null ? cmbSubType.getValue() : "";
+        String agruparPor    = subtypeToAgruparPor(subtype);
+        int    topN          = subtypeToTopN(subtype);
+        String effectiveTipo = subtypeToEffectiveTipo(tipo, subtype);
+        String dateRange     = dpFrom.getValue().format(FMT_DATERANGE)
+                + " - " + dpTo.getValue().format(FMT_DATERANGE);
+        LocalDate from       = dpFrom.getValue();
+        LocalDate to         = dpTo.getValue();
+        String format        = selectedFormat;
 
-        reportsService.generateReport(
-                apiTipo,
-                dpFrom.getValue(),
-                dpTo.getValue(),
-                apiFormato,
-                "dia",
-                20
-        ).thenAccept(ok -> Platform.runLater(() -> {
-            btnGenerate.setDisable(false);
-            if (ok) {
-                showStatus("\u2714 Reporte generado exitosamente.", true);
-            } else {
-                showStatus("\u2716 Error al generar el reporte. Intenta de nuevo.", false);
-            }
-        }));
+        reportsService.fetchReportData(tipo, from, to, agruparPor, topN)
+                .thenAccept(data -> Platform.runLater(() -> {
+                    btnGenerate.setDisable(false);
+
+                    if (data.isEmpty()) {
+                        showStatus("\u2716 Error al obtener datos del servidor. Verifica la conexión.", false);
+                        return;
+                    }
+
+                    try {
+                        ReportGeneratorService.GeneratedFile file;
+                        if ("rentabilidad_completo".equals(effectiveTipo)) {
+                            file = generator.generateRentabilidadCompleto(
+                                    format, name, dateRange,
+                                    extractRows(data, "rentabilidad"),
+                                    extractRows(data, "rentabilidad_categoria"),
+                                    extractRows(data, "rentabilidad_producto"));
+                        } else {
+                            List<Map<String, Object>> rows = extractRows(data, effectiveTipo);
+                            file = generator.generate(format, name, effectiveTipo, dateRange, rows);
+                        }
+
+                        String displayTypeName = selectedReportType.name()
+                                + (subtype.isEmpty() ? "" : " — " + subtype);
+                        ReportDTO report = new ReportDTO(
+                                System.currentTimeMillis(),
+                                name,
+                                effectiveTipo,
+                                displayTypeName,
+                                format,
+                                UserSession.getNombreCompleto(),
+                                LocalDateTime.now(),
+                                file.path().toString(),
+                                file.sizeKb()
+                        );
+
+                        registry.add(report);
+                        allSavedReports.add(0, report);
+                        renderSavedReports();
+
+                        String msg = "\u2714 Guardado en: " + file.path().getFileName();
+                        showStatus(msg, true);
+
+                    } catch (Exception e) {
+                        showStatus("\u2716 Error al generar el archivo: " + e.getMessage(), false);
+                    }
+                }))
+                .exceptionally(ex -> {
+                    Platform.runLater(() -> {
+                        btnGenerate.setDisable(false);
+                        showStatus("\u2716 Error inesperado: " + ex.getMessage(), false);
+                    });
+                    return null;
+                });
     }
 
     private void showStatus(String message, boolean isSuccess) {
@@ -317,6 +356,50 @@ public class ReportsController {
         lblGenerateStatus.setManaged(true);
     }
 
+    // ── Subtype helpers ───────────────────────────────────────────────────────
+
+    private String subtypeToAgruparPor(String subtype) {
+        if (subtype == null) return "mes";
+        String lower = subtype.toLowerCase();
+        if (lower.contains("d\u00eda") || lower.contains("dia")) return "dia";
+        if (lower.contains("semana")) return "semana";
+        return "mes";
+    }
+
+    private int subtypeToTopN(String subtype) {
+        if (subtype == null) return 20;
+        if (subtype.contains("10")) return 10;
+        if (subtype.contains("50")) return 50;
+        return 20;
+    }
+
+    /**
+     * Convierte tipo + subtype en un "tipo efectivo" para el generador de archivos.
+     */
+    private String subtypeToEffectiveTipo(String tipo, String subtype) {
+        if (!"rentabilidad".equals(tipo) || subtype == null) return tipo;
+        String lower = subtype.toLowerCase();
+        if (lower.contains("completo"))  return "rentabilidad_completo";
+        if (lower.contains("categor"))   return "rentabilidad_categoria";
+        if (lower.contains("producto"))  return "rentabilidad_producto";
+        return tipo; // "Solo mensual" → usa tipo base
+    }
+
+    @SuppressWarnings("unchecked")
+    private List<Map<String, Object>> extractRows(Map<String, Object> data, String effectiveTipo) {
+        Object reporteObj = data.get("reporte");
+        if (!(reporteObj instanceof Map<?, ?> reporte)) return List.of();
+        Object listObj = switch (effectiveTipo.toLowerCase()) {
+            case "productos"               -> reporte.get("productos");
+            case "rentabilidad"            -> reporte.get("datos_mensuales");
+            case "rentabilidad_categoria"  -> reporte.get("por_categoria");
+            case "rentabilidad_producto"   -> reporte.get("por_producto");
+            default                        -> reporte.get("datos");
+        };
+        if (listObj instanceof List<?> list) return (List<Map<String, Object>>) list;
+        return List.of();
+    }
+
     // ═════════════════════════════════════════════════════════════════════════
     //  REPORTES GUARDADOS — con buscador
     // ═════════════════════════════════════════════════════════════════════════
@@ -325,7 +408,6 @@ public class ReportsController {
         allSavedReports = FXCollections.observableArrayList(reports);
         filteredReports = new FilteredList<>(allSavedReports, p -> true);
 
-        // Listener del buscador: filtra en tiempo real
         txtSearch.textProperty().addListener((obs, oldVal, newVal) -> {
             String term = newVal == null ? "" : newVal.trim().toLowerCase();
             filteredReports.setPredicate(report -> {
@@ -338,7 +420,6 @@ public class ReportsController {
             renderSavedReports();
         });
 
-        // Renderizado inicial
         renderSavedReports();
     }
 
@@ -364,13 +445,11 @@ public class ReportsController {
         row.getStyleClass().add("saved-report-row");
         row.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
 
-        // ── Icono de formato ─────────────────────────────────────────────────
         String iconPath = report.format().equals("PDF")
                 ? "/images/reports/format-pdf.png"
                 : "/images/reports/format-excel.png";
         ImageView formatIcon = loadIcon(iconPath, 32, 32);
 
-        // ── Nombre + badge "Nuevo" ────────────────────────────────────────────
         HBox nameRow = new HBox(8);
         nameRow.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
         Label lblName = new Label(report.name());
@@ -383,43 +462,53 @@ public class ReportsController {
             nameRow.getChildren().add(badge);
         }
 
-        // ── Meta: tipo y fecha ────────────────────────────────────────────────
-        Label lblMeta = new Label(report.typeName() + "  ·  " +
+        Label lblMeta = new Label(report.typeName() + "  \u00B7  " +
                 report.createdAt().format(FMT_DISPLAY));
         lblMeta.getStyleClass().add("saved-report-meta");
 
-        // ── Usuario generó ────────────────────────────────────────────────────
         Label lblUser = new Label("\uD83D\uDC64  " + report.generatedBy());
         lblUser.getStyleClass().add("saved-report-user");
 
         VBox info = new VBox(3, nameRow, lblMeta, lblUser);
         HBox.setHgrow(info, Priority.ALWAYS);
 
-        // ── Tamaño ────────────────────────────────────────────────────────────
         Label lblSize = new Label(report.sizeKb() + " KB");
         lblSize.getStyleClass().add("saved-report-size");
 
-        // ── Botón descargar ───────────────────────────────────────────────────
         Button btnDownload = new Button();
         btnDownload.getStyleClass().add("icon-btn");
         btnDownload.setGraphic(loadIcon("/images/reports/icon-download.png", 18, 18));
-        btnDownload.setTooltip(new Tooltip("Descargar"));
-        // TODO: reemplazar por reportService.download(report.filePath())
+        btnDownload.setTooltip(new Tooltip("Abrir archivo"));
         btnDownload.setOnAction(e -> onDownloadReport(report));
 
         row.getChildren().addAll(formatIcon, info, lblSize, btnDownload);
         return row;
     }
 
-    /**
-     * Descarga un reporte guardado.
-     * TODO: reemplazar por reportService.download(report.filePath())
-     *       o abrir FileChooser para elegir destino y copiar el archivo
-     */
     private void onDownloadReport(ReportDTO report) {
-        System.out.printf("[REPORT] Descargando: id=%d, ruta=%s%n",
-                report.id(), report.filePath());
-        // Aquí iría la lógica de descarga / abrir con el SO
+        if (report.filePath() == null || report.filePath().isBlank()) {
+            showAlertError("No hay ruta de archivo disponible para este reporte.");
+            return;
+        }
+        File file = new File(report.filePath());
+        if (!file.exists()) {
+            showAlertError("El archivo ya no existe en disco:\n" + report.filePath());
+            return;
+        }
+        try {
+            Desktop.getDesktop().open(file);
+        } catch (Exception e) {
+            showAlertError("No se pudo abrir el archivo:\n" + e.getMessage());
+        }
+    }
+
+    private void showAlertError(String msg) {
+        Alert alert = new Alert(Alert.AlertType.ERROR);
+        alert.setTitle("Error");
+        alert.setHeaderText(null);
+        alert.setContentText(msg);
+        applyAlertStyle(alert);
+        alert.showAndWait();
     }
 
     // ═════════════════════════════════════════════════════════════════════════
@@ -444,28 +533,29 @@ public class ReportsController {
         card.getStyleClass().add("schedule-card");
         card.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
 
-        // ── Toggle de activación ──────────────────────────────────────────────
         AnimatedToggleSwitch toggle = new AnimatedToggleSwitch();
         toggle.setSelected(schedule.active());
         toggle.selectedProperty().addListener((obs, oldVal, active) -> {
-            // TODO: scheduledReportService.setActive(schedule.id(), active)
-            System.out.printf("[SCHEDULE] id=%d → activo=%s%n", schedule.id(), active);
+            ScheduledReportDTO updated = new ScheduledReportDTO(
+                    schedule.id(), schedule.name(), schedule.reportTypeId(),
+                    schedule.typeName(), schedule.frequency(), schedule.scheduledTime(),
+                    schedule.format(), active,
+                    schedule.lastExecution(), schedule.nextExecution(), schedule.createdBy());
+            scheduler.updateSchedule(updated);
         });
 
-        // ── Icono del tipo ────────────────────────────────────────────────────
         ReportTypeDTO type = cachedReportTypes.stream()
                 .filter(t -> t.id().equals(schedule.reportTypeId()))
                 .findFirst().orElse(null);
         ImageView typeIcon = loadIcon(
                 type != null ? type.iconPath() : "/images/reports/format-pdf.png", 28, 28);
 
-        // ── Información principal ─────────────────────────────────────────────
         Label lblName = new Label(schedule.name());
         lblName.getStyleClass().add("schedule-name");
 
         Label lblFreq = new Label("\uD83D\uDD01  " + schedule.frequency()
-                + "  ·  " + schedule.scheduledTime()
-                + "  ·  " + schedule.format());
+                + "  \u00B7  " + schedule.scheduledTime()
+                + "  \u00B7  " + schedule.format());
         lblFreq.getStyleClass().add("schedule-meta");
 
         String lastExec = schedule.lastExecution() != null
@@ -476,26 +566,23 @@ public class ReportsController {
 
         String nextExec = schedule.nextExecution() != null
                 ? schedule.nextExecution().format(FMT_DISPLAY)
-                : "—";
+                : "\u2014";
         Label lblNext = new Label("\u23F0  Pr\u00F3xima: " + nextExec);
         lblNext.getStyleClass().add("schedule-meta");
 
         VBox info = new VBox(4, lblName, lblFreq, lblLast, lblNext);
         HBox.setHgrow(info, Priority.ALWAYS);
 
-        // ── Botones de acción ─────────────────────────────────────────────────
         Button btnEdit = new Button();
         btnEdit.getStyleClass().add("icon-btn");
         btnEdit.setGraphic(loadIcon("/images/reports/icon-edit.png", 16, 16));
         btnEdit.setTooltip(new Tooltip("Editar programaci\u00F3n"));
-        // TODO: abrir modal de edición: scheduleDialog.open(schedule)
         btnEdit.setOnAction(e -> onEditSchedule(schedule));
 
         Button btnDelete = new Button();
         btnDelete.getStyleClass().addAll("icon-btn", "icon-btn-danger");
         btnDelete.setGraphic(loadIcon("/images/reports/icon-delete.png", 16, 16));
         btnDelete.setTooltip(new Tooltip("Eliminar programaci\u00F3n"));
-        // TODO: confirmar y llamar scheduleService.delete(schedule.id())
         btnDelete.setOnAction(e -> onDeleteSchedule(schedule));
 
         VBox actions = new VBox(6, btnEdit, btnDelete);
@@ -505,44 +592,145 @@ public class ReportsController {
         return card;
     }
 
-    /**
-     * Abre el formulario de edición de una programación existente.
-     * TODO: abrir modal/dialog con los datos de la programación precargados
-     */
     private void onEditSchedule(ScheduledReportDTO schedule) {
-        System.out.printf("[SCHEDULE] Editar id=%d: %s%n", schedule.id(), schedule.name());
+        openScheduleDialog(schedule);
     }
 
-    /**
-     * Elimina una programación tras confirmación del usuario.
-     * TODO: llamar a scheduledReportService.delete(schedule.id()) y recargar la lista
-     */
     private void onDeleteSchedule(ScheduledReportDTO schedule) {
         Alert confirm = new Alert(Alert.AlertType.CONFIRMATION);
         confirm.setTitle("Eliminar programaci\u00F3n");
-        confirm.setHeaderText("¿Eliminar \"" + schedule.name() + "\"?");
+        confirm.setHeaderText("\u00BFEliminar \"" + schedule.name() + "\"?");
         confirm.setContentText("Esta acci\u00F3n no se puede deshacer.");
 
         ButtonType btnYes = new ButtonType("Eliminar", ButtonBar.ButtonData.OK_DONE);
         ButtonType btnNo  = new ButtonType("Cancelar", ButtonBar.ButtonData.CANCEL_CLOSE);
         confirm.getButtonTypes().setAll(btnYes, btnNo);
+        applyAlertStyle(confirm);
 
         confirm.showAndWait().ifPresent(btn -> {
             if (btn == btnYes) {
-                // TODO: scheduledReportService.delete(schedule.id())
-                System.out.printf("[SCHEDULE] Eliminado id=%d%n", schedule.id());
-                // Recargar la lista (sustituir por carga real)
-                loadScheduledReports(getMockScheduledReports().stream()
-                        .filter(s -> s.id() != schedule.id()).toList());
+                scheduler.deleteSchedule(schedule.id());
+                loadScheduledReports(scheduler.loadSchedules());
             }
         });
     }
 
     @FXML
     private void onNewSchedule() {
-        // TODO: abrir modal/dialog de nueva programación
-        // scheduleDialog.openNew()
-        System.out.println("[SCHEDULE] Abrir formulario nueva programaci\u00F3n");
+        openScheduleDialog(null);
+    }
+
+    /**
+     * Abre un diálogo para crear o editar una programación.
+     * @param existing null = nueva programación; non-null = editar existente
+     */
+    private void openScheduleDialog(ScheduledReportDTO existing) {
+        boolean isNew = (existing == null);
+        Dialog<ScheduledReportDTO> dialog = new Dialog<>();
+        dialog.setTitle(isNew ? "Nueva Programaci\u00F3n" : "Editar Programaci\u00F3n");
+        dialog.setHeaderText(isNew ? "Configura la nueva programaci\u00F3n automática" : "Modifica la programaci\u00F3n");
+
+        ButtonType okBtn     = new ButtonType(isNew ? "Crear" : "Guardar", ButtonBar.ButtonData.OK_DONE);
+        ButtonType cancelBtn = new ButtonType("Cancelar", ButtonBar.ButtonData.CANCEL_CLOSE);
+        dialog.getDialogPane().getButtonTypes().addAll(okBtn, cancelBtn);
+
+        // ── Form fields ───────────────────────────────────────────────────────
+        TextField nameField = new TextField(isNew ? "" : existing.name());
+        nameField.setPromptText("Ej: Ventas Diarias");
+
+        ComboBox<String> tipoCombo = new ComboBox<>();
+        tipoCombo.getItems().addAll("ventas", "compras", "rentabilidad", "productos");
+        tipoCombo.setValue(isNew ? "ventas" : existing.reportTypeId());
+
+        ComboBox<String> frecCombo = new ComboBox<>();
+        frecCombo.getItems().addAll("Diaria", "Semanal", "Mensual", "Trimestral");
+        frecCombo.setValue(isNew ? "Diaria" : existing.frequency());
+
+        TextField horaField = new TextField(isNew ? "08:00" : existing.scheduledTime());
+        horaField.setPromptText("HH:mm");
+
+        ComboBox<String> formatoCombo = new ComboBox<>();
+        formatoCombo.getItems().addAll("PDF", "EXCEL");
+        formatoCombo.setValue(isNew ? "PDF" : (existing.format().equals("AMBOS") ? "PDF" : existing.format()));
+
+        // ── Layout ────────────────────────────────────────────────────────────
+        javafx.scene.layout.GridPane grid = new javafx.scene.layout.GridPane();
+        grid.setHgap(12);
+        grid.setVgap(10);
+        grid.setPadding(new javafx.geometry.Insets(16));
+
+        grid.add(new Label("Nombre:"),    0, 0); grid.add(nameField,   1, 0);
+        grid.add(new Label("Tipo:"),      0, 1); grid.add(tipoCombo,   1, 1);
+        grid.add(new Label("Frecuencia:"),0, 2); grid.add(frecCombo,   1, 2);
+        grid.add(new Label("Hora (HH:mm):"), 0, 3); grid.add(horaField, 1, 3);
+        grid.add(new Label("Formato:"),   0, 4); grid.add(formatoCombo,1, 4);
+
+        HBox.setHgrow(nameField, Priority.ALWAYS);
+        tipoCombo.setMaxWidth(Double.MAX_VALUE);
+        frecCombo.setMaxWidth(Double.MAX_VALUE);
+        horaField.setMaxWidth(Double.MAX_VALUE);
+        formatoCombo.setMaxWidth(Double.MAX_VALUE);
+
+        dialog.getDialogPane().setContent(grid);
+        applyAlertStyle(dialog);
+
+        // ── Result converter ──────────────────────────────────────────────────
+        dialog.setResultConverter(buttonType -> {
+            if (buttonType != okBtn) return null;
+
+            String name = nameField.getText().trim();
+            if (name.isEmpty()) {
+                showAlertError("El nombre de la programación no puede estar vacío.");
+                return null;
+            }
+            String hora = horaField.getText().trim();
+            if (!hora.matches("\\d{1,2}:\\d{2}")) {
+                showAlertError("La hora debe tener formato HH:mm (ej: 08:00).");
+                return null;
+            }
+
+            String tipo = tipoCombo.getValue();
+            String typeName = capitalize(tipo);
+            String frec   = frecCombo.getValue();
+            String formato = formatoCombo.getValue();
+            boolean active = isNew || existing.active();
+            LocalDateTime lastExec = isNew ? null : existing.lastExecution();
+
+            return new ScheduledReportDTO(
+                    isNew ? 0L : existing.id(),
+                    name, tipo, typeName, frec, hora, formato, active,
+                    lastExec, null,
+                    UserSession.getNombreCompleto()
+            );
+        });
+
+        dialog.showAndWait().ifPresent(result -> {
+            if (result != null) {
+                scheduler.saveSchedule(result);
+                loadScheduledReports(scheduler.loadSchedules());
+            }
+        });
+    }
+
+    /** Callback invocado por el scheduler cuando un reporte automático se genera. */
+    private void onScheduledReportGenerated(ReportDTO report) {
+        Platform.runLater(() -> {
+            allSavedReports.add(0, report);
+            renderSavedReports();
+
+            ExecutionLogDTO log = new ExecutionLogDTO(
+                    nextLogId.getAndIncrement(),
+                    0L,
+                    report.name(),
+                    report.createdAt(),
+                    "EXITOSO",
+                    0L,
+                    "[" + report.createdAt().format(FMT_DISPLAY) + "] Reporte generado automáticamente.\n"
+                            + "Archivo: " + report.filePath()
+            );
+            executionLogs.add(0, log);
+            loadExecutionHistory(executionLogs);
+        });
     }
 
     // ═════════════════════════════════════════════════════════════════════════
@@ -567,8 +755,6 @@ public class ReportsController {
         row.getStyleClass().add("history-row");
         row.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
 
-        // ── Helper interno: crea una columna de ancho fijo garantizado ────────────
-        // minWidth = maxWidth fuerza al HBox padre a respetar exactamente ese ancho
         java.util.function.BiFunction<javafx.scene.Node, Double, HBox> fixedCol =
                 (node, width) -> {
                     HBox col = new HBox(node);
@@ -578,8 +764,7 @@ public class ReportsController {
                     return col;
                 };
 
-        // Indicador de estado
-        Label statusDot = new Label("●");
+        Label statusDot = new Label("\u25CF");
         statusDot.getStyleClass().add("status-dot");
         statusDot.getStyleClass().add(switch (log.status()) {
             case "EXITOSO" -> "status-dot-success";
@@ -588,44 +773,34 @@ public class ReportsController {
         });
         HBox colDot = fixedCol.apply(statusDot, 20.0);
 
-        // ── Columna 2: nombre (flexible, consume el espacio restante) ─────────────
         Label lblName = new Label(log.scheduledName());
         lblName.getStyleClass().add("history-name");
         lblName.setTextOverrun(javafx.scene.control.OverrunStyle.ELLIPSIS);
-        lblName.setMaxWidth(Double.MAX_VALUE);   // permite que crezca hasta el límite
-        HBox.setHgrow(lblName, Priority.ALWAYS); // toma el espacio disponible
+        lblName.setMaxWidth(Double.MAX_VALUE);
+        HBox.setHgrow(lblName, Priority.ALWAYS);
 
-        // ── Columna 3: fecha (fijo 140px) ─────────────────────────────────────────
         Label lblDate = new Label(log.executedAt().format(FMT_DISPLAY));
         lblDate.getStyleClass().add("history-meta");
         HBox colDate = fixedCol.apply(lblDate, 140.0);
 
-        // ── Columna 4: duración (fijo 70px) ───────────────────────────────────────
         Label lblDuration = new Label(log.durationMs() + " ms");
         lblDuration.getStyleClass().add("history-meta");
         HBox colDuration = fixedCol.apply(lblDuration, 70.0);
 
-        // ── Columna 5: estatus con color (fijo 80px) ──────────────────────────────
         Label lblStatus = new Label(log.status());
         lblStatus.getStyleClass().add("history-status-" + log.status().toLowerCase());
         HBox colStatus = fixedCol.apply(lblStatus, 80.0);
 
-        // ── Columna 6: botón "Ver log" (ancho natural, al extremo derecho) ─────────
         Button btnLog = new Button();
         btnLog.getStyleClass().add("icon-btn-sm");
         btnLog.setGraphic(loadIcon("/images/reports/icon-log.png", 14, 14));
         btnLog.setTooltip(new Tooltip("Ver detalle del log"));
-        // TODO: abrir modal con log.logDetail()
         btnLog.setOnAction(e -> onViewLog(log));
 
         row.getChildren().addAll(colDot, lblName, colDate, colDuration, colStatus, btnLog);
         return row;
     }
 
-    /**
-     * Muestra el detalle del log de una ejecución.
-     * TODO: abrir modal estilizado con log.logDetail() en lugar de un Alert
-     */
     private void onViewLog(ExecutionLogDTO log) {
         Alert logDialog = new Alert(Alert.AlertType.INFORMATION);
         logDialog.setTitle("Log de ejecuci\u00F3n");
@@ -641,54 +816,8 @@ public class ReportsController {
         logDialog.getDialogPane().setExpandableContent(logArea);
         logDialog.getDialogPane().setExpanded(true);
 
-        // Mismo patrón que applyAlertStyle del ProfileController
         applyAlertStyle(logDialog);
-
         logDialog.showAndWait();
-    }
-
-    /**
-     * Aplica CSS e ícono de la app a cualquier Alert del módulo de reportes.
-     * Mismo patrón que ProfileController.applyAlertStyle().
-     */
-    private void applyAlertStyle(Alert alert) {
-        // 1. CSS
-        try {
-            String cssPath = Objects.requireNonNull(
-                    getClass().getResource("/styles/reports.css")
-            ).toExternalForm();
-            alert.getDialogPane().getStylesheets().add(cssPath);
-            alert.getDialogPane().getStyleClass().add("custom-alert");
-        } catch (Exception e) {
-            System.err.println("[Error] CSS del alert no encontrado: " + e.getMessage());
-        }
-
-        // 2. Ícono — mismo manejo robusto que ya tienes en Profile
-        var scene = alert.getDialogPane().getScene();
-        if (scene != null) {
-            scene.windowProperty().addListener((obs, oldWin, newWin) -> {
-                if (newWin instanceof javafx.stage.Stage dialogStage) {
-                    injectIcon(dialogStage);
-                }
-            });
-            // Caso: la ventana ya existe cuando se llama al método
-            if (scene.getWindow() instanceof javafx.stage.Stage stage) {
-                injectIcon(stage);
-            }
-        }
-    }
-
-    private void injectIcon(javafx.stage.Stage stage) {
-        try {
-            var iconStream = getClass().getResourceAsStream("/images/app-icon.png");
-            if (iconStream == null) {
-                System.err.println("[Error] app-icon.png no encontrado.");
-                return;
-            }
-            stage.getIcons().add(new Image(iconStream));
-        } catch (Exception e) {
-            System.err.println("[Error] No se pudo inyectar el ícono: " + e.getMessage());
-        }
     }
 
     // ═════════════════════════════════════════════════════════════════════════
@@ -716,10 +845,6 @@ public class ReportsController {
     //  UTILIDADES
     // ═════════════════════════════════════════════════════════════════════════
 
-    /**
-     * Carga una imagen desde el classpath y devuelve un ImageView configurado.
-     * Si la imagen no existe, devuelve un ImageView vacío sin lanzar excepción.
-     */
     private ImageView loadIcon(String path, int width, int height) {
         ImageView iv = new ImageView();
         iv.setFitWidth(width);
@@ -734,110 +859,55 @@ public class ReportsController {
         return iv;
     }
 
+    private void applyAlertStyle(Dialog<?> dialog) {
+        try {
+            String cssPath = Objects.requireNonNull(
+                    getClass().getResource("/styles/reports.css")
+            ).toExternalForm();
+            dialog.getDialogPane().getStylesheets().add(cssPath);
+            dialog.getDialogPane().getStyleClass().add("custom-alert");
+        } catch (Exception e) {
+            System.err.println("[Error] CSS del alert no encontrado: " + e.getMessage());
+        }
+
+        var scene = dialog.getDialogPane().getScene();
+        if (scene != null) {
+            scene.windowProperty().addListener((obs, oldWin, newWin) -> {
+                if (newWin instanceof javafx.stage.Stage dialogStage) injectIcon(dialogStage);
+            });
+            if (scene.getWindow() instanceof javafx.stage.Stage stage) injectIcon(stage);
+        }
+    }
+
+    private void injectIcon(javafx.stage.Stage stage) {
+        try {
+            var iconStream = getClass().getResourceAsStream("/images/app-icon.png");
+            if (iconStream == null) return;
+            stage.getIcons().add(new Image(iconStream));
+        } catch (Exception e) {
+            System.err.println("[Error] No se pudo inyectar el \u00EDcono: " + e.getMessage());
+        }
+    }
+
+    private String capitalize(String s) {
+        if (s == null || s.isEmpty()) return s == null ? "" : s;
+        return Character.toUpperCase(s.charAt(0)) + s.substring(1).toLowerCase();
+    }
+
     // ═════════════════════════════════════════════════════════════════════════
-    //  MOCKS — sustituir por servicios reales
+    //  MOCK fallback — sólo para tipos de reporte mientras carga la API
     // ═════════════════════════════════════════════════════════════════════════
 
-    /**
-     * Tipos de reporte disponibles en el sistema.
-     * TODO: sustituir por reportTypeService.findAll()
-     */
     private List<ReportTypeDTO> getMockReportTypes() {
         return List.of(
-                new ReportTypeDTO(
-                        "PREDICTIVE",
-                        "Reporte de Predicciones",
-                        "Exporta los resultados de los modelos predictivos generados.",
-                        "/images/reports/report-predictive.png"
-                ),
-                new ReportTypeDTO(
-                        "PROFIT",
-                        "Reporte de Rentabilidad",
-                        "An\u00E1lisis completo de rentabilidad por producto o categor\u00EDa.",
-                        "/images/reports/report-profit.png"
-                )
-        );
-    }
-
-    /**
-     * Reportes ya generados y guardados en el sistema.
-     * TODO: sustituir por reportService.findAll() o reportService.findByUser(userId)
-     */
-    private List<ReportDTO> getMockSavedReports() {
-        return List.of(
-                new ReportDTO(1L, "Predicciones Q1 2026", "PREDICTIVE",
-                        "Reporte de Predicciones", "PDF", "Mateo Alexander",
-                        LocalDateTime.now().minusHours(2),
-                        "/reports/pred_q1_2026.pdf", 1248L),
-                new ReportDTO(2L, "Rentabilidad Enero 2026", "PROFIT",
-                        "Reporte de Rentabilidad", "EXCEL", "Mateo Alexander",
-                        LocalDateTime.now().minusDays(3),
-                        "/reports/rent_ene_2026.xlsx", 2034L),
-                new ReportDTO(3L, "Predicciones Dic 2025", "PREDICTIVE",
-                        "Reporte de Predicciones", "PDF", "Ana Mart\u00EDnez",
-                        LocalDateTime.now().minusDays(45),
-                        "/reports/pred_dic_2025.pdf", 987L),
-                new ReportDTO(4L, "Rentabilidad General 2025", "PROFIT",
-                        "Reporte de Rentabilidad", "PDF", "Mateo Alexander",
-                        LocalDateTime.now().minusDays(60),
-                        "/reports/rent_gen_2025.pdf", 3512L)
-        );
-    }
-
-    /**
-     * Reportes con programación automática configurada.
-     * TODO: sustituir por scheduledReportService.findAll()
-     */
-    private List<ScheduledReportDTO> getMockScheduledReports() {
-        return List.of(
-                new ScheduledReportDTO(1L, "Predicciones Semanal",
-                        "PREDICTIVE", "Reporte de Predicciones",
-                        "Semanal", "08:00", "PDF", true,
-                        LocalDateTime.now().minusDays(7),
-                        LocalDateTime.now().plusDays(7),
-                        "Mateo Alexander"),
-                new ScheduledReportDTO(2L, "Rentabilidad Mensual",
-                        "PROFIT", "Reporte de Rentabilidad",
-                        "Mensual", "06:00", "AMBOS", true,
-                        LocalDateTime.now().minusDays(30),
-                        LocalDateTime.now().plusDays(1),
-                        "Mateo Alexander"),
-                new ScheduledReportDTO(3L, "Resumen Trimestral",
-                        "PROFIT", "Reporte de Rentabilidad",
-                        "Trimestral", "07:00", "PDF", false,
-                        LocalDateTime.now().minusDays(90),
-                        LocalDateTime.now().plusDays(3),
-                        "Ana Mart\u00EDnez")
-        );
-    }
-
-    /**
-     * Historial de las últimas ejecuciones de reportes programados.
-     * TODO: sustituir por executionLogService.findRecent(limit = 10)
-     */
-    private List<ExecutionLogDTO> getMockExecutionHistory() {
-        return List.of(
-                new ExecutionLogDTO(1L, 1L, "Predicciones Semanal alias alejandror riba sjs",
-                        LocalDateTime.now().minusDays(7),
-                        "EXITOSO", 3420L,
-                        "[2026-02-07 08:00:03] Inicio de generaci\u00F3n\n"
-                                + "[2026-02-07 08:00:05] Consultando predicciones...\n"
-                                + "[2026-02-07 08:00:06] Aplicando formato PDF\n"
-                                + "[2026-02-07 08:00:06] Archivo generado: pred_semanal_0207.pdf\n"
-                                + "[2026-02-07 08:00:06] Proceso completado exitosamente."),
-                new ExecutionLogDTO(2L, 2L, "Rentabilidad Mensual",
-                        LocalDateTime.now().minusDays(30),
-                        "EXITOSO", 8210L,
-                        "[2026-01-14 06:00:01] Inicio de generaci\u00F3n\n"
-                                + "[2026-01-14 06:00:04] Consultando datos de rentabilidad...\n"
-                                + "[2026-01-14 06:00:07] Generando Excel y PDF\n"
-                                + "[2026-01-14 06:00:09] Proceso completado."),
-                new ExecutionLogDTO(3L, 3L, "Resumen Trimestral",
-                        LocalDateTime.now().minusDays(90),
-                        "FALLIDO", 1200L,
-                        "[2025-11-14 07:00:01] Inicio de generaci\u00F3n\n"
-                                + "[2025-11-14 07:00:02] ERROR: No se encontraron datos para el per\u00EDodo.\n"
-                                + "[2025-11-14 07:00:02] Proceso terminado con error.")
+                new ReportTypeDTO("ventas", "Reporte de Ventas",
+                        "Ventas agrupadas por período.", "/images/reports/report-predictive.png"),
+                new ReportTypeDTO("compras", "Reporte de Compras",
+                        "Compras agrupadas por período.", "/images/reports/report-profit.png"),
+                new ReportTypeDTO("rentabilidad", "Rentabilidad",
+                        "Análisis de rentabilidad mensual.", "/images/reports/report-profit.png"),
+                new ReportTypeDTO("productos", "Top Productos",
+                        "Productos más vendidos del período.", "/images/reports/report-predictive.png")
         );
     }
 }

@@ -287,8 +287,10 @@ class ReportService:
         margen_bruto = (utilidad_bruta / ingresos * 100) if ingresos > 0 else 0
         roi = (utilidad_bruta / costos * 100) if costos > 0 else 0
 
-        # Calcular por mes
+        # Calcular desglose
         datos_mensuales = self._calcular_rentabilidad_mensual(ventas, compras)
+        por_categoria   = self._calcular_rentabilidad_por_categoria(fecha_inicio, fecha_fin)
+        por_producto    = self._calcular_rentabilidad_por_producto(fecha_inicio, fecha_fin)
 
         reporte_data = {
             "tipo_reporte": "rentabilidad",
@@ -304,6 +306,8 @@ class ReportService:
                 "roi_porcentaje": round(roi, 2)
             },
             "datos_mensuales": datos_mensuales,
+            "por_categoria": por_categoria,
+            "por_producto": por_producto,
             "generado_en": datetime.now().isoformat()
         }
 
@@ -372,6 +376,103 @@ class ReportService:
                 "margen": round(margen, 2)
             })
 
+        return datos
+
+    def _calcular_rentabilidad_por_categoria(
+        self, fecha_inicio: date, fecha_fin: date
+    ) -> List[Dict]:
+        """
+        Rentabilidad agrupada por categoría.
+        Ingresos = ventas (precio venta × cantidad).
+        Costos   = COGS (costo unitario × cantidad vendida).
+        """
+        try:
+            rows = (
+                self.db.query(
+                    Categoria.nombre.label("cat_nombre"),
+                    func.sum(
+                        DetalleVenta.cantidad * DetalleVenta.precioUnitario
+                    ).label("ingresos"),
+                    func.sum(
+                        DetalleVenta.cantidad
+                        * func.coalesce(Producto.costoUnitario, 0)
+                    ).label("costos"),
+                )
+                .join(Venta, DetalleVenta.idVenta == Venta.idVenta)
+                .join(Producto, DetalleVenta.idProducto == Producto.idProducto)
+                .join(Categoria, Producto.idCategoria == Categoria.idCategoria)
+                .filter(Venta.fecha >= fecha_inicio, Venta.fecha <= fecha_fin)
+                .group_by(Categoria.nombre)
+                .order_by(func.sum(DetalleVenta.cantidad * DetalleVenta.precioUnitario).desc())
+                .all()
+            )
+        except Exception as e:
+            logger.error(f"Error en rentabilidad por categoría: {e}")
+            return []
+
+        datos = []
+        for r in rows:
+            ing = round(float(r.ingresos or 0), 2)
+            cos = round(float(r.costos  or 0), 2)
+            uti = round(ing - cos, 2)
+            mar = round((uti / ing * 100) if ing > 0 else 0, 2)
+            datos.append({
+                "categoria": r.cat_nombre or "Sin categoría",
+                "ingresos":  ing,
+                "costos":    cos,
+                "utilidad":  uti,
+                "margen":    mar,
+            })
+        return datos
+
+    def _calcular_rentabilidad_por_producto(
+        self, fecha_inicio: date, fecha_fin: date, top_n: int = 50
+    ) -> List[Dict]:
+        """
+        Rentabilidad agrupada por producto (top_n por ingresos).
+        Ingresos = precio venta × cantidad.
+        Costos   = costo unitario × cantidad vendida.
+        """
+        try:
+            rows = (
+                self.db.query(
+                    Producto.nombre.label("prod_nombre"),
+                    Categoria.nombre.label("cat_nombre"),
+                    func.sum(
+                        DetalleVenta.cantidad * DetalleVenta.precioUnitario
+                    ).label("ingresos"),
+                    func.sum(
+                        DetalleVenta.cantidad
+                        * func.coalesce(Producto.costoUnitario, 0)
+                    ).label("costos"),
+                )
+                .join(Venta, DetalleVenta.idVenta == Venta.idVenta)
+                .join(Producto, DetalleVenta.idProducto == Producto.idProducto)
+                .outerjoin(Categoria, Producto.idCategoria == Categoria.idCategoria)
+                .filter(Venta.fecha >= fecha_inicio, Venta.fecha <= fecha_fin)
+                .group_by(Producto.idProducto, Producto.nombre, Categoria.nombre)
+                .order_by(func.sum(DetalleVenta.cantidad * DetalleVenta.precioUnitario).desc())
+                .limit(top_n)
+                .all()
+            )
+        except Exception as e:
+            logger.error(f"Error en rentabilidad por producto: {e}")
+            return []
+
+        datos = []
+        for r in rows:
+            ing = round(float(r.ingresos or 0), 2)
+            cos = round(float(r.costos  or 0), 2)
+            uti = round(ing - cos, 2)
+            mar = round((uti / ing * 100) if ing > 0 else 0, 2)
+            datos.append({
+                "nombre":    r.prod_nombre or "Sin nombre",
+                "categoria": r.cat_nombre  or "Sin categoría",
+                "ingresos":  ing,
+                "costos":    cos,
+                "utilidad":  uti,
+                "margen":    mar,
+            })
         return datos
 
     def generate_products_report(

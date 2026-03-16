@@ -6,9 +6,11 @@ import com.app.model.reports.ReportTypeDTO;
 import com.app.model.reports.ReportTypesResponseDTO;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
+import com.google.gson.reflect.TypeToken;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.lang.reflect.Type;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -16,6 +18,7 @@ import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 
 /**
@@ -76,21 +79,20 @@ public class ReportsService {
     }
 
     /**
-     * POST /dashboard/reports/generate
+     * POST /dashboard/reports/generate con formato="json".
+     * Retorna el body completo parseado como Map, incluyendo la clave "reporte"
+     * con los datos tabulares. Retorna un Map vacío en caso de error.
      *
-     * @param tipo         "ventas" | "compras" | "rentabilidad" | "productos"
-     * @param fechaInicio  fecha inicio del periodo
-     * @param fechaFin     fecha fin del periodo
-     * @param formato      "json" | "csv" | "excel"
-     * @param agruparPor   "dia" | "semana" | "mes"
-     * @param topN         número de productos para reporte de productos (1-100)
-     * @return true si el reporte se generó exitosamente
+     * @param tipo       "ventas" | "compras" | "rentabilidad" | "productos"
+     * @param fechaInicio fecha inicio del periodo
+     * @param fechaFin    fecha fin del periodo
+     * @param agruparPor "dia" | "semana" | "mes"
+     * @param topN        número de productos (para tipo=productos, 1-100)
      */
-    public CompletableFuture<Boolean> generateReport(
+    public CompletableFuture<Map<String, Object>> fetchReportData(
             String tipo,
             LocalDate fechaInicio,
             LocalDate fechaFin,
-            String formato,
             String agruparPor,
             int topN
     ) {
@@ -98,7 +100,7 @@ public class ReportsService {
         body.addProperty("tipo", tipo);
         body.addProperty("fecha_inicio", fechaInicio.toString());
         body.addProperty("fecha_fin", fechaFin.toString());
-        body.addProperty("formato", formato.toLowerCase());
+        body.addProperty("formato", "json");
         body.addProperty("agrupar_por", agruparPor);
         body.addProperty("top_n", topN);
 
@@ -110,14 +112,21 @@ public class ReportsService {
                 .POST(HttpRequest.BodyPublishers.ofString(body.toString()))
                 .build();
 
+        Type mapType = new TypeToken<Map<String, Object>>() {}.getType();
+
         return httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofString())
                 .thenApply(response -> {
                     logger.debug("POST /dashboard/reports/generate → HTTP {}", response.statusCode());
-                    return response.statusCode() == 200;
+                    if (response.statusCode() == 200) {
+                        Map<String, Object> result = gson.fromJson(response.body(), mapType);
+                        return result != null ? result : Map.<String, Object>of();
+                    }
+                    logger.warn("fetchReportData falló - HTTP {}: {}", response.statusCode(), response.body());
+                    return Map.<String, Object>of();
                 })
                 .exceptionally(ex -> {
-                    logger.error("Error en generateReport: {}", ex.getMessage());
-                    return false;
+                    logger.error("Error en fetchReportData: {}", ex.getMessage());
+                    return Map.of();
                 });
     }
 }
