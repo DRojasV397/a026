@@ -2,7 +2,7 @@
 Modelos DAO para el módulo de Usuarios y Seguridad.
 """
 
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Table
+from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Table, UniqueConstraint
 from sqlalchemy.orm import relationship
 from datetime import datetime
 
@@ -25,6 +25,7 @@ class Usuario(Base):
     # Relaciones
     roles = relationship("UsuarioRol", back_populates="usuario", cascade="all, delete-orphan")
     preferencias = relationship("PreferenciaUsuario", back_populates="usuario", cascade="all, delete-orphan")
+    permisos_modulo = relationship("PermisoModulo", back_populates="usuario", cascade="all, delete-orphan")
     ventas_creadas = relationship("Venta", foreign_keys="Venta.creadoPor", back_populates="creador")
     compras_creadas = relationship("Compra", foreign_keys="Compra.creadoPor", back_populates="creador")
     escenarios_creados = relationship("Escenario", foreign_keys="Escenario.creadoPor", overlaps="creador")
@@ -56,7 +57,6 @@ class UsuarioRol(Base):
 
     idUsuario = Column(Integer, ForeignKey('Usuario.idUsuario'), primary_key=True)
     idRol = Column(Integer, ForeignKey('Rol.idRol'), primary_key=True)
-    fechaAsignacion = Column(DateTime, default=datetime.now)
 
     # Relaciones
     usuario = relationship("Usuario", back_populates="roles")
@@ -83,3 +83,23 @@ class PreferenciaUsuario(Base):
 
     def __repr__(self):
         return f"<PreferenciaUsuario(id={self.idPreferencia}, kpi={self.kpi})>"
+
+
+class PermisoModulo(Base):
+    """Modelo de permisos por modulo para usuarios secundarios."""
+
+    __tablename__ = 'PermisoModulo'
+
+    idPermiso = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    idUsuario = Column(Integer, ForeignKey('Usuario.idUsuario', ondelete='CASCADE'), nullable=False)
+    modulo = Column(String(50), nullable=False)
+
+    # Relaciones
+    usuario = relationship("Usuario", back_populates="permisos_modulo")
+
+    __table_args__ = (
+        UniqueConstraint('idUsuario', 'modulo', name='UQ_PermisoModulo'),
+    )
+
+    def __repr__(self):
+        return f"<PermisoModulo(id={self.idPermiso}, usuario={self.idUsuario}, modulo={self.modulo})>"

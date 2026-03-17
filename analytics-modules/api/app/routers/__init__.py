@@ -13,6 +13,7 @@ from .profitability import router as profitability_router
 from .simulations import router as simulations_router
 from .alerts import router as alerts_router
 from .dashboard import router as dashboard_router
+from .admin import router as admin_router
 
 __all__ = [
     'auth_router',
@@ -27,5 +28,6 @@ __all__ = [
     'profitability_router',
     'simulations_router',
     'alerts_router',
-    'dashboard_router'
+    'dashboard_router',
+    'admin_router'
 ]

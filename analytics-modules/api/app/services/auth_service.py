@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 import logging
 
 from app.config import settings
-from app.models import Usuario, Rol, UsuarioRol
+from app.models import Usuario, Rol, UsuarioRol, PermisoModulo
 from app.repositories import UsuarioRepository, RolRepository
 from app.schemas.auth import TokenData, UserInfo
 
@@ -227,6 +227,31 @@ class AuthService:
             logger.error(f"Error al obtener roles: {str(e)}")
             return []
 
+    # Todos los modulos disponibles en el sistema
+    ALL_MODULES = [
+        "dashboard", "datos", "predicciones",
+        "rentabilidad", "simulacion", "alertas", "reportes"
+    ]
+
+    def _get_user_modules(self, user_id: int) -> list:
+        """
+        Obtiene los modulos permitidos para un usuario secundario.
+
+        Args:
+            user_id: ID del usuario
+
+        Returns:
+            list: Lista de nombres de modulos permitidos
+        """
+        try:
+            permisos = self.db.query(PermisoModulo).filter(
+                PermisoModulo.idUsuario == user_id
+            ).all()
+            return [p.modulo for p in permisos]
+        except Exception as e:
+            logger.error(f"Error al obtener modulos del usuario: {str(e)}")
+            return []
+
     def get_user_info(self, user: Usuario) -> UserInfo:
         """
         Obtiene informacion del usuario para respuesta.
@@ -235,16 +260,27 @@ class AuthService:
             user: Objeto Usuario
 
         Returns:
-            UserInfo: Informacion del usuario
+            UserInfo: Informacion del usuario con tipo y modulos
         """
         roles = self.get_user_roles(user.idUsuario)
+
+        # Determinar tipo de usuario
+        tipo = "Principal" if "Administrador" in roles else "Secundario"
+
+        # Determinar modulos accesibles
+        if tipo == "Principal":
+            modulos = list(self.ALL_MODULES)
+        else:
+            modulos = self._get_user_modules(user.idUsuario)
 
         return UserInfo(
             idUsuario=user.idUsuario,
             nombreCompleto=user.nombreCompleto,
             nombreUsuario=user.nombreUsuario,
             email=user.email,
-            roles=roles
+            roles=roles,
+            tipo=tipo,
+            modulos=modulos
         )
 
     def login(self, username: str, password: str) -> Optional[Dict[str, Any]]:

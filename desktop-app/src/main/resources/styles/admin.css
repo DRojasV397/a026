@@ -521,3 +521,20 @@
 .scroll-pane > .corner {
     -fx-background-color: transparent;
 }
+
+/* ── Module Checkboxes (UserFormView) ─────────────── */
+.form-hint-label {
+    -fx-font-size: 11px;
+    -fx-text-fill: #9CA3AF;
+}
+
+.module-checkbox {
+    -fx-font-size: 13px;
+    -fx-text-fill: #374151;
+    -fx-padding: 4 0 4 0;
+}
+
+.module-checkbox .box {
+    -fx-background-radius: 4px;
+    -fx-border-radius: 4px;
+}

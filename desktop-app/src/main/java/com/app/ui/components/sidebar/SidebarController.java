@@ -90,10 +90,21 @@ public class SidebarController {
     private void initialize() {
         userNameLabel.setText(UserSession.getUser());
 
-        //Control por rol
-        if (UserSession.isAdmin()) {
+        // Admin button: only for Principal (admin) users
+        if (!UserSession.isAdmin()) {
             adminItem.setManaged(false);
             adminItem.setVisible(false);
+        }
+
+        // Module-based visibility for secondary users
+        if (!UserSession.isPrincipal()) {
+            setModuleVisibility(predictiveBtn, "predicciones");
+            setModuleVisibility(profitBtn,     "rentabilidad");
+            setModuleVisibility(simulationBtn, "simulacion");
+            setModuleVisibility(alertsBtn,     "alertas");
+            setModuleVisibility(reportsBtn,    "reportes");
+            setModuleVisibility(dataBtn,       "datos");
+            // dashboardBtn is always visible
         }
 
 
@@ -208,6 +219,13 @@ public class SidebarController {
         return "";
     }
 
+
+    private void setModuleVisibility(Button btn, String moduleId) {
+        if (!UserSession.hasModuleAccess(moduleId)) {
+            btn.setManaged(false);
+            btn.setVisible(false);
+        }
+    }
 
     private void loadDefaultAvatar() {
         // 1. Intentar cargar el avatar guardado del usuario

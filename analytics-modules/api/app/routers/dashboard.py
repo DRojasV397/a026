@@ -12,7 +12,7 @@ from pydantic import BaseModel, Field
 from enum import Enum
 
 from app.database import get_db
-from app.middleware.auth_middleware import get_current_user
+from app.middleware.auth_middleware import get_current_user, get_current_active_user
 from app.services.dashboard_service import DashboardService
 from app.services.report_service import ReportService
 
@@ -301,7 +301,7 @@ async def get_report_types(
 async def generate_report(
     request: GenerateReportRequest,
     db: Session = Depends(get_db),
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_active_user)
 ):
     """
     Genera un reporte en el formato especificado.
@@ -382,7 +382,7 @@ async def quick_sales_report(
     formato: ReportFormat = Query(ReportFormat.JSON, description="Formato de salida"),
     agrupar_por: GroupBy = Query(GroupBy.DIA, description="Agrupacion"),
     db: Session = Depends(get_db),
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_active_user)
 ):
     """
     Genera reporte rapido de ventas via GET.
@@ -417,7 +417,7 @@ async def quick_purchases_report(
     formato: ReportFormat = Query(ReportFormat.JSON, description="Formato de salida"),
     agrupar_por: GroupBy = Query(GroupBy.DIA, description="Agrupacion"),
     db: Session = Depends(get_db),
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_active_user)
 ):
     """
     Genera reporte rapido de compras via GET.

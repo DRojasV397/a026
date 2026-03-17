@@ -15,7 +15,7 @@ from app.routers import (
     auth_router, usuarios_router, rol_router, productos_router,
     categoria_router, data_router, ventas_router, compras_router,
     predictions_router, profitability_router, simulations_router,
-    alerts_router, dashboard_router
+    alerts_router, dashboard_router, admin_router
 )
 
 # Configuración de logging
@@ -124,6 +124,9 @@ app.include_router(alerts_router, prefix=api_prefix)
 
 # Router de dashboard y reportes (RF-07)
 app.include_router(dashboard_router, prefix=api_prefix)
+
+# Router de administracion de usuarios
+app.include_router(admin_router, prefix=api_prefix)
 
 
 # Manejador global de excepciones

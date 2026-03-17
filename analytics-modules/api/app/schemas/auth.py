@@ -30,6 +30,8 @@ class UserInfo(BaseModel):
     nombreUsuario: str
     email: str
     roles: List[str] = []
+    tipo: str = "Secundario"
+    modulos: List[str] = []
 
     model_config = ConfigDict(from_attributes=True)
 

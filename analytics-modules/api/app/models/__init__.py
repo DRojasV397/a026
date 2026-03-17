@@ -3,7 +3,7 @@ Módulo de modelos DAO (Database Access Objects).
 Contiene las definiciones de las tablas de la base de datos.
 """
 
-from .usuario import Usuario, Rol, UsuarioRol, PreferenciaUsuario
+from .usuario import Usuario, Rol, UsuarioRol, PreferenciaUsuario, PermisoModulo
 from .producto import Categoria, Producto
 from .venta import Venta, DetalleVenta
 from .compra import Compra, DetalleCompra
@@ -12,7 +12,7 @@ from .rentabilidad import Rentabilidad, ResultadoFinanciero, Reporte, Alerta
 from .historial_carga import HistorialCarga
 
 __all__ = [
-    'Usuario', 'Rol', 'UsuarioRol', 'PreferenciaUsuario',
+    'Usuario', 'Rol', 'UsuarioRol', 'PreferenciaUsuario', 'PermisoModulo',
     'Categoria', 'Producto',
     'Venta', 'DetalleVenta',
     'Compra', 'DetalleCompra',

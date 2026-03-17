@@ -271,4 +271,22 @@ public class ApiConfig {
     public static String getReportByIdUrl(int idReporte) {
         return BASE_URL + "/dashboard/reports/" + idReporte;
     }
+
+    // ── Admin Module ──────────────────────────────────────────────────────────
+
+    public static String getAdminUsuariosUrl() {
+        return BASE_URL + "/admin/usuarios";
+    }
+
+    public static String getAdminUsuarioUrl(int id) {
+        return BASE_URL + "/admin/usuarios/" + id;
+    }
+
+    public static String getAdminUsuarioModulosUrl(int id) {
+        return BASE_URL + "/admin/usuarios/" + id + "/modulos";
+    }
+
+    public static String getAdminUsuarioEstadoUrl(int id) {
+        return BASE_URL + "/admin/usuarios/" + id + "/estado";
+    }
 }

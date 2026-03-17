@@ -1,7 +1,9 @@
 package com.app.ui.admin;
 
-import com.app.model.UserDTO;
+import com.app.model.admin.AdminUserDTO;
+import com.app.service.admin.AdminApiService;
 import com.app.util.ValidationUtil;
+import javafx.application.Platform;
 import javafx.fxml.FXML;
 import javafx.scene.control.*;
 import javafx.scene.image.Image;
@@ -9,8 +11,10 @@ import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
 import javafx.stage.Stage;
 
-import java.time.LocalDate;
-import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.function.Consumer;
 
@@ -27,6 +31,15 @@ public class UserFormController {
     @FXML private VBox         roleRow;
     @FXML private ComboBox<String> cmbRole;
 
+    @FXML private VBox         modulesSection;
+    @FXML private CheckBox     chkDashboard;
+    @FXML private CheckBox     chkDatos;
+    @FXML private CheckBox     chkPredicciones;
+    @FXML private CheckBox     chkRentabilidad;
+    @FXML private CheckBox     chkSimulacion;
+    @FXML private CheckBox     chkAlertas;
+    @FXML private CheckBox     chkReportes;
+
     @FXML private HBox passwordSection;
     @FXML private PasswordField txtPassword;
     @FXML private PasswordField txtConfirmPassword;
@@ -36,56 +49,96 @@ public class UserFormController {
     @FXML private Button       btnSubmit;
 
     // ── Estado ────────────────────────────────────────────────────────────────
-    private UserDTO            userToEdit = null;
-    private Consumer<UserDTO>  onSaved;
-    private boolean            isEditMode = false;
+    private AdminUserDTO             adminUserToEdit = null;
+    private Consumer<AdminUserDTO>   onSaved;
+    private boolean                  isEditMode = false;
+
+    private final AdminApiService adminApiService = new AdminApiService();
 
     // ═════════════════════════════════════════════════════════════════════════
-    //  Init público: llamado desde AdminController
+    //  Init publico: llamado desde AdminController
     // ═════════════════════════════════════════════════════════════════════════
 
     /**
-     * @param user     null → modo creación, non-null → modo edición
-     * @param onSaved  callback con el UserDTO resultante
+     * @param user     null = modo creacion, non-null = modo edicion
+     * @param onSaved  callback con el AdminUserDTO resultante
      */
-    public void initForm(UserDTO user, Consumer<UserDTO> onSaved) {
-        this.onSaved    = onSaved;
-        this.userToEdit = user;
-        this.isEditMode = (user != null);
+    public void initForm(AdminUserDTO user, Consumer<AdminUserDTO> onSaved) {
+        this.onSaved         = onSaved;
+        this.adminUserToEdit = user;
+        this.isEditMode      = (user != null);
 
-        // Poblar roles
-        cmbRole.getItems().addAll("Administrador", "Analista");
+        // Poblar tipos de usuario
+        cmbRole.getItems().addAll("Principal", "Secundario");
+
+        // Listener para mostrar/ocultar seccion de modulos
+        cmbRole.getSelectionModel().selectedItemProperty().addListener((obs, oldVal, newVal) -> {
+            boolean isSecundario = "Secundario".equals(newVal);
+            modulesSection.setVisible(isSecundario);
+            modulesSection.setManaged(isSecundario);
+        });
 
         if (isEditMode) {
-            // Modo edición
             formTitle.setText("Editar usuario");
             formSubtitle.setText("Modifica los datos del usuario");
             btnSubmit.setText("Guardar cambios");
 
-            txtFullName.setText(user.fullName());
-            txtUsername.setText(user.username());
-            txtUsername.setEditable(false); // No se puede cambiar el username
-            txtEmail.setText(user.email());
-            cmbRole.getSelectionModel().select(
-                    user.roleDisplay() != null ? user.roleDisplay() : user.role()
-            );
+            txtFullName.setText(user.getNombreCompleto());
+            txtUsername.setText(user.getNombreUsuario());
+            txtUsername.setEditable(false);
+            txtEmail.setText(user.getEmail());
 
-            // Ocultar campos de contraseña, mostrar reset
+            // Seleccionar tipo
+            String tipo = user.isPrincipal() ? "Principal" : "Secundario";
+            cmbRole.getSelectionModel().select(tipo);
+
+            // Pre-check modulos
+            if (!user.isPrincipal()) {
+                List<String> userModulos = user.getModulos();
+                chkDashboard.setSelected(userModulos.contains("dashboard"));
+                chkDatos.setSelected(userModulos.contains("datos"));
+                chkPredicciones.setSelected(userModulos.contains("predicciones"));
+                chkRentabilidad.setSelected(userModulos.contains("rentabilidad"));
+                chkSimulacion.setSelected(userModulos.contains("simulacion"));
+                chkAlertas.setSelected(userModulos.contains("alertas"));
+                chkReportes.setSelected(userModulos.contains("reportes"));
+
+                modulesSection.setVisible(true);
+                modulesSection.setManaged(true);
+            }
+
+            // Ocultar campos de contrasena, mostrar reset
             passwordSection.setVisible(false);
             passwordSection.setManaged(false);
             resetSection.setVisible(true);
             resetSection.setManaged(true);
 
         } else {
-            // Modo creación
+            // Modo creacion
             roleRow.setVisible(true);
             roleRow.setManaged(true);
         }
 
-        // Listeners de validación en tiempo real
+        // Listeners de validacion en tiempo real
         txtEmail.textProperty().addListener((obs, o, v) -> validateEmail(v));
         txtConfirmPassword.textProperty().addListener((obs, o, v) -> validatePasswordMatch());
         txtPassword.textProperty().addListener((obs, o, v) -> validatePasswordMatch());
+    }
+
+    // ═════════════════════════════════════════════════════════════════════════
+    //  Modulos helper
+    // ═════════════════════════════════════════════════════════════════════════
+
+    private List<String> getSelectedModulos() {
+        List<String> modulos = new ArrayList<>();
+        if (chkDashboard.isSelected())     modulos.add("dashboard");
+        if (chkDatos.isSelected())         modulos.add("datos");
+        if (chkPredicciones.isSelected())  modulos.add("predicciones");
+        if (chkRentabilidad.isSelected())  modulos.add("rentabilidad");
+        if (chkSimulacion.isSelected())    modulos.add("simulacion");
+        if (chkAlertas.isSelected())       modulos.add("alertas");
+        if (chkReportes.isSelected())      modulos.add("reportes");
+        return modulos;
     }
 
     // ═════════════════════════════════════════════════════════════════════════
@@ -99,7 +152,7 @@ public class UserFormController {
             return false;
         }
         if (!ValidationUtil.isEmailFormatValid(email)) {
-            showFieldError(emailError, "Ingresa un correo válido (ej. usuario@dominio.com)");
+            showFieldError(emailError, "Ingresa un correo valido (ej. usuario@dominio.com)");
             markError(txtEmail, true);
             return false;
         }
@@ -118,7 +171,7 @@ public class UserFormController {
                 return false;
             }
             if (!pwd.equals(confirm)) {
-                showFieldError(passwordMatchError, "Las contraseñas no coinciden");
+                showFieldError(passwordMatchError, "Las contrasenas no coinciden");
                 markError(txtConfirmPassword, true);
                 return false;
             }
@@ -158,77 +211,106 @@ public class UserFormController {
         String fullName = txtFullName.getText().trim();
         String username = txtUsername.getText().trim();
         String email    = txtEmail.getText().trim();
-        String role     = cmbRole.getSelectionModel().getSelectedItem();
+        String tipo     = cmbRole.getSelectionModel().getSelectedItem();
 
         if (fullName.isBlank()) {
-            showAlert("Campo requerido", "El nombre completo es obligatorio."); return;
+            showFormAlert("Campo requerido", "El nombre completo es obligatorio."); return;
         }
         if (username.isBlank()) {
-            showAlert("Campo requerido", "El nombre de usuario es obligatorio."); return;
+            showFormAlert("Campo requerido", "El nombre de usuario es obligatorio."); return;
         }
         if (!validateEmail(email)) return;
-        if (role == null) {
-            showAlert("Campo requerido", "Selecciona un rol para el usuario."); return;
+        if (tipo == null) {
+            showFormAlert("Campo requerido", "Selecciona un tipo de usuario."); return;
         }
+
+        // Validar que Secundario tenga al menos un modulo
+        List<String> modulos = getSelectedModulos();
+        if ("Secundario".equals(tipo) && modulos.isEmpty()) {
+            showFormAlert("Modulos requeridos",
+                    "Selecciona al menos un modulo para el usuario secundario."); return;
+        }
+
+        // Deshabilitar boton mientras se procesa
+        btnSubmit.setDisable(true);
+        btnSubmit.setText("Guardando...");
 
         if (!isEditMode) {
             String pwd     = txtPassword.getText();
             String confirm = txtConfirmPassword.getText();
 
             if (pwd.isBlank()) {
-                showAlert("Campo requerido", "La contraseña es obligatoria."); return;
+                resetSubmitButton();
+                showFormAlert("Campo requerido", "La contrasena es obligatoria."); return;
             }
             if (pwd.length() < 8) {
-                showAlert("Contraseña inválida", "La contraseña debe tener al menos 8 caracteres."); return;
+                resetSubmitButton();
+                showFormAlert("Contrasena invalida",
+                        "La contrasena debe tener al menos 8 caracteres."); return;
             }
             if (!validatePasswordMatch()) {
-                showAlert("Contraseñas no coinciden",
-                        "La contraseña y su confirmación no son iguales."); return;
+                resetSubmitButton();
+                showFormAlert("Contrasenas no coinciden",
+                        "La contrasena y su confirmacion no son iguales."); return;
             }
 
-            // TODO: adminApiService.createUser(payload)
-            System.out.println("[ADMIN] Crear usuario:");
-            System.out.println("  nombreCompleto:  " + fullName);
-            System.out.println("  nombreUsuario:   " + username);
-            System.out.println("  email:           " + email);
-            System.out.println("  rol:             " + role);
-            System.out.println("  password:        [REDACTED]");
+            // Crear usuario via API
+            Map<String, Object> payload = new HashMap<>();
+            payload.put("nombreCompleto", fullName);
+            payload.put("nombreUsuario", username);
+            payload.put("email", email);
+            payload.put("password", pwd);
+            payload.put("tipo", tipo);
+            payload.put("modulos", modulos);
+
+            adminApiService.createUsuario(payload).thenAccept(result -> {
+                Platform.runLater(() -> {
+                    resetSubmitButton();
+                    if (result != null) {
+                        if (onSaved != null) onSaved.accept(result);
+                        closeModal();
+                    } else {
+                        showFormAlert("Error al crear",
+                                "No se pudo crear el usuario. Verifica que el nombre de usuario y email no esten en uso.");
+                    }
+                });
+            });
 
         } else {
-            // TODO: adminApiService.updateUser(userId, payload)
-            System.out.println("[ADMIN] Editar usuario:");
-            System.out.println("  nombreCompleto:  " + fullName);
-            System.out.println("  email:           " + email);
-            System.out.println("  rol:             " + role);
+            // Editar usuario via API
+            Map<String, Object> payload = new HashMap<>();
+            payload.put("nombreCompleto", fullName);
+            payload.put("email", email);
+            payload.put("tipo", tipo);
+            payload.put("modulos", modulos);
+
+            adminApiService.updateUsuario(adminUserToEdit.getIdUsuario(), payload)
+                    .thenAccept(result -> {
+                        Platform.runLater(() -> {
+                            resetSubmitButton();
+                            if (result != null) {
+                                if (onSaved != null) onSaved.accept(result);
+                                closeModal();
+                            } else {
+                                showFormAlert("Error al guardar",
+                                        "No se pudieron guardar los cambios.");
+                            }
+                        });
+                    });
         }
+    }
 
-        // Construir DTO actualizado/nuevo y disparar callback
-        UserDTO result = new UserDTO(
-                fullName,
-                username,
-                role,
-                role,
-                userToEdit != null ? userToEdit.department() : "",
-                email,
-                userToEdit != null && userToEdit.isVerified(),
-                userToEdit != null ? userToEdit.phone() : "",
-                null,
-                userToEdit != null ? userToEdit.memberSince() : LocalDate.now(),
-                userToEdit != null ? userToEdit.lastAccess()  : LocalDateTime.now(),
-                userToEdit != null ? userToEdit.stats()
-                        : new UserDTO.UserStats(0, 0, 0)
-        );
-
-        if (onSaved != null) onSaved.accept(result);
-        closeModal();
+    private void resetSubmitButton() {
+        btnSubmit.setDisable(false);
+        btnSubmit.setText(isEditMode ? "Guardar cambios" : "Crear usuario");
     }
 
     @FXML
     private void onResetPassword() {
         Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
-        alert.setTitle("Resetear contraseña");
-        alert.setHeaderText("¿Resetear la contraseña de " + txtFullName.getText() + "?");
-        alert.setContentText("Se generará una contraseña temporal y se enviará al correo del usuario.");
+        alert.setTitle("Resetear contrasena");
+        alert.setHeaderText("Resetear la contrasena de " + txtFullName.getText() + "?");
+        alert.setContentText("Se generara una contrasena temporal y se enviara al correo del usuario.");
 
         ButtonType btnConfirm = new ButtonType("Resetear", ButtonBar.ButtonData.OK_DONE);
         ButtonType btnCancel  = new ButtonType("Cancelar", ButtonBar.ButtonData.CANCEL_CLOSE);
@@ -237,14 +319,13 @@ public class UserFormController {
 
         alert.showAndWait().ifPresent(r -> {
             if (r == btnConfirm) {
-                // TODO: adminApiService.resetPassword(userId)
-                System.out.println("[ADMIN] Resetear contraseña para: "
+                System.out.println("[ADMIN] Resetear contrasena para: "
                         + txtEmail.getText());
 
                 Alert info = new Alert(Alert.AlertType.INFORMATION);
-                info.setTitle("Contraseña reseteada");
+                info.setTitle("Contrasena reseteada");
                 info.setHeaderText(null);
-                info.setContentText("Se ha enviado la nueva contraseña al correo del usuario.");
+                info.setContentText("Se ha enviado la nueva contrasena al correo del usuario.");
                 applyAlertStyle(info);
                 info.showAndWait();
             }
@@ -265,7 +346,7 @@ public class UserFormController {
         stage.close();
     }
 
-    private void showAlert(String title, String msg) {
+    private void showFormAlert(String title, String msg) {
         Alert a = new Alert(Alert.AlertType.WARNING);
         a.setTitle(title);
         a.setHeaderText(null);

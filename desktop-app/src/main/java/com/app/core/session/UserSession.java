@@ -19,6 +19,8 @@ public class UserSession {
     private static String nombreUsuario;
     private static String email;
     private static List<String> roles;
+    private static String tipo;
+    private static List<String> modulos;
 
 
 
@@ -34,6 +36,8 @@ public class UserSession {
         nombreUsuario = user.getNombreUsuario();
         email = user.getEmail();
         roles = user.getRoles();
+        tipo = user.getTipo();
+        modulos = user.getModulos();
     }
 
     public static void setUser(String user, String role) {
@@ -80,6 +84,8 @@ public class UserSession {
         nombreUsuario = null;
         email = null;
         roles = null;
+        tipo = null;
+        modulos = null;
     }
 
     public static boolean isLoggedIn() {
@@ -100,6 +106,19 @@ public class UserSession {
 
     public static List<String> getRoles() {
         return roles != null ? roles : List.of();
+    }
+
+    public static boolean isPrincipal() {
+        return "Principal".equals(tipo);
+    }
+
+    public static List<String> getModulos() {
+        return modulos != null ? modulos : List.of();
+    }
+
+    public static boolean hasModuleAccess(String moduloId) {
+        if (isPrincipal()) return true;
+        return modulos != null && modulos.contains(moduloId);
     }
 
     // ── Propiedades observables globales ─────────────────────────────────────

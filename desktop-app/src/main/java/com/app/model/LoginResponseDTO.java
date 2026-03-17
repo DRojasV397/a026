@@ -39,6 +39,8 @@ public class LoginResponseDTO {
         private String nombreUsuario;
         private String email;
         private List<String> roles;
+        private String tipo;
+        private List<String> modulos;
 
         public int getIdUsuario() {
             return idUsuario;
@@ -58,6 +60,14 @@ public class LoginResponseDTO {
 
         public List<String> getRoles() {
             return roles != null ? roles : List.of();
+        }
+
+        public String getTipo() {
+            return tipo != null ? tipo : "Secundario";
+        }
+
+        public List<String> getModulos() {
+            return modulos != null ? modulos : List.of();
         }
     }
 }

@@ -1,6 +1,8 @@
 package com.app.ui.admin;
 
 import com.app.model.UserDTO;
+import com.app.model.admin.AdminUserDTO;
+import com.app.service.admin.AdminApiService;
 import com.app.service.storage.AvatarStorageService;
 import javafx.application.Platform;
 import javafx.fxml.FXML;
@@ -22,7 +24,9 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
 
@@ -47,8 +51,14 @@ public class AdminController {
     private static final int PAGE_SIZE = 4;
     private int currentPage = 0;
 
+    private final AdminApiService adminApiService = new AdminApiService();
+
+    private List<AdminUserDTO> allAdminUsers = new ArrayList<>();
     private List<UserDTO> allUsers   = new ArrayList<>();
     private List<UserDTO> filtered   = new ArrayList<>();
+
+    /** Lookup rapido: nombreUsuario -> AdminUserDTO (para acciones) */
+    private Map<String, AdminUserDTO> adminUserByUsername = new HashMap<>();
 
     private static final DateTimeFormatter FMT_DATE =
             DateTimeFormatter.ofPattern("dd/MM/yyyy");
@@ -56,12 +66,12 @@ public class AdminController {
             DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
 
 
-    // ── Constraints compartidos: úsalos en header y en cada fila ──
+    // ── Constraints compartidos: usarlos en header y en cada fila ──
     private static final double COL_USER_MIN   = 140;
     private static final double COL_USER_MAX   = 9999;
-    private static final double COL_ROLE_MIN   = 110;   // mínimo
+    private static final double COL_ROLE_MIN   = 110;
     private static final double COL_ROLE_MAX     = 140;
-    private static final double COL_STATUS_MIN = 99;    // mínimo
+    private static final double COL_STATUS_MIN = 99;
     private static final double COL_STATUS_MAX = 140;
     private static final double COL_LASTACCESS = 145;
     private static final double COL_REGDATE    = 115;
@@ -70,13 +80,13 @@ public class AdminController {
     // ── Init ──────────────────────────────────────────────────────────────────
     @FXML
     public void initialize() {
-        allUsers = getMockUsers();
-        filtered = new ArrayList<>(allUsers);
-
         usersContainer.getChildren().addFirst(buildTableHeader());
 
-        updateKpis();
-        renderPage();
+        // Mostrar estado de carga
+        showLoadingState();
+
+        // Cargar usuarios desde la API
+        loadUsersFromApi();
 
         // Filtrado reactivo
         searchField.textProperty().addListener((obs, o, v) -> {
@@ -84,24 +94,112 @@ public class AdminController {
         });
     }
 
+    private void showLoadingState() {
+        // Limpiar filas existentes (conservar header en indice 0)
+        if (usersContainer.getChildren().size() > 1) {
+            usersContainer.getChildren().remove(1, usersContainer.getChildren().size());
+        }
+
+        VBox loading = new VBox(8);
+        loading.getStyleClass().add("empty-state");
+        loading.setAlignment(Pos.CENTER);
+        Label msg = new Label("Cargando usuarios...");
+        msg.getStyleClass().add("empty-state-text");
+        loading.getChildren().add(msg);
+        usersContainer.getChildren().add(loading);
+
+        // KPIs en 0 mientras carga
+        kpiActiveUsers.setText("...");
+        kpiFullAccess.setText("...");
+        kpiOnlineToday.setText("...");
+        kpiPendingVerify.setText("...");
+
+        pageLabel.setText("Cargando...");
+        btnPrevPage.setDisable(true);
+        btnNextPage.setDisable(true);
+    }
+
+    private void loadUsersFromApi() {
+        adminApiService.getUsuarios().thenAccept(users -> {
+            Platform.runLater(() -> {
+                if (users == null || users.isEmpty()) {
+                    allAdminUsers = new ArrayList<>();
+                    allUsers = new ArrayList<>();
+                    filtered = new ArrayList<>();
+                    adminUserByUsername = new HashMap<>();
+                } else {
+                    allAdminUsers = new ArrayList<>(users);
+                    adminUserByUsername = new HashMap<>();
+                    allUsers = new ArrayList<>();
+
+                    for (AdminUserDTO dto : allAdminUsers) {
+                        UserDTO userDto = toUserDTO(dto);
+                        allUsers.add(userDto);
+                        adminUserByUsername.put(dto.getNombreUsuario(), dto);
+                    }
+
+                    filtered = new ArrayList<>(allUsers);
+                }
+
+                updateKpis();
+                renderPage();
+            });
+        });
+    }
+
+    // ═════════════════════════════════════════════════════════════════════════
+    //  Conversion AdminUserDTO -> UserDTO
+    // ═════════════════════════════════════════════════════════════════════════
+
+    private UserDTO toUserDTO(AdminUserDTO dto) {
+        String role = dto.isPrincipal() ? "Administrador" : "Secundario";
+        String department = dto.isPrincipal()
+                ? "Acceso completo"
+                : dto.getModulos().size() + " modulos";
+
+        return new UserDTO(
+                dto.getNombreCompleto(),
+                dto.getNombreUsuario(),
+                role,
+                role,
+                department,
+                dto.getEmail(),
+                dto.isActivo(),
+                "",
+                null,
+                parseCreadoEn(dto.getCreadoEn()),
+                null,
+                new UserDTO.UserStats(0, 0, 0)
+        );
+    }
+
+    private LocalDate parseCreadoEn(String creadoEn) {
+        if (creadoEn == null || creadoEn.isBlank()) return null;
+        try {
+            return LocalDate.parse(creadoEn.substring(0, 10));
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
     // ═════════════════════════════════════════════════════════════════════════
     //  KPIs
     // ═════════════════════════════════════════════════════════════════════════
 
     private void updateKpis() {
-        long active         = allUsers.stream().filter(this::isActive).count();
-        long fullAccess     = allUsers.stream().filter(this::isAdmin).count();
-        long onlineToday    = allUsers.stream().filter(this::accessedToday).count();
-        long pendingVerify  = allUsers.stream().filter(u -> !u.isVerified()).count();
+        long active      = allAdminUsers.stream().filter(AdminUserDTO::isActivo).count();
+        long fullAccess  = allAdminUsers.stream().filter(AdminUserDTO::isPrincipal).count();
+        long inactive    = allAdminUsers.stream().filter(u -> !u.isActivo()).count();
+        long total       = allAdminUsers.size();
 
         kpiActiveUsers.setText(String.valueOf(active));
         kpiFullAccess.setText(String.valueOf(fullAccess));
-        kpiOnlineToday.setText(String.valueOf(onlineToday));
-        kpiPendingVerify.setText(String.valueOf(pendingVerify));
+        kpiOnlineToday.setText(String.valueOf(total));
+        kpiPendingVerify.setText(String.valueOf(inactive));
     }
 
     // ═════════════════════════════════════════════════════════════════════════
-    //  FILTRO Y PAGINACIÓN
+    //  FILTRO Y PAGINACION
     // ═════════════════════════════════════════════════════════════════════════
 
     private void applyFilter(String query) {
@@ -120,7 +218,7 @@ public class AdminController {
     }
 
     private void renderPage() {
-        // Conserva el header (índice 0), borra solo las filas
+        // Conserva el header (indice 0), borra solo las filas
         if (!usersContainer.getChildren().isEmpty()) {
             usersContainer.getChildren().remove(1, usersContainer.getChildren().size());
         }
@@ -136,7 +234,7 @@ public class AdminController {
             VBox empty = new VBox(8);
             empty.getStyleClass().add("empty-state");
             empty.setAlignment(Pos.CENTER);
-            Label icon = new Label("🔍");
+            Label icon = new Label("");
             icon.getStyleClass().add("empty-state-icon");
             Label msg = new Label("No se encontraron usuarios");
             msg.getStyleClass().add("empty-state-text");
@@ -148,7 +246,7 @@ public class AdminController {
             }
         }
 
-        pageLabel.setText("Página " + (currentPage + 1) + " de " + totalPages);
+        pageLabel.setText("Pagina " + (currentPage + 1) + " de " + totalPages);
         btnPrevPage.setDisable(currentPage == 0);
         btnNextPage.setDisable(currentPage >= totalPages - 1);
     }
@@ -170,13 +268,11 @@ public class AdminController {
 
 
     private void applyColumnConstraints(GridPane grid) {
-        // Col 0: Usuario — crece con el espacio disponible
         ColumnConstraints colUser = new ColumnConstraints();
         colUser.setMinWidth(COL_USER_MIN);
         colUser.setMaxWidth(COL_USER_MAX);
         colUser.setHgrow(Priority.ALWAYS);
 
-        // Col 1–5: fijas
         ColumnConstraints colRole   = flexible(COL_ROLE_MIN,   COL_ROLE_MAX);
         ColumnConstraints colStatus = flexible(COL_STATUS_MIN, COL_STATUS_MAX);
         ColumnConstraints colLast   = fixed(COL_LASTACCESS);
@@ -197,23 +293,21 @@ public class AdminController {
         return c;
     }
 
-    /** Columna que tiene un mínimo pero puede crecer hasta max */
     private ColumnConstraints flexible(double min, double max) {
         ColumnConstraints c = new ColumnConstraints();
         c.setMinWidth(min);
         c.setMaxWidth(max);
-        c.setPrefWidth(min);      // arranca en el mínimo
-        c.setHgrow(Priority.ALWAYS);  // crece si hay espacio sobrante
+        c.setPrefWidth(min);
+        c.setHgrow(Priority.ALWAYS);
         return c;
     }
 
-    /** Header de la tabla — mismo GridPane, mismos constraints */
     private GridPane buildTableHeader() {
         GridPane grid = new GridPane();
         grid.getStyleClass().add("table-header");
         applyColumnConstraints(grid);
 
-        Label roleTh = styledHeader("Rol");
+        Label roleTh = styledHeader("Tipo");
         roleTh.setAlignment(Pos.CENTER);
         roleTh.setTextAlignment(javafx.scene.text.TextAlignment.CENTER);
 
@@ -225,7 +319,7 @@ public class AdminController {
         grid.add(styledHeader("Usuario"),        0, 0);
         grid.add(roleTh, 1, 0);
         grid.add(edoTh,  2, 0);
-        grid.add(styledHeader("Último acceso"),  3, 0);
+        grid.add(styledHeader("Modulos"),        3, 0);
         grid.add(styledHeader("Registro"),       4, 0);
         grid.add(styledHeader(""),               5, 0);
 
@@ -267,11 +361,11 @@ public class AdminController {
         nameBox.setMinWidth(0);
         HBox.setHgrow(nameBox, Priority.ALWAYS);
 
-        Label nameLabel = new Label(user.fullName() != null ? user.fullName() : "—");
+        Label nameLabel = new Label(user.fullName() != null ? user.fullName() : "--");
         nameLabel.getStyleClass().add("user-name");
         nameLabel.setMaxWidth(Double.MAX_VALUE);
 
-        Label emailLabel = new Label(user.email() != null ? user.email() : "—");
+        Label emailLabel = new Label(user.email() != null ? user.email() : "--");
         emailLabel.getStyleClass().add("user-email");
         emailLabel.setMaxWidth(Double.MAX_VALUE);
 
@@ -279,7 +373,7 @@ public class AdminController {
         userCell.getChildren().addAll(avatarWrap, nameBox);
         GridPane.setFillWidth(userCell, true);
 
-        // ── Col 1: Rol pill ───────────────────────────────────────
+        // ── Col 1: Tipo pill ───────────────────────────────────────
         HBox roleCell = new HBox();
         roleCell.setAlignment(Pos.CENTER);
         roleCell.getChildren().add(
@@ -289,47 +383,55 @@ public class AdminController {
         // ── Col 2: Estado ─────────────────────────────────────────
         HBox statusCell = new HBox();
         statusCell.setAlignment(Pos.CENTER);
-        boolean active = isActive(user);
-        Label statusLabel = new Label(active ? "● Activo" : "● Inactivo");
+        boolean active = user.isVerified(); // isVerified maps to isActivo
+        Label statusLabel = new Label(active ? "Activo" : "Inactivo");
         statusLabel.getStyleClass().add(active ? "status-dot-active" : "status-dot-inactive");
         statusCell.getChildren().add(statusLabel);
 
-        // ── Col 3: Último acceso ──────────────────────────────────
-        Label lastLabel = new Label(
-                user.lastAccess() != null ? user.lastAccess().format(FMT_DATETIME) : "—"
-        );
-        lastLabel.getStyleClass().add("date-label");
+        // ── Col 3: Modulos ──────────────────────────────────
+        AdminUserDTO adminDto = adminUserByUsername.get(user.username());
+        String modulosText = "--";
+        if (adminDto != null) {
+            if (adminDto.isPrincipal()) {
+                modulosText = "Todos";
+            } else {
+                int count = adminDto.getModulos().size();
+                modulosText = count + " de 7";
+            }
+        }
+        Label modulosLabel = new Label(modulosText);
+        modulosLabel.getStyleClass().add("date-label");
 
         // ── Col 4: Registro ───────────────────────────────────────
         Label regLabel = new Label(
-                user.memberSince() != null ? user.memberSince().format(FMT_DATE) : "—"
+                user.memberSince() != null ? user.memberSince().format(FMT_DATE) : "--"
         );
         regLabel.getStyleClass().add("date-label");
 
-        // ── Col 5: Botón acciones ─────────────────────────────────
-        Button btnActions = new Button("•••");
+        // ── Col 5: Boton acciones ─────────────────────────────────
+        Button btnActions = new Button("...");
         btnActions.getStyleClass().add("btn-row-actions");
         btnActions.setMinWidth(COL_ACTIONS); btnActions.setMaxWidth(COL_ACTIONS);
         btnActions.setOnAction(e -> showActionsMenu(btnActions, user));
 
-        grid.add(userCell,    0, 0);
-        grid.add(roleCell,    1, 0);
-        grid.add(statusCell,  2, 0);
-        grid.add(lastLabel,   3, 0);
-        grid.add(regLabel,    4, 0);
-        grid.add(btnActions,  5, 0);
+        grid.add(userCell,      0, 0);
+        grid.add(roleCell,      1, 0);
+        grid.add(statusCell,    2, 0);
+        grid.add(modulosLabel,  3, 0);
+        grid.add(regLabel,      4, 0);
+        grid.add(btnActions,    5, 0);
 
         return grid;
     }
 
     private Label buildRolePill(String role) {
-        Label pill = new Label(role != null ? role : "—");
+        Label pill = new Label(role != null ? role : "--");
         pill.getStyleClass().add("role-pill");
         if (role == null) {
             pill.getStyleClass().add("role-default");
-        } else if (role.equalsIgnoreCase("Administrador") || role.equalsIgnoreCase("Admin")) {
+        } else if (role.equalsIgnoreCase("Administrador") || role.equalsIgnoreCase("Principal")) {
             pill.getStyleClass().add("role-admin");
-        } else if (role.equalsIgnoreCase("Analista") || role.equalsIgnoreCase("Usuario")) {
+        } else if (role.equalsIgnoreCase("Secundario") || role.equalsIgnoreCase("Analista")) {
             pill.getStyleClass().add("role-analyst");
         } else {
             pill.getStyleClass().add("role-default");
@@ -338,7 +440,6 @@ public class AdminController {
     }
 
     private void loadUserAvatar(ImageView view, UserDTO user) {
-        // Intentar cargar por ID desde AvatarStorageService
         String userId = String.valueOf(
                 user.username() != null ? user.username().hashCode() : user.fullName().hashCode()
         );
@@ -348,7 +449,6 @@ public class AdminController {
             view.setImage(saved);
             return;
         }
-        // Fallback: default avatar
         try {
             var stream = getClass().getResourceAsStream("/images/default-avatar.png");
             if (stream != null) view.setImage(new Image(stream));
@@ -358,45 +458,70 @@ public class AdminController {
     }
 
     // ═════════════════════════════════════════════════════════════════════════
-    //  MENÚ ACCIONES
+    //  MENU ACCIONES
     // ═════════════════════════════════════════════════════════════════════════
 
     private void showActionsMenu(Button anchor, UserDTO user) {
         ContextMenu menu = new ContextMenu();
         menu.getStyleClass().add("actions-context-menu");
 
-        MenuItem editItem = new MenuItem("✏️  Editar");
-        editItem.setOnAction(e -> openEditModal(user));
+        AdminUserDTO adminDto = adminUserByUsername.get(user.username());
+
+        MenuItem editItem = new MenuItem("Editar");
+        editItem.setOnAction(e -> {
+            if (adminDto != null) {
+                openEditModal(adminDto);
+            }
+        });
 
         SeparatorMenuItem sep = new SeparatorMenuItem();
 
-        MenuItem deactivateItem = new MenuItem("🚫  Desactivar");
-        deactivateItem.getStyleClass().add("deactivate-menu-item");
-        deactivateItem.setOnAction(e -> onDeactivateUser(user));
+        // Mostrar activar o desactivar segun estado actual
+        boolean isActive = adminDto != null && adminDto.isActivo();
+        MenuItem toggleItem = new MenuItem(isActive ? "Desactivar" : "Activar");
+        if (isActive) {
+            toggleItem.getStyleClass().add("deactivate-menu-item");
+        }
+        toggleItem.setOnAction(e -> {
+            if (adminDto != null) {
+                onToggleUserEstado(adminDto);
+            }
+        });
 
-        menu.getItems().addAll(editItem, sep, deactivateItem);
+        menu.getItems().addAll(editItem, sep, toggleItem);
         menu.show(anchor, javafx.geometry.Side.BOTTOM, 0, 4);
     }
 
-    private void onDeactivateUser(UserDTO user) {
-        Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
-        alert.setTitle("Desactivar usuario");
-        alert.setHeaderText("¿Desactivar a " + user.fullName() + "?");
-        alert.setContentText("El usuario perderá acceso al sistema. Podrás reactivarlo más tarde.");
+    private void onToggleUserEstado(AdminUserDTO user) {
+        boolean isActive = user.isActivo();
+        String action = isActive ? "Desactivar" : "Activar";
+        String newEstado = isActive ? "Inactivo" : "Activo";
 
-        ButtonType btnConfirm = new ButtonType("Desactivar", ButtonBar.ButtonData.OK_DONE);
+        Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
+        alert.setTitle(action + " usuario");
+        alert.setHeaderText(action + " a " + user.getNombreCompleto() + "?");
+        alert.setContentText(isActive
+                ? "El usuario perdera acceso al sistema. Podras reactivarlo mas tarde."
+                : "El usuario recuperara acceso al sistema.");
+
+        ButtonType btnConfirm = new ButtonType(action, ButtonBar.ButtonData.OK_DONE);
         ButtonType btnCancel  = new ButtonType("Cancelar",   ButtonBar.ButtonData.CANCEL_CLOSE);
         alert.getButtonTypes().setAll(btnConfirm, btnCancel);
         applyAlertStyle(alert);
 
         alert.showAndWait().ifPresent(r -> {
             if (r == btnConfirm) {
-                // TODO: adminApiService.deactivateUser(userId)
-                System.out.println("[ADMIN] Desactivar usuario: id=" + user.username()
-                        + " | email=" + user.email());
-                showInfo("Usuario desactivado",
-                        user.fullName() + " ha sido desactivado correctamente.");
-                renderPage();
+                adminApiService.updateEstado(user.getIdUsuario(), newEstado)
+                        .thenAccept(success -> Platform.runLater(() -> {
+                            if (success) {
+                                showInfo("Usuario " + (isActive ? "desactivado" : "activado"),
+                                        user.getNombreCompleto() + " ha sido " +
+                                                (isActive ? "desactivado" : "activado") + " correctamente.");
+                                loadUsersFromApi();
+                            } else {
+                                showAlert("Error", "No se pudo cambiar el estado del usuario.");
+                            }
+                        }));
             }
         });
     }
@@ -410,18 +535,18 @@ public class AdminController {
         openUserFormModal(null);
     }
 
-    private void openEditModal(UserDTO user) {
+    private void openEditModal(AdminUserDTO user) {
         openUserFormModal(user);
     }
 
-    private void openUserFormModal(UserDTO userToEdit) {
+    private void openUserFormModal(AdminUserDTO adminUserToEdit) {
         try {
             FXMLLoader loader = new FXMLLoader(
                     getClass().getResource("/fxml/admin/UserFormView.fxml")
             );
             Parent root = loader.load();
             UserFormController controller = loader.getController();
-            controller.initForm(userToEdit, this::onUserSaved);
+            controller.initForm(adminUserToEdit, this::onUserSaved);
 
             Scene scene = new Scene(root);
             scene.getStylesheets().add(
@@ -431,12 +556,11 @@ public class AdminController {
             );
 
             Stage modal = new Stage();
-            modal.setTitle(userToEdit == null ? "Nuevo usuario" : "Editar usuario");
+            modal.setTitle(adminUserToEdit == null ? "Nuevo usuario" : "Editar usuario");
             modal.initModality(Modality.APPLICATION_MODAL);
             modal.setResizable(false);
             modal.setScene(scene);
 
-            // Icono
             var iconStream = getClass().getResourceAsStream("/images/app-icon.png");
             if (iconStream != null) modal.getIcons().add(new Image(iconStream));
 
@@ -448,20 +572,9 @@ public class AdminController {
     }
 
     /** Callback cuando el formulario guarda un usuario (nuevo o editado) */
-    private void onUserSaved(UserDTO savedUser) {
-        // Buscar si existe y reemplazar, o agregar
-        boolean found = false;
-        for (int i = 0; i < allUsers.size(); i++) {
-            if (allUsers.get(i).username().equals(savedUser.username())) {
-                allUsers.set(i, savedUser);
-                found = true;
-                break;
-            }
-        }
-        if (!found) allUsers.add(savedUser);
-
-        applyFilter(searchField.getText());
-        updateKpis();
+    private void onUserSaved(AdminUserDTO savedUser) {
+        // Recargar toda la lista desde la API para mantener consistencia
+        loadUsersFromApi();
     }
 
     // ═════════════════════════════════════════════════════════════════════════
@@ -470,47 +583,27 @@ public class AdminController {
 
     @FXML
     private void onExport() {
-        // Mapear lista filtrada a arreglo para el backend
         List<java.util.Map<String, Object>> rows = filtered.stream().map(u -> {
             java.util.Map<String, Object> row = new java.util.LinkedHashMap<>();
             row.put("Nombre",         u.fullName());
             row.put("Usuario",        u.username());
             row.put("Email",          u.email());
-            row.put("Rol",            u.roleDisplay());
-            row.put("Verificado",     u.isVerified() ? "Sí" : "No");
-            row.put("Último acceso",  u.lastAccess() != null ? u.lastAccess().format(FMT_DATETIME) : "—");
-            row.put("Fecha registro", u.memberSince() != null ? u.memberSince().format(FMT_DATE) : "—");
+            row.put("Tipo",           u.roleDisplay());
+            row.put("Estado",         u.isVerified() ? "Activo" : "Inactivo");
+            row.put("Fecha registro", u.memberSince() != null ? u.memberSince().format(FMT_DATE) : "--");
             return row;
         }).collect(Collectors.toList());
 
-        // TODO: adminApiService.exportUsers(rows)  →  genera Excel en backend
         System.out.println("[ADMIN] Exportar " + rows.size() + " usuarios:");
         rows.forEach(r -> System.out.println("  " + r));
 
-        showInfo("Exportación iniciada",
-                "Se están exportando " + rows.size() + " usuarios.");
+        showInfo("Exportacion iniciada",
+                "Se estan exportando " + rows.size() + " usuarios.");
     }
 
     // ═════════════════════════════════════════════════════════════════════════
     //  HELPERS
     // ═════════════════════════════════════════════════════════════════════════
-
-    private boolean isActive(UserDTO u) {
-        // Consideramos activo si tuvo acceso en los últimos 30 días
-        return u.lastAccess() != null &&
-                u.lastAccess().isAfter(LocalDateTime.now().minusDays(30));
-    }
-
-    private boolean isAdmin(UserDTO u) {
-        return u.role() != null &&
-                (u.role().equalsIgnoreCase("Administrador") ||
-                        u.role().equalsIgnoreCase("Admin"));
-    }
-
-    private boolean accessedToday(UserDTO u) {
-        return u.lastAccess() != null &&
-                u.lastAccess().toLocalDate().equals(LocalDate.now());
-    }
 
     private void applyAlertStyle(Alert alert) {
         try {
@@ -538,72 +631,12 @@ public class AdminController {
         a.showAndWait();
     }
 
-    // ═════════════════════════════════════════════════════════════════════════
-    //  MOCK DATA
-    // ═════════════════════════════════════════════════════════════════════════
-
-    private List<UserDTO> getMockUsers() {
-        return List.of(
-                new UserDTO(
-                        "Mateo Alexander", "malex_sani",
-                        "Administrador", "Administrador",
-                        "Business Intelligence",
-                        "mateo.alex@sani-bi.com", true, "+52 55 1234 5678",
-                        null,
-                        LocalDate.of(2023, 3, 15),
-                        LocalDateTime.now().minusHours(2),
-                        new UserDTO.UserStats(128, 1042, 45)
-                ),
-                new UserDTO(
-                        "Laura Martínez", "lmartinez",
-                        "Analista", "Analista",
-                        "Ventas",
-                        "laura.martinez@sani-bi.com", true, "+52 55 9876 5432",
-                        null,
-                        LocalDate.of(2023, 7, 20),
-                        LocalDateTime.now().minusDays(1),
-                        new UserDTO.UserStats(89, 540, 22)
-                ),
-                new UserDTO(
-                        "Carlos Ruiz", "cruiz",
-                        "Analista", "Analista",
-                        "Operaciones",
-                        "carlos.ruiz@sani-bi.com", false, "",
-                        null,
-                        LocalDate.of(2024, 1, 10),
-                        LocalDateTime.now().minusDays(5),
-                        new UserDTO.UserStats(45, 210, 8)
-                ),
-                new UserDTO(
-                        "Sofía Hernández", "shernandez",
-                        "Administrador", "Administrador",
-                        "Dirección",
-                        "sofia.hdz@sani-bi.com", true, "+52 55 4567 8901",
-                        null,
-                        LocalDate.of(2022, 11, 3),
-                        LocalDateTime.now().minusMinutes(30),
-                        new UserDTO.UserStats(200, 1800, 70)
-                ),
-                new UserDTO(
-                        "Diego López", "dlopez",
-                        "Analista", "Analista",
-                        "Finanzas",
-                        "diego.lopez@sani-bi.com", false, "",
-                        null,
-                        LocalDate.of(2024, 4, 18),
-                        LocalDateTime.now().minusDays(12),
-                        new UserDTO.UserStats(30, 98, 3)
-                ),
-                new UserDTO(
-                        "Valentina Torres", "vtorres",
-                        "Analista", "Analista",
-                        "Marketing",
-                        "v.torres@sani-bi.com", true, "+52 55 2345 6789",
-                        null,
-                        LocalDate.of(2023, 9, 5),
-                        LocalDateTime.now().minusDays(2),
-                        new UserDTO.UserStats(67, 320, 15)
-                )
-        );
+    private void showAlert(String title, String msg) {
+        Alert a = new Alert(Alert.AlertType.WARNING);
+        a.setTitle(title);
+        a.setHeaderText(null);
+        a.setContentText(msg);
+        applyAlertStyle(a);
+        a.showAndWait();
     }
 }
