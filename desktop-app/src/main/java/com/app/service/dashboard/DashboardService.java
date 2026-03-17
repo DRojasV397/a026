@@ -12,6 +12,7 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
+import java.time.LocalDate;
 import java.util.concurrent.CompletableFuture;
 
 /**
@@ -36,12 +37,20 @@ public class DashboardService {
     }
 
     /**
-     * GET /dashboard/executive
-     * Retorna el dashboard ejecutivo con KPIs, alertas, top productos y tendencias.
+     * GET /dashboard/executive (período por defecto = último mes)
      */
     public CompletableFuture<ExecutiveDashboardDTO> getExecutiveDashboard() {
+        LocalDate fin = LocalDate.now();
+        return getExecutiveDashboard(fin.minusDays(30), fin);
+    }
+
+    /**
+     * GET /dashboard/executive?fecha_inicio=...&fecha_fin=...
+     */
+    public CompletableFuture<ExecutiveDashboardDTO> getExecutiveDashboard(LocalDate inicio, LocalDate fin) {
+        String url = ApiConfig.getDashboardExecutiveUrl(inicio.toString(), fin.toString());
         HttpRequest request = HttpRequest.newBuilder()
-                .uri(URI.create(ApiConfig.getDashboardExecutiveUrl()))
+                .uri(URI.create(url))
                 .header("Authorization", authHeader())
                 .timeout(Duration.ofSeconds(30))
                 .GET()
@@ -49,7 +58,7 @@ public class DashboardService {
 
         return httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofString())
                 .thenApply(response -> {
-                    logger.debug("GET /dashboard/executive → HTTP {}", response.statusCode());
+                    logger.debug("GET /dashboard/executive [{}→{}] → HTTP {}", inicio, fin, response.statusCode());
                     if (response.statusCode() == 200) {
                         ExecutiveDashboardDTO dto = gson.fromJson(response.body(), ExecutiveDashboardDTO.class);
                         if (dto != null && dto.isSuccess()) {

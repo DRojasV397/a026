@@ -14,6 +14,7 @@ import logging
 from app.models import (
     Venta, DetalleVenta, Compra, DetalleCompra,
     Producto, Categoria, Alerta, Prediccion,
+    Modelo, VersionModelo,
     Rentabilidad, ResultadoFinanciero, Escenario,
     PreferenciaUsuario
 )
@@ -82,6 +83,9 @@ class DashboardService:
             "alertas_activas": alertas_activas,
             "tendencias": tendencias,
             "top_productos": top_productos,
+            "ventas_por_categoria": self._get_sales_by_category(fecha_inicio, fecha_fin),
+            "rentabilidad_categorias": self._get_rentabilidad_categorias(fecha_inicio, fecha_fin),
+            "precision_modelos": self._get_precision_modelos(),
             "fecha_generacion": datetime.now().isoformat()
         }
 
@@ -283,6 +287,78 @@ class DashboardService:
         except Exception as e:
             logger.error(f"Error al obtener tendencias: {str(e)}")
             return {"ventas": [], "compras": []}
+
+    def _get_sales_by_category(self, fecha_inicio: date, fecha_fin: date) -> List[Dict]:
+        """Obtiene ventas agrupadas por categoría para el periodo."""
+        try:
+            result = self.db.query(
+                Categoria.nombre,
+                func.sum(DetalleVenta.cantidad * DetalleVenta.precioUnitario).label("total")
+            ).join(Producto, DetalleVenta.idProducto == Producto.idProducto
+            ).join(Categoria, Producto.idCategoria == Categoria.idCategoria
+            ).join(Venta, DetalleVenta.idVenta == Venta.idVenta
+            ).filter(Venta.fecha >= fecha_inicio, Venta.fecha <= fecha_fin
+            ).group_by(Categoria.nombre
+            ).order_by(desc("total")
+            ).limit(8).all()
+            return [{"categoria": r.nombre or "Sin categoría",
+                     "total": round(float(r.total or 0), 2)} for r in result]
+        except Exception as e:
+            logger.error(f"Error al obtener ventas por categoría: {str(e)}")
+            return []
+
+    def _get_rentabilidad_categorias(self, fecha_inicio: date, fecha_fin: date) -> List[Dict]:
+        """Ingresos y utilidad estimada por categoría, para el gráfico de rentabilidad."""
+        try:
+            result = self.db.query(
+                Categoria.nombre,
+                func.sum(DetalleVenta.cantidad * DetalleVenta.precioUnitario).label("ingresos"),
+                func.sum(DetalleVenta.cantidad * func.coalesce(Producto.costoUnitario, 0)).label("costo")
+            ).join(Producto, DetalleVenta.idProducto == Producto.idProducto
+            ).join(Categoria, Producto.idCategoria == Categoria.idCategoria
+            ).join(Venta, DetalleVenta.idVenta == Venta.idVenta
+            ).filter(Venta.fecha >= fecha_inicio, Venta.fecha <= fecha_fin
+            ).group_by(Categoria.nombre
+            ).order_by(desc("ingresos")
+            ).limit(8).all()
+
+            items = []
+            for r in result:
+                ingresos = float(r.ingresos or 0)
+                costo = float(r.costo or 0)
+                utilidad = ingresos - costo
+                margen = round(utilidad / ingresos * 100, 1) if ingresos > 0 else 0
+                items.append({
+                    "categoria": r.nombre or "Sin categoría",
+                    "ingresos": round(ingresos, 2),
+                    "utilidad": round(utilidad, 2),
+                    "margen": margen
+                })
+            return items
+        except Exception as e:
+            logger.error(f"Error al obtener rentabilidad por categoría: {str(e)}")
+            return []
+
+    def _get_precision_modelos(self) -> List[Dict]:
+        """Últimas versiones activas de modelos predictivos con su R²."""
+        try:
+            versiones = self.db.query(VersionModelo).join(
+                Modelo, VersionModelo.idModelo == Modelo.idModelo
+            ).filter(
+                VersionModelo.estado == 'Activo'
+            ).order_by(
+                desc(VersionModelo.fechaEntrenamiento)
+            ).limit(8).all()
+
+            return [{
+                "nombre": (v.modelo.nombre or v.modelo.tipoModelo or "Modelo"),
+                "tipo": v.modelo.tipoModelo or "",
+                "precision": round(float(v.precision or 0), 4),
+                "estado": v.estado or ""
+            } for v in versiones]
+        except Exception as e:
+            logger.error(f"Error al obtener precisión de modelos: {str(e)}")
+            return []
 
     def _get_top_products(
         self,

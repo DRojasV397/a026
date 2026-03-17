@@ -22,6 +22,9 @@ public class ExecutiveDashboardDTO {
     private AlertasActivas alertas_activas;
     private Tendencias tendencias;
     private TopProductos top_productos;
+    private List<VentaCategoria> ventas_por_categoria;
+    private List<RentabilidadCategoria> rentabilidad_categorias;
+    private List<ModeloResumen> precision_modelos;
     private String fecha_generacion;
 
     // ── Getters ──────────────────────────────────────────────────────────────
@@ -34,6 +37,15 @@ public class ExecutiveDashboardDTO {
     public AlertasActivas getAlertasActivas()   { return alertas_activas != null ? alertas_activas : new AlertasActivas(); }
     public Tendencias getTendencias()           { return tendencias != null ? tendencias : new Tendencias(); }
     public TopProductos getTopProductos()       { return top_productos != null ? top_productos : new TopProductos(); }
+    public List<VentaCategoria> getVentasPorCategoria() {
+        return ventas_por_categoria != null ? ventas_por_categoria : List.of();
+    }
+    public List<RentabilidadCategoria> getRentabilidadCategorias() {
+        return rentabilidad_categorias != null ? rentabilidad_categorias : List.of();
+    }
+    public List<ModeloResumen> getPrecisionModelos() {
+        return precision_modelos != null ? precision_modelos : List.of();
+    }
     public String getFechaGeneracion()          { return fecha_generacion; }
 
     // ── Nested DTOs ───────────────────────────────────────────────────────────
@@ -140,6 +152,35 @@ public class ExecutiveDashboardDTO {
 
         public List<ProductoTop> getPorCantidad()     { return por_cantidad != null ? por_cantidad : List.of(); }
         public int getTotalProductosVendidos()         { return total_productos_vendidos; }
+    }
+
+    public static class RentabilidadCategoria {
+        private String categoria;
+        private double ingresos;
+        private double utilidad;
+        private double margen;
+        public String getCategoria() { return categoria != null ? categoria : ""; }
+        public double getIngresos()  { return ingresos; }
+        public double getUtilidad()  { return utilidad; }
+        public double getMargen()    { return margen; }
+    }
+
+    public static class ModeloResumen {
+        private String nombre;
+        private String tipo;
+        private double precision;
+        private String estado;
+        public String getNombre()    { return nombre != null ? nombre : ""; }
+        public String getTipo()      { return tipo != null ? tipo : ""; }
+        public double getPrecision() { return precision; }
+        public String getEstado()    { return estado != null ? estado : ""; }
+    }
+
+    public static class VentaCategoria {
+        private String categoria;
+        private double total;
+        public String getCategoria() { return categoria != null ? categoria : ""; }
+        public double getTotal()     { return total; }
     }
 
     public static class ProductoTop {

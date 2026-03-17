@@ -11,15 +11,23 @@ import com.app.ui.components.charts.*;
 import com.app.ui.components.lists.VerticalListCardController;
 import com.app.ui.components.cards.StatsCard;
 import javafx.application.Platform;
+import javafx.collections.FXCollections;
+import javafx.collections.ObservableList;
 import javafx.concurrent.Task;
+import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
+import javafx.scene.chart.PieChart;
+import javafx.scene.chart.XYChart;
 import javafx.scene.control.Label;
 import javafx.scene.control.ScrollPane;
+import javafx.scene.control.ToggleButton;
+import javafx.scene.control.ToggleGroup;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
 
 import java.io.IOException;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -42,9 +50,6 @@ public class HomeController {
     @FXML
     private VerticalListCardController topProductsListController;
 
-    @FXML
-    private VBox chartsContainer;
-
     // Contenedor de alertas
     @FXML
     private HBox alertsContainer;
@@ -57,11 +62,29 @@ public class HomeController {
 
     @FXML private HBox statsCardsContainer;
 
-    // Controladores de charts adicionales (cargados bajo demanda)
+    // Botones de selección de período
+    @FXML private ToggleButton btn1S;
+    @FXML private ToggleButton btn2S;
+    @FXML private ToggleButton btn1M;
+    @FXML private ToggleButton btn3M;
+    @FXML private ToggleButton btn6M;
+    @FXML private ToggleButton btn1A;
+
+    // Charts adicionales — sección "Tendencias Detalladas"
+    @FXML private VBox chartsContainer;
     private PieChartCardController productDistributionChartController;
     private AreaChartCardController revenueExpenseChartController;
-
     private boolean additionalChartsLoaded = false;
+
+    // Charts de módulos — sección "Análisis por Módulo"
+    @FXML private VBox modulesChartsContainer;
+    private BarChartCardController rentabilidadChartController;
+    private PieChartCardController alertasChartController;
+    private BarChartCardController modelosChartController;
+    private boolean moduleChartsLoaded = false;
+
+    // Datos del dashboard ejecutivo cargado (para uso diferido en lazy charts)
+    private ExecutiveDashboardDTO dashboardDto;
 
     // Servicios
     private final AlertService alertService = new AlertService();
@@ -69,31 +92,81 @@ public class HomeController {
 
     @FXML
     private void initialize() {
-        // Cargar CSS de alertas programáticamente
         loadAlertsCSS();
 
-        //Ajustar altura mínima del dashboard al viewport (CLAVE)
-        dashboardContainer.minHeightProperty().bind(
-                dashboardRoot.heightProperty()
-        );
+        dashboardContainer.minHeightProperty().bind(dashboardRoot.heightProperty());
 
-        // Cargar datos del dashboard ejecutivo desde la API
-        dashboardService.getExecutiveDashboard().thenAccept(dto -> Platform.runLater(() -> {
+        // Configurar ToggleGroup para los botones de período
+        ToggleGroup periodGroup = new ToggleGroup();
+        btn1S.setToggleGroup(periodGroup);
+        btn2S.setToggleGroup(periodGroup);
+        btn1M.setToggleGroup(periodGroup);
+        btn3M.setToggleGroup(periodGroup);
+        btn6M.setToggleGroup(periodGroup);
+        btn1A.setToggleGroup(periodGroup);
+        btn1M.setSelected(true); // Último mes como default
+
+        // Evitar deselección (siempre debe haber uno seleccionado)
+        periodGroup.selectedToggleProperty().addListener((obs, oldVal, newVal) -> {
+            if (newVal == null) periodGroup.selectToggle(oldVal);
+        });
+
+        loadDashboardForPeriod(30);
+    }
+
+    /**
+     * Carga (o recarga) el dashboard para el rango de días dado desde hoy.
+     */
+    private void loadDashboardForPeriod(int days) {
+        LocalDate fin = LocalDate.now();
+        LocalDate inicio = fin.minusDays(days);
+
+        dashboardService.getExecutiveDashboard(inicio, fin).thenAccept(dto -> Platform.runLater(() -> {
             if (dto != null) {
+                this.dashboardDto = dto;
                 loadStatsFromDashboard(dto);
                 loadTopProductsFromDashboard(dto);
                 loadAlertsFromDashboard(dto);
+                loadChartsFromDashboard(dto);
+                if (additionalChartsLoaded) refreshLazyCharts();
+                if (moduleChartsLoaded)    populateModuleCharts();
             } else {
-                // Fallback a charts estáticos si la API no responde
                 loadStatsCards();
                 loadAlerts();
+                loadInitialCharts();
             }
-            loadInitialCharts();
         })).exceptionally(ex -> {
-            System.err.println("[HOME] Error al cargar dashboard ejecutivo: " + ex.getMessage());
+            System.err.println("[HOME] Error al cargar dashboard: " + ex.getMessage());
             Platform.runLater(() -> { loadStatsCards(); loadAlerts(); loadInitialCharts(); });
             return null;
         });
+    }
+
+    /** Maneja el clic en cualquier botón de período. */
+    @FXML
+    private void onPeriodChanged(ActionEvent event) {
+        ToggleButton btn = (ToggleButton) event.getSource();
+        String userData = (String) btn.getUserData();
+        if (userData != null) {
+            loadDashboardForPeriod(Integer.parseInt(userData));
+        }
+    }
+
+    /** Refresca los charts lazy (PieChart y AreaChart) cuando ya están visibles. */
+    private void refreshLazyCharts() {
+        if (productDistributionChartController != null && dashboardDto != null
+                && !dashboardDto.getVentasPorCategoria().isEmpty()) {
+            ObservableList<PieChart.Data> pie = FXCollections.observableArrayList();
+            dashboardDto.getVentasPorCategoria().forEach(c ->
+                pie.add(new PieChart.Data(c.getCategoria(), c.getTotal())));
+            productDistributionChartController.loadCustomData(pie);
+        }
+        if (revenueExpenseChartController != null && dashboardDto != null) {
+            revenueExpenseChartController.loadCustomData(
+                buildTrendSeries("Ingresos", dashboardDto.getTendencias().getVentas()),
+                buildTrendSeries("Gastos",   dashboardDto.getTendencias().getCompras())
+            );
+        }
     }
 
     /**
@@ -132,6 +205,46 @@ public class HomeController {
                 loadTopProductsList();
             }
         });
+    }
+
+    /**
+     * Carga los charts iniciales con datos reales del dashboard ejecutivo.
+     */
+    private void loadChartsFromDashboard(ExecutiveDashboardDTO dto) {
+        Platform.runLater(() -> {
+            if (salesTrendChartController != null) {
+                salesTrendChartController.setTitle("Tendencia de Ventas");
+                salesTrendChartController.setSubtitle("Últimas semanas del período");
+                salesTrendChartController.loadCustomData(
+                    buildTrendSeries("Ventas",  dto.getTendencias().getVentas()),
+                    buildTrendSeries("Compras", dto.getTendencias().getCompras())
+                );
+            }
+            if (regionSalesChartController != null) {
+                regionSalesChartController.setTitle("Ventas por Categoría");
+                regionSalesChartController.setSubtitle("Distribución del período");
+                XYChart.Series<String, Number> s = new XYChart.Series<>();
+                s.setName("Ingresos");
+                dto.getVentasPorCategoria().forEach(c ->
+                    s.getData().add(new XYChart.Data<>(c.getCategoria(), c.getTotal())));
+                regionSalesChartController.loadCustomData(s);
+            }
+        });
+    }
+
+    private XYChart.Series<String, Number> buildTrendSeries(
+            String name, List<ExecutiveDashboardDTO.PuntoTendencia> puntos) {
+        XYChart.Series<String, Number> s = new XYChart.Series<>();
+        s.setName(name);
+        puntos.forEach(pt -> s.getData().add(
+            new XYChart.Data<>(formatWeek(pt.getPeriodo()), pt.getValor())));
+        return s;
+    }
+
+    private static String formatWeek(String period) {
+        if (period == null) return "";
+        int idx = period.indexOf("-W");
+        return idx >= 0 ? "Sem " + period.substring(idx + 2) : period;
     }
 
     /**
@@ -288,15 +401,29 @@ public class HomeController {
             protected void succeeded() {
                 Platform.runLater(() -> {
                     if (productDistributionChartController != null) {
-                        productDistributionChartController.setTitle("Distribución de Productos");
-                        productDistributionChartController.setSubtitle("Por categoría");
-                        productDistributionChartController.loadData();
+                        productDistributionChartController.setTitle("Distribución por Categoría");
+                        productDistributionChartController.setSubtitle("Participación en ventas");
+                        if (dashboardDto != null && !dashboardDto.getVentasPorCategoria().isEmpty()) {
+                            ObservableList<PieChart.Data> pie = FXCollections.observableArrayList();
+                            dashboardDto.getVentasPorCategoria().forEach(c ->
+                                pie.add(new PieChart.Data(c.getCategoria(), c.getTotal())));
+                            productDistributionChartController.loadCustomData(pie);
+                        } else {
+                            productDistributionChartController.loadData();
+                        }
                     }
 
                     if (revenueExpenseChartController != null) {
                         revenueExpenseChartController.setTitle("Ingresos vs Gastos");
-                        revenueExpenseChartController.setSubtitle("Análisis trimestral");
-                        revenueExpenseChartController.loadData();
+                        revenueExpenseChartController.setSubtitle("Comparativa semanal");
+                        if (dashboardDto != null) {
+                            revenueExpenseChartController.loadCustomData(
+                                buildTrendSeries("Ingresos", dashboardDto.getTendencias().getVentas()),
+                                buildTrendSeries("Gastos",   dashboardDto.getTendencias().getCompras())
+                            );
+                        } else {
+                            revenueExpenseChartController.loadData();
+                        }
                     }
 
                     additionalChartsLoaded = true;
@@ -305,6 +432,123 @@ public class HomeController {
         };
 
         new Thread(loadTask).start();
+    }
+
+    /**
+     * Carga los 3 gráficos de análisis por módulo bajo demanda.
+     */
+    @FXML
+    private void loadModuleCharts() {
+        if (moduleChartsLoaded) return;
+
+        Task<Void> loadTask = new Task<>() {
+            @Override
+            protected Void call() {
+                try {
+                    // BarChart — Rentabilidad por Categoría (ancho completo)
+                    FXMLLoader barLoader1 = new FXMLLoader(
+                            getClass().getResource("/fxml/components/charts/BarChartCard.fxml"));
+                    VBox bar1Node = barLoader1.load();
+                    rentabilidadChartController = barLoader1.getController();
+                    Platform.runLater(() -> modulesChartsContainer.getChildren().add(bar1Node));
+
+                    Thread.sleep(150);
+
+                    // PieChart Alertas + BarChart Modelos lado a lado
+                    FXMLLoader pieLoader = new FXMLLoader(
+                            getClass().getResource("/fxml/components/charts/PieChartCard.fxml"));
+                    VBox pieNode = pieLoader.load();
+                    alertasChartController = pieLoader.getController();
+
+                    FXMLLoader barLoader2 = new FXMLLoader(
+                            getClass().getResource("/fxml/components/charts/BarChartCard.fxml"));
+                    VBox bar2Node = barLoader2.load();
+                    modelosChartController = barLoader2.getController();
+
+                    HBox row2 = new HBox(20);
+                    HBox.setHgrow(pieNode,  javafx.scene.layout.Priority.ALWAYS);
+                    HBox.setHgrow(bar2Node, javafx.scene.layout.Priority.ALWAYS);
+                    row2.getChildren().addAll(pieNode, bar2Node);
+
+                    Platform.runLater(() -> modulesChartsContainer.getChildren().add(row2));
+
+                } catch (IOException | InterruptedException e) {
+                    e.printStackTrace();
+                }
+                return null;
+            }
+
+            @Override
+            protected void succeeded() {
+                Platform.runLater(() -> {
+                    populateModuleCharts();
+                    moduleChartsLoaded = true;
+                });
+            }
+        };
+
+        new Thread(loadTask).start();
+    }
+
+    /** Llena los 3 gráficos de módulos con datos del dashboardDto actual. */
+    private void populateModuleCharts() {
+        if (dashboardDto == null) return;
+
+        // 1. BarChart — Rentabilidad por Categoría (ingresos vs utilidad)
+        if (rentabilidadChartController != null) {
+            rentabilidadChartController.setTitle("Rentabilidad por Categoría");
+            rentabilidadChartController.setSubtitle("Ingresos vs Utilidad del período");
+            List<ExecutiveDashboardDTO.RentabilidadCategoria> cats = dashboardDto.getRentabilidadCategorias();
+            if (!cats.isEmpty()) {
+                XYChart.Series<String, Number> serieIngresos = new XYChart.Series<>();
+                serieIngresos.setName("Ingresos");
+                XYChart.Series<String, Number> serieUtilidad = new XYChart.Series<>();
+                serieUtilidad.setName("Utilidad");
+                cats.forEach(c -> {
+                    serieIngresos.getData().add(new XYChart.Data<>(c.getCategoria(), c.getIngresos()));
+                    serieUtilidad.getData().add(new XYChart.Data<>(c.getCategoria(), c.getUtilidad()));
+                });
+                rentabilidadChartController.loadCustomData(serieIngresos, serieUtilidad);
+            } else {
+                rentabilidadChartController.loadData();
+            }
+        }
+
+        // 2. PieChart — Alertas por tipo
+        if (alertasChartController != null) {
+            alertasChartController.setTitle("Distribución de Alertas");
+            alertasChartController.setSubtitle("Por tipo de alerta activa");
+            java.util.Map<String, Integer> porTipo = dashboardDto.getAlertasActivas().getPorTipo();
+            if (porTipo != null && !porTipo.isEmpty()) {
+                ObservableList<PieChart.Data> pie = FXCollections.observableArrayList();
+                porTipo.forEach((tipo, count) -> {
+                    if (count > 0) pie.add(new PieChart.Data(tipo, count));
+                });
+                if (!pie.isEmpty()) {
+                    alertasChartController.loadCustomData(pie);
+                } else {
+                    alertasChartController.loadData();
+                }
+            } else {
+                alertasChartController.loadData();
+            }
+        }
+
+        // 3. BarChart — Precisión (R²) de modelos predictivos
+        if (modelosChartController != null) {
+            modelosChartController.setTitle("Precisión de Modelos Predictivos");
+            modelosChartController.setSubtitle("R² de modelos entrenados (0 = peor, 1 = mejor)");
+            List<ExecutiveDashboardDTO.ModeloResumen> modelos = dashboardDto.getPrecisionModelos();
+            if (!modelos.isEmpty()) {
+                XYChart.Series<String, Number> serie = new XYChart.Series<>();
+                serie.setName("R²");
+                modelos.forEach(m -> serie.getData().add(
+                        new XYChart.Data<>(m.getNombre(), m.getPrecision())));
+                modelosChartController.loadCustomData(serie);
+            } else {
+                modelosChartController.loadData();
+            }
+        }
     }
 
     /**
@@ -358,7 +602,13 @@ public class HomeController {
                         "Ventas del Periodo",
                         String.format("ROI: %.1f%%", kpis.getRoiPorcentaje()),
                         "blue",
-                        kpis.getRoiPorcentaje() >= 0)
+                        kpis.getRoiPorcentaje() >= 0),
+                new StatsDTO("🎯",
+                        String.format("$%,.0f", ventas.getTicketPromedio()),
+                        "Ticket Promedio",
+                        String.format("%d transacciones", ventas.getCantidad()),
+                        "blue",
+                        ventas.getTicketPromedio() >= 0)
         );
 
         statsCardsContainer.getChildren().clear();

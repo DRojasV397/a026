@@ -242,6 +242,10 @@ public class ApiConfig {
         return BASE_URL + "/dashboard/executive";
     }
 
+    public static String getDashboardExecutiveUrl(String fechaInicio, String fechaFin) {
+        return BASE_URL + "/dashboard/executive?fecha_inicio=" + fechaInicio + "&fecha_fin=" + fechaFin;
+    }
+
     public static String getDashboardKpiUrl(String kpiName) {
         return BASE_URL + "/dashboard/kpi/" + kpiName;
     }
