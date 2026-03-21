@@ -543,7 +543,7 @@ async def get_model_types(
                 "use_case": "Negocios con patrones estacionales anuales y semanales claros"
             }
         ],
-        "r2_threshold": 0.7,
+        "r2_threshold": PredictionService.R2_THRESHOLD,
         "max_forecast_days": 180
     }
 

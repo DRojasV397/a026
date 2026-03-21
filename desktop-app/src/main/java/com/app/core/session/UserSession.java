@@ -15,6 +15,8 @@ public class UserSession {
     private static String accessToken;
     private static String refreshToken;
     private static int userId;
+    /** Timestamp Unix (segundos) en que expira el access token. 0 = desconocido. */
+    private static long tokenExpiryEpoch = 0;
     private static String nombreCompleto;
     private static String nombreUsuario;
     private static String email;
@@ -29,6 +31,7 @@ public class UserSession {
     public static void setFromLoginResponse(LoginResponseDTO response) {
         accessToken = response.getAccessToken();
         refreshToken = response.getRefreshToken();
+        tokenExpiryEpoch = System.currentTimeMillis() / 1000 + response.getExpiresIn();
 
         LoginResponseDTO.UserInfo user = response.getUser();
         userId = user.getIdUsuario();
@@ -38,6 +41,27 @@ public class UserSession {
         roles = user.getRoles();
         tipo = user.getTipo();
         modulos = user.getModulos();
+    }
+
+    /**
+     * Actualiza solo el access token tras un refresh exitoso.
+     *
+     * @param newToken  nuevo access token JWT
+     * @param expiresIn segundos hasta la expiración
+     */
+    public static void updateAccessToken(String newToken, int expiresIn) {
+        accessToken = newToken;
+        tokenExpiryEpoch = System.currentTimeMillis() / 1000 + expiresIn;
+    }
+
+    /**
+     * Retorna true si el access token expira en menos de {@code minutes} minutos.
+     * Si no se conoce la expiración, devuelve false (no forzar refresh).
+     */
+    public static boolean isTokenExpiringSoon(int minutes) {
+        if (tokenExpiryEpoch == 0) return false;
+        long nowSeconds = System.currentTimeMillis() / 1000;
+        return (tokenExpiryEpoch - nowSeconds) < (minutes * 60L);
     }
 
     public static void setUser(String user, String role) {
@@ -64,7 +88,6 @@ public class UserSession {
     }
 
     public static int getUserId() {
-        System.out.println("getUserId " +  userId);
         return userId;
     }
 
@@ -80,6 +103,7 @@ public class UserSession {
         accessToken = null;
         refreshToken = null;
         userId = 0;
+        tokenExpiryEpoch = 0;
         nombreCompleto = null;
         nombreUsuario = null;
         email = null;

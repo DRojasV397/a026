@@ -52,9 +52,8 @@ class PredictionService:
     MODELS_DIR = "trained_models"
 
     # Umbral minimo de R2 (RN-03.02)
-    # 0.5 es un umbral realista para datos diarios de retail con 1 año de historia.
-    # R2 > 0.7 es excelente; 0.5-0.7 es aceptable; < 0.5 es un aviso de calidad baja.
-    R2_THRESHOLD = 0.5
+    # R2 >= 0.7 es el estándar de calidad requerido para que un modelo sea usable.
+    R2_THRESHOLD = 0.7
 
     # Minimo de datos historicos (RN-01.01: 6 meses)
     MIN_HISTORICAL_DAYS = 180
@@ -337,7 +336,7 @@ class PredictionService:
                 "meets_r2_threshold": meets_threshold,
                 "recommendation": (
                     "Modelo apto para predicciones" if meets_threshold
-                    else "Modelo no cumple umbral minimo R2=0.7"
+                    else f"Modelo no cumple umbral minimo R2={self.R2_THRESHOLD}"
                 ),
                 "training_samples": metrics.training_samples,
                 "test_samples": metrics.test_samples
@@ -674,8 +673,9 @@ class PredictionService:
         if not valid:
             return {"success": False, "error": "Datos insuficientes", "issues": issues}
 
-        # Entrenar todos los modelos
-        model_types = ['linear', 'arima', 'sarima', 'random_forest']
+        # Entrenar todos los modelos candidatos.
+        # Se excluye solo 'prophet' (especializado, mejor configurar manualmente).
+        model_types = ['linear', 'arima', 'sarima', 'random_forest', 'multiple_regression', 'xgboost', 'ensemble']
         results = {}
         predictions = {}
 
