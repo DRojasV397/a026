@@ -704,8 +704,7 @@ class DashboardService:
         """Obtiene preferencias de un usuario."""
         try:
             preferencias = self.db.query(PreferenciaUsuario).filter(
-                PreferenciaUsuario.idUsuario == user_id,
-                PreferenciaUsuario.visible == 1
+                PreferenciaUsuario.idUsuario == user_id
             ).order_by(PreferenciaUsuario.orden).all()
 
             return {

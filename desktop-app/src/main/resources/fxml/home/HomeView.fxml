@@ -27,6 +27,7 @@
         <HBox alignment="CENTER_LEFT" spacing="8" styleClass="period-selector">
             <Label text="Período:" styleClass="period-selector-label"/>
             <Region HBox.hgrow="ALWAYS"/>
+            <Button text="⚙ Personalizar" onAction="#onOpenPreferences" styleClass="period-btn"/>
             <ToggleButton fx:id="btn1S"  text="1 sem"   userData="7"   styleClass="period-btn" onAction="#onPeriodChanged"/>
             <ToggleButton fx:id="btn2S"  text="2 sem"   userData="14"  styleClass="period-btn" onAction="#onPeriodChanged"/>
             <ToggleButton fx:id="btn1M"  text="1 mes"   userData="30"  styleClass="period-btn" onAction="#onPeriodChanged"/>

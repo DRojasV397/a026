@@ -5,6 +5,8 @@ import com.app.model.ListItem;
 import com.app.model.StatsDTO;
 import com.app.model.alerts.AlertDTO;
 import com.app.model.dashboard.ExecutiveDashboardDTO;
+import com.app.model.dashboard.PreferencesResponseDTO;
+import com.app.model.dashboard.UserPreferenceItemDTO;
 import com.app.service.alerts.AlertApiService;
 import com.app.service.dashboard.DashboardService;
 import com.app.ui.components.alerts.AlertCardController;
@@ -18,6 +20,7 @@ import javafx.concurrent.Task;
 import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
+import javafx.scene.Scene;
 import javafx.scene.chart.PieChart;
 import javafx.scene.chart.XYChart;
 import javafx.scene.control.Button;
@@ -28,12 +31,18 @@ import javafx.scene.control.ToggleGroup;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
+import javafx.stage.Modality;
+import javafx.stage.Stage;
 
 import java.io.IOException;
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
+import java.util.stream.Collectors;
 
 /**
  * Controlador principal del Dashboard/Home
@@ -96,6 +105,14 @@ public class HomeController {
     // Datos del dashboard ejecutivo cargado (para uso diferido en lazy charts)
     private ExecutiveDashboardDTO dashboardDto;
 
+    // Preferencias del usuario
+    private final Map<String, UserPreferenceItemDTO> preferenceMap = new HashMap<>();
+    private int currentDays = 30;
+
+    private static final List<String> DEFAULT_STAT_ORDER = List.of(
+            "stat_ventas_totales", "stat_utilidad_bruta", "stat_compras_totales",
+            "stat_margen_operativo", "stat_ticket_promedio");
+
     // Servicios
     private final AlertApiService alertApiService = new AlertApiService();
     private final DashboardService dashboardService = new DashboardService();
@@ -121,13 +138,53 @@ public class HomeController {
             if (newVal == null) periodGroup.selectToggle(oldVal);
         });
 
-        loadDashboardForPeriod(30);
+        loadPreferences();
+    }
+
+    /**
+     * Carga las preferencias del usuario desde la API y luego carga el dashboard.
+     */
+    private void loadPreferences() {
+        dashboardService.getPreferences().thenAccept(resp -> Platform.runLater(() -> {
+            preferenceMap.clear();
+            if (resp != null && resp.isSuccess()) {
+                for (UserPreferenceItemDTO p : resp.getPreferencias()) {
+                    preferenceMap.put(p.getKpi(), p);
+                }
+            }
+            loadDashboardForPeriod(currentDays);
+        })).exceptionally(ex -> {
+            Platform.runLater(() -> loadDashboardForPeriod(currentDays));
+            return null;
+        });
+    }
+
+    /**
+     * Retorna true si el elemento con la clave kpi debe mostrarse.
+     * Por defecto (sin preferencia guardada) todo es visible.
+     */
+    private boolean isVisible(String kpi) {
+        UserPreferenceItemDTO pref = preferenceMap.get(kpi);
+        return pref == null || pref.isVisible();
+    }
+
+    /**
+     * Retorna las claves de stats cards en el orden guardado por el usuario.
+     */
+    private List<String> getStatOrder() {
+        boolean hasPrefs = DEFAULT_STAT_ORDER.stream().anyMatch(preferenceMap::containsKey);
+        if (!hasPrefs) return DEFAULT_STAT_ORDER;
+        return DEFAULT_STAT_ORDER.stream()
+                .sorted(Comparator.comparingInt((String k) ->
+                        preferenceMap.containsKey(k) ? preferenceMap.get(k).getOrden() : 999))
+                .collect(Collectors.toList());
     }
 
     /**
      * Carga (o recarga) el dashboard para el rango de días dado desde hoy.
      */
     private void loadDashboardForPeriod(int days) {
+        this.currentDays = days;
         LocalDate fin = LocalDate.now();
         LocalDate inicio = fin.minusDays(days);
 
@@ -158,6 +215,54 @@ public class HomeController {
         String userData = (String) btn.getUserData();
         if (userData != null) {
             loadDashboardForPeriod(Integer.parseInt(userData));
+        }
+    }
+
+    /** Abre el diálogo modal de personalización del dashboard. */
+    @FXML
+    private void onOpenPreferences() {
+        try {
+            FXMLLoader loader = new FXMLLoader(
+                    getClass().getResource("/fxml/home/DashboardPreferencesView.fxml"));
+            VBox root = loader.load();
+            DashboardPreferencesController ctrl = loader.getController();
+            ctrl.initPreferences(preferenceMap);
+            ctrl.setOnSaveCallback(newPrefs -> {
+                // 1. Apply preferences locally and immediately (FX thread — no async needed)
+                preferenceMap.clear();
+                for (int i = 0; i < newPrefs.size(); i++) {
+                    UserPreferenceItemDTO p = newPrefs.get(i);
+                    p.setOrden(i + 1);
+                    preferenceMap.put(p.getKpi(), p);
+                }
+                // 2. Reset lazy charts and reload dashboard right away
+                additionalChartsLoaded = false;
+                moduleChartsLoaded     = false;
+                productDistributionChartController = null;
+                revenueExpenseChartController      = null;
+                rentabilidadChartController        = null;
+                alertasChartController             = null;
+                modelosChartController             = null;
+                chartsContainer.getChildren().clear();
+                modulesChartsContainer.getChildren().clear();
+                loadDashboardForPeriod(currentDays);
+                // 3. Persist to API in background (best-effort — UI doesn't wait for this)
+                dashboardService.savePreferences(newPrefs)
+                        .exceptionally(ex -> {
+                            System.err.println("[HOME] Error al guardar preferencias en API: " + ex.getMessage());
+                            return false;
+                        });
+            });
+
+            Stage stage = new Stage();
+            stage.initModality(Modality.WINDOW_MODAL);
+            stage.initOwner(dashboardRoot.getScene().getWindow());
+            stage.setTitle("Personalizar Dashboard");
+            stage.setScene(new Scene(root));
+            stage.setResizable(false);
+            stage.showAndWait();
+        } catch (IOException e) {
+            e.printStackTrace();
         }
     }
 
@@ -414,35 +519,36 @@ public class HomeController {
     }
 
     /**
-     * Carga charts adicionales bajo demanda (cuando el usuario hace clic)
+     * Carga charts adicionales bajo demanda (cuando el usuario hace clic).
+     * Respeta preferencias de visibilidad.
      */
     @FXML
     private void loadMoreCharts() {
         if (additionalChartsLoaded) return;
 
+        final boolean showPie  = isVisible("chart_distribucion_categoria");
+        final boolean showArea = isVisible("chart_ingresos_gastos");
+
         Task<Void> loadTask = new Task<>() {
             @Override
             protected Void call() {
                 try {
-                    // Cargar PieChart
-                    FXMLLoader pieLoader = new FXMLLoader(
-                            getClass().getResource("/fxml/components/charts/PieChartCard.fxml")
-                    );
-                    VBox pieChartNode = pieLoader.load();
-                    productDistributionChartController = pieLoader.getController();
+                    if (showPie) {
+                        FXMLLoader pieLoader = new FXMLLoader(
+                                getClass().getResource("/fxml/components/charts/PieChartCard.fxml"));
+                        VBox pieChartNode = pieLoader.load();
+                        productDistributionChartController = pieLoader.getController();
+                        Platform.runLater(() -> chartsContainer.getChildren().add(pieChartNode));
+                        Thread.sleep(200);
+                    }
 
-                    Platform.runLater(() -> chartsContainer.getChildren().add(pieChartNode));
-
-                    Thread.sleep(200);
-
-                    // Cargar AreaChart
-                    FXMLLoader areaLoader = new FXMLLoader(
-                            getClass().getResource("/fxml/components/charts/AreaChartCard.fxml")
-                    );
-                    VBox areaChartNode = areaLoader.load();
-                    revenueExpenseChartController = areaLoader.getController();
-
-                    Platform.runLater(() -> chartsContainer.getChildren().add(areaChartNode));
+                    if (showArea) {
+                        FXMLLoader areaLoader = new FXMLLoader(
+                                getClass().getResource("/fxml/components/charts/AreaChartCard.fxml"));
+                        VBox areaChartNode = areaLoader.load();
+                        revenueExpenseChartController = areaLoader.getController();
+                        Platform.runLater(() -> chartsContainer.getChildren().add(areaChartNode));
+                    }
 
                 } catch (IOException | InterruptedException e) {
                     e.printStackTrace();
@@ -490,42 +596,69 @@ public class HomeController {
     }
 
     /**
-     * Carga los 3 gráficos de análisis por módulo bajo demanda.
+     * Carga los gráficos de análisis por módulo bajo demanda.
+     * Respeta preferencias de visibilidad.
      */
     @FXML
     private void loadModuleCharts() {
         if (moduleChartsLoaded) return;
+
+        final boolean showRentabilidad = isVisible("chart_rentabilidad");
+        final boolean showAlertas      = isVisible("chart_alertas");
+        final boolean showModelos      = isVisible("chart_precision_packs");
 
         Task<Void> loadTask = new Task<>() {
             @Override
             protected Void call() {
                 try {
                     // BarChart — Rentabilidad por Categoría (ancho completo)
-                    FXMLLoader barLoader1 = new FXMLLoader(
-                            getClass().getResource("/fxml/components/charts/BarChartCard.fxml"));
-                    VBox bar1Node = barLoader1.load();
-                    rentabilidadChartController = barLoader1.getController();
-                    Platform.runLater(() -> modulesChartsContainer.getChildren().add(bar1Node));
+                    if (showRentabilidad) {
+                        FXMLLoader barLoader1 = new FXMLLoader(
+                                getClass().getResource("/fxml/components/charts/BarChartCard.fxml"));
+                        VBox bar1Node = barLoader1.load();
+                        rentabilidadChartController = barLoader1.getController();
+                        Platform.runLater(() -> modulesChartsContainer.getChildren().add(bar1Node));
+                        Thread.sleep(150);
+                    }
 
-                    Thread.sleep(150);
+                    // PieChart Alertas + BarChart Modelos (visibles según preferencia)
+                    if (showAlertas || showModelos) {
+                        FXMLLoader pieLoader = showAlertas ? new FXMLLoader(
+                                getClass().getResource("/fxml/components/charts/PieChartCard.fxml")) : null;
+                        VBox pieNode = null;
+                        if (pieLoader != null) {
+                            pieNode = pieLoader.load();
+                            alertasChartController = pieLoader.getController();
+                        }
 
-                    // PieChart Alertas + BarChart Modelos lado a lado
-                    FXMLLoader pieLoader = new FXMLLoader(
-                            getClass().getResource("/fxml/components/charts/PieChartCard.fxml"));
-                    VBox pieNode = pieLoader.load();
-                    alertasChartController = pieLoader.getController();
+                        FXMLLoader barLoader2 = showModelos ? new FXMLLoader(
+                                getClass().getResource("/fxml/components/charts/BarChartCard.fxml")) : null;
+                        VBox bar2Node = null;
+                        if (barLoader2 != null) {
+                            bar2Node = barLoader2.load();
+                            modelosChartController = barLoader2.getController();
+                        }
 
-                    FXMLLoader barLoader2 = new FXMLLoader(
-                            getClass().getResource("/fxml/components/charts/BarChartCard.fxml"));
-                    VBox bar2Node = barLoader2.load();
-                    modelosChartController = barLoader2.getController();
+                        final VBox finalPieNode  = pieNode;
+                        final VBox finalBar2Node = bar2Node;
 
-                    HBox row2 = new HBox(20);
-                    HBox.setHgrow(pieNode,  Priority.ALWAYS);
-                    HBox.setHgrow(bar2Node, Priority.ALWAYS);
-                    row2.getChildren().addAll(pieNode, bar2Node);
-
-                    Platform.runLater(() -> modulesChartsContainer.getChildren().add(row2));
+                        Platform.runLater(() -> {
+                            if (finalPieNode != null && finalBar2Node != null) {
+                                // Both visible: side by side
+                                HBox row2 = new HBox(20);
+                                HBox.setHgrow(finalPieNode,  Priority.ALWAYS);
+                                HBox.setHgrow(finalBar2Node, Priority.ALWAYS);
+                                row2.getChildren().addAll(finalPieNode, finalBar2Node);
+                                modulesChartsContainer.getChildren().add(row2);
+                            } else if (finalPieNode != null) {
+                                HBox.setHgrow(finalPieNode, Priority.ALWAYS);
+                                modulesChartsContainer.getChildren().add(finalPieNode);
+                            } else if (finalBar2Node != null) {
+                                HBox.setHgrow(finalBar2Node, Priority.ALWAYS);
+                                modulesChartsContainer.getChildren().add(finalBar2Node);
+                            }
+                        });
+                    }
 
                 } catch (IOException | InterruptedException e) {
                     e.printStackTrace();
@@ -545,7 +678,7 @@ public class HomeController {
         new Thread(loadTask).start();
     }
 
-    /** Llena los 3 gráficos de módulos con datos del dashboardDto actual. */
+    /** Llena los gráficos de módulos con datos del dashboardDto actual. */
     private void populateModuleCharts() {
         if (dashboardDto == null) return;
 
@@ -554,7 +687,6 @@ public class HomeController {
             rentabilidadChartController.setTitle("Rentabilidad por Categoría");
             List<ExecutiveDashboardDTO.RentabilidadCategoria> cats = dashboardDto.getRentabilidadCategorias();
             if (!cats.isEmpty()) {
-                // Calcular margen promedio ponderado para el subtítulo informativo
                 double totalIngresos = cats.stream().mapToDouble(ExecutiveDashboardDTO.RentabilidadCategoria::getIngresos).sum();
                 double totalUtilidad = cats.stream().mapToDouble(ExecutiveDashboardDTO.RentabilidadCategoria::getUtilidad).sum();
                 double margenProm = totalIngresos > 0 ? (totalUtilidad / totalIngresos * 100) : 0;
@@ -602,9 +734,8 @@ public class HomeController {
             modelosChartController.setTitle("Precisión de Packs Predictivos");
             List<ExecutiveDashboardDTO.ModeloResumen> modelos = dashboardDto.getPrecisionModelos();
             if (!modelos.isEmpty()) {
-                // Encontrar el mejor pack para resaltarlo en el subtítulo
                 ExecutiveDashboardDTO.ModeloResumen mejor = modelos.stream()
-                        .max(java.util.Comparator.comparingDouble(ExecutiveDashboardDTO.ModeloResumen::getPrecision))
+                        .max(Comparator.comparingDouble(ExecutiveDashboardDTO.ModeloResumen::getPrecision))
                         .orElse(null);
                 String subtitulo = mejor != null
                         ? String.format("R² por pack activo  |  Mejor: %s (R²=%.3f)", mejor.getNombre(), mejor.getPrecision())
@@ -642,21 +773,19 @@ public class HomeController {
 
     // ── Carga desde API ───────────────────────────────────────────────────────
 
-    /** Popula las stats cards con datos reales del dashboard ejecutivo. */
+    /** Popula las stats cards con datos reales, respetando orden y visibilidad del usuario. */
     private void loadStatsFromDashboard(ExecutiveDashboardDTO dto) {
-        ExecutiveDashboardDTO.ResumenVentas ventas   = dto.getResumenVentas();
-        ExecutiveDashboardDTO.ResumenCompras compras  = dto.getResumenCompras();
-        ExecutiveDashboardDTO.KpisFinancieros kpis    = dto.getKpisFinancieros();
+        ExecutiveDashboardDTO.ResumenVentas  ventas  = dto.getResumenVentas();
+        ExecutiveDashboardDTO.ResumenCompras compras = dto.getResumenCompras();
+        ExecutiveDashboardDTO.KpisFinancieros kpis   = dto.getKpisFinancieros();
 
         double variacionVentas = ventas.getVariacion();
-        String signV   = variacionVentas >= 0 ? "↑" : "↓";
-        String colorV  = variacionVentas >= 0 ? "blue" : "orange";
+        String signV  = variacionVentas >= 0 ? "↑" : "↓";
+        String colorV = variacionVentas >= 0 ? "blue" : "orange";
 
-        // Margen bruto (tres razones — razón 1)
         double margenBruto = kpis.getMargenBrutoPct();
         String colorMB = margenBruto >= 20 ? "green" : margenBruto >= 10 ? "blue" : "orange";
 
-        // Margen operativo (tres razones — razón 2)
         double margenOp = kpis.getMargenOperativoPct();
         String colorMO = margenOp >= 15 ? "green" : margenOp >= 8 ? "blue" : "orange";
 
@@ -664,7 +793,6 @@ public class HomeController {
         String signC  = variacionCompras >= 0 ? "↑" : "↓";
         String colorC = variacionCompras >= 0 ? "orange" : "green";
 
-        // Estado financiero (de backend)
         String estado = kpis.getEstadoFinanciero();
         String estadoLabel = switch (estado) {
             case "excelente" -> "Estado: Excelente";
@@ -675,46 +803,33 @@ public class HomeController {
             default          -> "Sin datos";
         };
 
-        List<StatsDTO> stats = List.of(
-                // Card 1: Ventas Totales con variación vs período anterior
-                new StatsDTO("📊",
-                        String.format("$%,.0f", ventas.getTotal()),
-                        "Ventas Totales",
+        // Build a map from kpi key → StatsDTO
+        Map<String, StatsDTO> statsMap = new HashMap<>();
+        statsMap.put("stat_ventas_totales",
+                new StatsDTO("📊", String.format("$%,.0f", ventas.getTotal()), "Ventas Totales",
                         String.format("%s %.1f%% vs período ant.", signV, Math.abs(variacionVentas)),
-                        colorV,
-                        variacionVentas >= 0),
-                // Card 2: Utilidad Bruta — razón 1 del módulo de rentabilidad
-                new StatsDTO("💰",
-                        String.format("$%,.0f", kpis.getUtilidadBruta()),
-                        "Utilidad Bruta",
+                        colorV, variacionVentas >= 0));
+        statsMap.put("stat_utilidad_bruta",
+                new StatsDTO("💰", String.format("$%,.0f", kpis.getUtilidadBruta()), "Utilidad Bruta",
                         String.format("Margen bruto: %.1f%%", margenBruto),
-                        colorMB,
-                        kpis.getUtilidadBruta() >= 0),
-                // Card 3: Compras Totales
-                new StatsDTO("🛒",
-                        String.format("$%,.0f", compras.getTotal()),
-                        "Compras Totales",
+                        colorMB, kpis.getUtilidadBruta() >= 0));
+        statsMap.put("stat_compras_totales",
+                new StatsDTO("🛒", String.format("$%,.0f", compras.getTotal()), "Compras Totales",
                         String.format("%s %.1f%% vs período ant.", signC, Math.abs(variacionCompras)),
-                        colorC,
-                        variacionCompras <= 0),
-                // Card 4: Margen Operativo — razón 2 del módulo de rentabilidad
-                new StatsDTO("📈",
-                        String.format("%.1f%%", margenOp),
-                        "Margen Operativo",
-                        estadoLabel,
-                        colorMO,
-                        margenOp >= 0),
-                // Card 5: Ticket Promedio
-                new StatsDTO("🎯",
-                        String.format("$%,.0f", ventas.getTicketPromedio()),
-                        "Ticket Promedio",
+                        colorC, variacionCompras <= 0));
+        statsMap.put("stat_margen_operativo",
+                new StatsDTO("📈", String.format("%.1f%%", margenOp), "Margen Operativo",
+                        estadoLabel, colorMO, margenOp >= 0));
+        statsMap.put("stat_ticket_promedio",
+                new StatsDTO("🎯", String.format("$%,.0f", ventas.getTicketPromedio()), "Ticket Promedio",
                         String.format("%d transacciones", ventas.getCantidad()),
-                        "blue",
-                        ventas.getTicketPromedio() >= 0)
-        );
+                        "blue", ventas.getTicketPromedio() >= 0));
 
         statsCardsContainer.getChildren().clear();
-        for (StatsDTO stat : stats) {
+        for (String kpi : getStatOrder()) {
+            if (!isVisible(kpi)) continue;
+            StatsDTO stat = statsMap.get(kpi);
+            if (stat == null) continue;
             HBox card = StatsCard.createStatsCard(
                     stat.emoji(), stat.value(), stat.label(),
                     stat.change(), stat.colorClass(), stat.positive());
@@ -751,7 +866,4 @@ public class HomeController {
         msg.setStyle("-fx-text-fill: #6B7280; -fx-font-size: 13px; -fx-padding: 20px 0;");
         statsCardsContainer.getChildren().add(msg);
     }
-
-
-
 }

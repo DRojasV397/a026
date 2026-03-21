@@ -274,6 +274,10 @@ public class ApiConfig {
         return BASE_URL + "/dashboard/predictions";
     }
 
+    public static String getDashboardPreferencesUrl(int userId) {
+        return BASE_URL + "/dashboard/users/" + userId + "/preferences";
+    }
+
     // ── Reports Module (via dashboard) ───────────────────────────────────────
 
     public static String getReportTypesUrl() {

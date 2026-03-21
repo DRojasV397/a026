@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.scene.layout.*?>
+<?import javafx.scene.control.*?>
+<?import javafx.geometry.Insets?>
+
+<VBox xmlns="http://javafx.com/javafx/21"
+      xmlns:fx="http://javafx.com/fxml/1"
+      fx:controller="com.app.ui.home.DashboardPreferencesController"
+      prefWidth="440"
+      spacing="8">
+
+    <padding>
+        <Insets top="24" right="24" bottom="24" left="24"/>
+    </padding>
+
+    <Label text="Personalizar Dashboard"
+           style="-fx-font-size: 16px; -fx-font-weight: bold; -fx-text-fill: #1F2937;"/>
+
+    <Label text="Activa, desactiva y ordena los elementos del dashboard."
+           style="-fx-font-size: 12px; -fx-text-fill: #6B7280;"/>
+
+    <Separator>
+        <VBox.margin><Insets top="4" bottom="2"/></VBox.margin>
+    </Separator>
+
+    <Label text="Tarjetas de KPI"
+           style="-fx-font-size: 13px; -fx-font-weight: bold; -fx-text-fill: #374151;"/>
+
+    <VBox fx:id="statsItemsContainer" spacing="2"/>
+
+    <Separator>
+        <VBox.margin><Insets top="4" bottom="2"/></VBox.margin>
+    </Separator>
+
+    <Label text="Gráficos"
+           style="-fx-font-size: 13px; -fx-font-weight: bold; -fx-text-fill: #374151;"/>
+
+    <VBox fx:id="chartsItemsContainer" spacing="2"/>
+
+    <Separator>
+        <VBox.margin><Insets top="4" bottom="2"/></VBox.margin>
+    </Separator>
+
+    <HBox alignment="CENTER_RIGHT" spacing="10">
+        <VBox.margin><Insets top="4"/></VBox.margin>
+        <Button text="Cancelar" onAction="#onCancel"
+                style="-fx-font-size: 13px; -fx-padding: 8 16; -fx-background-color: #E5E7EB; -fx-text-fill: #374151; -fx-cursor: hand; -fx-background-radius: 6;"/>
+        <Button text="Guardar" onAction="#onSave"
+                style="-fx-font-size: 13px; -fx-padding: 8 16; -fx-background-color: #3B82F6; -fx-text-fill: white; -fx-cursor: hand; -fx-background-radius: 6;"/>
+    </HBox>
+
+</VBox>

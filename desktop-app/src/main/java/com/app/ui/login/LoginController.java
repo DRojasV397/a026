@@ -82,8 +82,8 @@ public class LoginController {
         }
 
         // Si todo es válido, limpia error
-        System.out.println("Email valid " +  emailValid);
-        System.out.println("Password valid " +  passRequired);
+        // System.out.println("Email valid " +  emailValid);
+        // System.out.println("Password valid " +  passRequired);
         if (emailValid && passRequired) {
             clearError();
         }
