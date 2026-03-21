@@ -179,9 +179,13 @@ class RandomForestModel(BaseModel):
         if self.model is None:
             raise ValueError("Modelo no entrenado")
 
+        # Convertir a numpy para evitar el UserWarning de sklearn sobre feature names
+        # en los DecisionTreeRegressor internos (que no tienen feature names propias)
+        X_arr = X.values if hasattr(X, 'values') else X
+
         # Predicciones de cada arbol
         predictions = np.array([
-            tree.predict(X) for tree in self.model.estimators_
+            tree.predict(X_arr) for tree in self.model.estimators_
         ])
 
         mean_pred = predictions.mean(axis=0)

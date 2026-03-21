@@ -1,8 +1,13 @@
 package com.app.ui.profit;
 
+import com.app.model.profitability.CategoriesResponseDTO;
 import com.app.model.profitability.CategoryProfitDTO;
 import com.app.model.profitability.IndicatorsResponseDTO;
 import com.app.model.profitability.ProductProfitDTO;
+import com.app.model.profitability.ProductsResponseDTO;
+import com.app.model.profitability.ProjectionResponseDTO;
+import com.app.model.profitability.ProjectionGeneralDTO;
+import com.app.model.profitability.ProjectionItemDTO;
 import com.app.service.profitability.ProfitabilityService;
 import javafx.application.Platform;
 import javafx.collections.FXCollections;
@@ -17,6 +22,7 @@ import javafx.beans.property.SimpleStringProperty;
 import java.text.DecimalFormat;
 import java.time.LocalDate;
 import java.util.*;
+import java.util.concurrent.CompletableFuture;
 import java.util.function.BiConsumer;
 
 public class ProfitController {
@@ -119,32 +125,12 @@ public class ProfitController {
        ========================= */
 
     private void buildIndicatorsUI() {
-        VBox kpiContainer = new VBox(16);
+        VBox kpiContainer = new VBox(20);
 
         HBox periodRow = buildPeriodSelector(0,
                 (from, to) -> loadIndicatorsForPeriod(kpiContainer, from, to));
 
-        Label roaRoeTitle = new Label("Indicadores Avanzados");
-        roaRoeTitle.getStyleClass().add("card-title");
-        roaRoeTitle.setStyle("-fx-padding: 16 0 0 0;");
-
-        Label roaRoeNote = new Label(
-                "Ingresa activos totales y patrimonio para calcular ROA y ROE");
-        roaRoeNote.getStyleClass().add("main-subtitle");
-
-        FlowPane roaRoeGrid = new FlowPane(20, 20);
-        roaRoeGrid.getStyleClass().add("indicators-grid");
-        roaRoeGrid.getChildren().addAll(
-            createIndicatorCard("📊", "Retorno sobre Activos (ROA)",
-                    "(Utilidad Neta / Activos Totales) × 100",
-                    List.of("Utilidad Neta ($)", "Activos Totales ($)"), "ROA"),
-            createIndicatorCard("📈", "Rendimiento sobre Patrimonio (ROE)",
-                    "(Utilidad Neta / Patrimonio) × 100",
-                    List.of("Utilidad Neta ($)", "Patrimonio ($)"), "ROE")
-        );
-
-        indicatorsView.getChildren().addAll(
-                periodRow, kpiContainer, roaRoeTitle, roaRoeNote, roaRoeGrid);
+        indicatorsView.getChildren().addAll(periodRow, kpiContainer);
 
         // Carga inicial: último mes (índice 0)
         LocalDate to = LocalDate.now();
@@ -157,28 +143,25 @@ public class ProfitController {
         loading.getStyleClass().add("main-subtitle");
         kpiContainer.getChildren().add(loading);
 
-        profitabilityService.calculateIndicators(from, to, null, null).thenAccept(response -> {
+        CompletableFuture<IndicatorsResponseDTO> indFuture =
+                profitabilityService.calculateIndicators(from, to, null, null);
+        CompletableFuture<ProductsResponseDTO> prodFuture =
+                profitabilityService.getProductProfitability(from, to);
+
+        indFuture.thenAcceptBoth(prodFuture, (indResp, prodResp) ->
             Platform.runLater(() -> {
                 kpiContainer.getChildren().clear();
 
-                if (response == null) {
+                if (indResp == null || !indResp.isSuccess()) {
                     Label err = new Label("⚠ Error de conexión con el servidor.");
                     err.getStyleClass().add("main-subtitle");
                     kpiContainer.getChildren().add(err);
                     return;
                 }
 
-                if (!response.isSuccess()) {
-                    Label noData = new Label("Sin datos disponibles para el período seleccionado.");
-                    noData.getStyleClass().add("main-subtitle");
-                    kpiContainer.getChildren().add(noData);
-                    return;
-                }
+                IndicatorsResponseDTO.IndicatorsData ind = indResp.getIndicators();
+                IndicatorsResponseDTO.SummaryData sum = indResp.getSummary();
 
-                IndicatorsResponseDTO.IndicatorsData ind = response.getIndicators();
-                IndicatorsResponseDTO.SummaryData sum = response.getSummary();
-
-                // Estado vacío: sin ventas en el período
                 if (sum != null && sum.getTotalVentas() == 0) {
                     Label noData = new Label("Sin ventas registradas para el período seleccionado.");
                     noData.getStyleClass().add("main-subtitle");
@@ -193,25 +176,300 @@ public class ProfitController {
                     kpiContainer.getChildren().add(period);
                 }
 
-                FlowPane kpiGrid = new FlowPane(16, 16);
-                kpiGrid.getStyleClass().add("indicators-grid");
-                kpiGrid.getChildren().addAll(
-                    buildKpiCard("Ingresos Totales", fmtMoney(ind.getIngresosTotales()),
-                            "Total ventas del período", "#10B981"),
-                    buildKpiCard("Costos Totales", fmtMoney(ind.getCostosTotales()),
-                            "Costo de mercancía vendida", "#EF4444"),
-                    buildKpiCard("Utilidad Bruta", fmtMoney(ind.getUtilidadBruta()),
-                            marginPill(ind.getMargenBruto()), marginColor(ind.getMargenBruto())),
-                    buildKpiCard("Margen Bruto", pct.format(ind.getMargenBruto()) + "%",
-                            marginPill(ind.getMargenBruto()), marginColor(ind.getMargenBruto())),
-                    buildKpiCard("Utilidad Neta", fmtMoney(ind.getUtilidadNeta()),
-                            marginPill(ind.getMargenNeto()), marginColor(ind.getMargenNeto())),
-                    buildKpiCard("Margen Neto", pct.format(ind.getMargenNeto()) + "%",
-                            marginPill(ind.getMargenNeto()), marginColor(ind.getMargenNeto()))
-                );
-                kpiContainer.getChildren().add(kpiGrid);
+                // Panel 1 (Tres Razones) + Panel 2 (Utilidad Bruta) — lado a lado
+                VBox panel1 = buildTresRazonesPanel(ind);
+                VBox panel2 = buildUtilidadBrutaPanel(ind);
+                HBox panelsRow = new HBox(20);
+                HBox.setHgrow(panel1, Priority.ALWAYS);
+                HBox.setHgrow(panel2, Priority.ALWAYS);
+                panelsRow.getChildren().addAll(panel1, panel2);
+                kpiContainer.getChildren().add(panelsRow);
+
+                // Tabla de productos
+                if (prodResp != null && prodResp.isSuccess()) {
+                    List<ProductProfitDTO> products = prodResp.getProductos().stream()
+                            .filter(p -> p.getIngresos() > 0)
+                            .toList();
+                    if (!products.isEmpty()) {
+                        kpiContainer.getChildren().add(createProductsDetailTable(products));
+                    }
+                }
+            })
+        ).exceptionally(ex -> {
+            Platform.runLater(() -> {
+                kpiContainer.getChildren().clear();
+                Label err = new Label("⚠ Error al cargar los datos: " + ex.getMessage());
+                err.getStyleClass().add("main-subtitle");
+                kpiContainer.getChildren().add(err);
             });
+            return null;
         });
+    }
+
+    /** Panel 1: Tres razones simples de rentabilidad. */
+    private VBox buildTresRazonesPanel(IndicatorsResponseDTO.IndicatorsData ind) {
+        VBox card = new VBox(14);
+        card.getStyleClass().add("kpi-card");
+
+        Label title = new Label("Rentabilidad — Tres Razones Simples");
+        title.getStyleClass().add("card-title");
+
+        Label sub = new Label("Razones de rentabilidad calculadas sobre los ingresos totales del período");
+        sub.getStyleClass().add("main-subtitle");
+        sub.setWrapText(true);
+
+        HBox ratiosRow = new HBox(12);
+        VBox r1 = buildRatioCard("Razón Bruta",
+                "Utilidad Bruta / Ingresos",
+                pct.format(ind.getMargenBruto()) + "%",
+                ind.getMargenBruto());
+        VBox r2 = buildRatioCard("Razón Operativa",
+                "Utilidad Operativa / Ingresos",
+                pct.format(ind.getMargenOperativo()) + "%",
+                ind.getMargenOperativo());
+        VBox r3 = buildRatioCard("Razón Neta",
+                "Utilidad Neta / Ingresos",
+                pct.format(ind.getMargenNeto()) + "%",
+                ind.getMargenNeto());
+        HBox.setHgrow(r1, Priority.ALWAYS);
+        HBox.setHgrow(r2, Priority.ALWAYS);
+        HBox.setHgrow(r3, Priority.ALWAYS);
+        ratiosRow.getChildren().addAll(r1, r2, r3);
+
+        card.getChildren().addAll(title, sub, ratiosRow);
+        return card;
+    }
+
+    /** Tarjeta individual de razón simple. */
+    private VBox buildRatioCard(String name, String formula, String value, double pctVal) {
+        VBox card = new VBox(8);
+        card.getStyleClass().add("kpi-card");
+        card.setStyle("-fx-background-color: #F8FAFB;");
+
+        Label nameLbl = new Label(name);
+        nameLbl.getStyleClass().add("kpi-label");
+
+        Label formulaLbl = new Label(formula);
+        formulaLbl.getStyleClass().add("indicator-formula");
+        formulaLbl.setWrapText(true);
+
+        Label valueLbl = new Label(value);
+        valueLbl.getStyleClass().add("kpi-value");
+        valueLbl.setStyle("-fx-text-fill: " + marginColor(pctVal) + ";");
+
+        Label pill = new Label(marginPill(pctVal));
+        pill.getStyleClass().addAll("status-pill", statusPillClass(marginPill(pctVal)));
+
+        card.getChildren().addAll(nameLbl, formulaLbl, valueLbl, pill);
+        return card;
+    }
+
+    /** Panel 2: Utilidad Bruta destacada. */
+    private VBox buildUtilidadBrutaPanel(IndicatorsResponseDTO.IndicatorsData ind) {
+        VBox card = new VBox(14);
+        card.getStyleClass().add("kpi-card");
+
+        Label title = new Label("Utilidad Bruta del Período");
+        title.getStyleClass().add("card-title");
+
+        Label valueLbl = new Label(fmtMoney(ind.getUtilidadBruta()));
+        valueLbl.getStyleClass().add("kpi-value");
+        valueLbl.setStyle("-fx-font-size: 28px; -fx-text-fill: "
+                + marginColor(ind.getMargenBruto()) + ";");
+
+        Label pill = new Label(marginPill(ind.getMargenBruto()));
+        pill.getStyleClass().addAll("status-pill", statusPillClass(marginPill(ind.getMargenBruto())));
+
+        HBox breakdown = new HBox(20);
+        breakdown.setAlignment(Pos.CENTER_LEFT);
+        Label ingLbl = new Label("Ingresos: " + fmtMoney(ind.getIngresosTotales()));
+        ingLbl.setStyle("-fx-text-fill: #10B981; -fx-font-size: 12px;");
+        Label cosLbl = new Label("Costos: " + fmtMoney(ind.getCostosTotales()));
+        cosLbl.setStyle("-fx-text-fill: #EF4444; -fx-font-size: 12px;");
+        breakdown.getChildren().addAll(ingLbl, cosLbl);
+
+        card.getChildren().addAll(title, valueLbl, pill, breakdown);
+        return card;
+    }
+
+    /** Tabla de productos con las 5 columnas requeridas: Producto, Ingresos, Costos,
+     *  Margen de Contribución y Utilidad Total. */
+    private VBox createProductsDetailTable(List<ProductProfitDTO> dtos) {
+        VBox card = new VBox(12);
+        card.getStyleClass().add("table-card");
+
+        Label title = new Label("Detalle por Producto");
+        title.getStyleClass().add("card-title");
+
+        List<ProductProfit> data = new ArrayList<>();
+        for (var dto : dtos) {
+            data.add(new ProductProfit(
+                    dto.getNombre(),
+                    dto.getIngresosFormateado(),
+                    dto.getCostoFormateado(),
+                    dto.getMargenFormateado(),
+                    dto.getUtilidadFormateada(),
+                    dto.getEstado()
+            ));
+        }
+
+        TableView<ProductProfit> table = new TableView<>();
+        table.getStyleClass().add("profit-table");
+        table.setPrefHeight(620);
+
+        TableColumn<ProductProfit, String> nameCol = new TableColumn<>("Producto");
+        nameCol.setCellValueFactory(new PropertyValueFactory<>("name"));
+        nameCol.prefWidthProperty().bind(table.widthProperty().multiply(0.25));
+        nameCol.setSortable(true);
+
+        TableColumn<ProductProfit, String> ingresosCol = new TableColumn<>("Ingresos");
+        ingresosCol.setCellValueFactory(new PropertyValueFactory<>("sales"));
+        ingresosCol.prefWidthProperty().bind(table.widthProperty().multiply(0.18));
+        ingresosCol.setStyle("-fx-alignment: CENTER-RIGHT;");
+        ingresosCol.setSortable(true);
+
+        TableColumn<ProductProfit, String> costosCol = new TableColumn<>("Costos");
+        costosCol.setCellValueFactory(new PropertyValueFactory<>("costs"));
+        costosCol.prefWidthProperty().bind(table.widthProperty().multiply(0.18));
+        costosCol.setStyle("-fx-alignment: CENTER-RIGHT; -fx-text-fill: #6B7280;");
+        costosCol.setSortable(true);
+
+        TableColumn<ProductProfit, String> margenCol = new TableColumn<>("Margen de Contribución");
+        margenCol.setCellValueFactory(new PropertyValueFactory<>("margin"));
+        margenCol.prefWidthProperty().bind(table.widthProperty().multiply(0.20));
+        margenCol.setStyle("-fx-alignment: CENTER;");
+        margenCol.setSortable(true);
+        margenCol.setCellFactory(col -> new TableCell<>() {
+            @Override protected void updateItem(String item, boolean empty) {
+                super.updateItem(item, empty);
+                if (empty || item == null) { setText(null); setStyle(""); return; }
+                setText(item);
+                try {
+                    double v = Double.parseDouble(item.replace("%", ""));
+                    if (v >= 20)      setStyle("-fx-text-fill: #10B981; -fx-font-weight: bold;");
+                    else if (v >= 10) setStyle("-fx-text-fill: #3B82F6; -fx-font-weight: bold;");
+                    else if (v < 0)   setStyle("-fx-text-fill: #EF4444; -fx-font-weight: bold;");
+                    else              setStyle("-fx-text-fill: #F59E0B;");
+                } catch (NumberFormatException e) { setStyle(""); }
+            }
+        });
+
+        TableColumn<ProductProfit, String> utilidadCol = new TableColumn<>("Utilidad Total");
+        utilidadCol.setCellValueFactory(new PropertyValueFactory<>("profit"));
+        utilidadCol.prefWidthProperty().bind(table.widthProperty().multiply(0.19));
+        utilidadCol.setStyle("-fx-alignment: CENTER-RIGHT;");
+        utilidadCol.setSortable(true);
+        utilidadCol.setCellFactory(col -> new TableCell<>() {
+            @Override protected void updateItem(String item, boolean empty) {
+                super.updateItem(item, empty);
+                if (empty || item == null) { setText(null); setStyle(""); return; }
+                setText(item);
+                setStyle(item.startsWith("-")
+                        ? "-fx-text-fill: #EF4444; -fx-font-weight: bold;"
+                        : "-fx-text-fill: #10B981; -fx-font-weight: bold;");
+            }
+        });
+
+        table.getColumns().addAll(nameCol, ingresosCol, costosCol, margenCol, utilidadCol);
+
+        Label pageInfoLabel = new Label(String.format("Mostrando 1-%d de %d registros",
+                Math.min(ROWS_PER_PAGE, data.size()), data.size()));
+        pageInfoLabel.getStyleClass().add("page-info-label");
+
+        Pagination pagination = createDynamicPaginationWithSorting(data, table, pageInfoLabel);
+
+        card.getChildren().addAll(title, table, pageInfoLabel, pagination);
+        return card;
+    }
+
+    /** Tabla de categorías con las 5 columnas requeridas: Categoría, Ingresos, Costos,
+     *  Margen de Contribución y Utilidad Total. */
+    private VBox createCategoriesDetailTable(List<CategoryProfitDTO> dtos) {
+        VBox card = new VBox(12);
+        card.getStyleClass().add("table-card");
+
+        Label title = new Label("Detalle por Categoría");
+        title.getStyleClass().add("card-title");
+
+        List<ProductProfit> data = new ArrayList<>();
+        for (var dto : dtos) {
+            data.add(new ProductProfit(
+                    dto.getNombre(),
+                    dto.getIngresosFormateado(),
+                    dto.getCostoFormateado(),
+                    dto.getMargenFormateado(),
+                    dto.getUtilidadFormateada(),
+                    dto.getEstado()
+            ));
+        }
+
+        TableView<ProductProfit> table = new TableView<>();
+        table.getStyleClass().add("profit-table");
+        table.setPrefHeight(620);
+
+        TableColumn<ProductProfit, String> nameCol = new TableColumn<>("Categoría");
+        nameCol.setCellValueFactory(new PropertyValueFactory<>("name"));
+        nameCol.prefWidthProperty().bind(table.widthProperty().multiply(0.25));
+        nameCol.setSortable(true);
+
+        TableColumn<ProductProfit, String> ingresosCol = new TableColumn<>("Ingresos");
+        ingresosCol.setCellValueFactory(new PropertyValueFactory<>("sales"));
+        ingresosCol.prefWidthProperty().bind(table.widthProperty().multiply(0.18));
+        ingresosCol.setStyle("-fx-alignment: CENTER-RIGHT;");
+        ingresosCol.setSortable(true);
+
+        TableColumn<ProductProfit, String> costosCol = new TableColumn<>("Costos");
+        costosCol.setCellValueFactory(new PropertyValueFactory<>("costs"));
+        costosCol.prefWidthProperty().bind(table.widthProperty().multiply(0.18));
+        costosCol.setStyle("-fx-alignment: CENTER-RIGHT;");
+        costosCol.setSortable(true);
+
+        TableColumn<ProductProfit, String> margenCol = new TableColumn<>("Margen de Contribución");
+        margenCol.setCellValueFactory(new PropertyValueFactory<>("margin"));
+        margenCol.prefWidthProperty().bind(table.widthProperty().multiply(0.20));
+        margenCol.setStyle("-fx-alignment: CENTER;");
+        margenCol.setSortable(true);
+        margenCol.setCellFactory(col -> new TableCell<>() {
+            @Override protected void updateItem(String item, boolean empty) {
+                super.updateItem(item, empty);
+                if (empty || item == null) { setText(null); setStyle(""); return; }
+                setText(item);
+                try {
+                    double v = Double.parseDouble(item.replace("%", ""));
+                    if (v >= 20)      setStyle("-fx-text-fill: #10B981; -fx-font-weight: bold;");
+                    else if (v >= 10) setStyle("-fx-text-fill: #3B82F6; -fx-font-weight: bold;");
+                    else if (v < 0)   setStyle("-fx-text-fill: #EF4444; -fx-font-weight: bold;");
+                    else              setStyle("-fx-text-fill: #F59E0B;");
+                } catch (NumberFormatException e) { setStyle(""); }
+            }
+        });
+
+        TableColumn<ProductProfit, String> utilidadCol = new TableColumn<>("Utilidad Total");
+        utilidadCol.setCellValueFactory(new PropertyValueFactory<>("profit"));
+        utilidadCol.prefWidthProperty().bind(table.widthProperty().multiply(0.19));
+        utilidadCol.setStyle("-fx-alignment: CENTER-RIGHT;");
+        utilidadCol.setSortable(true);
+        utilidadCol.setCellFactory(col -> new TableCell<>() {
+            @Override protected void updateItem(String item, boolean empty) {
+                super.updateItem(item, empty);
+                if (empty || item == null) { setText(null); setStyle(""); return; }
+                setText(item);
+                setStyle(item.startsWith("-")
+                        ? "-fx-text-fill: #EF4444; -fx-font-weight: bold;"
+                        : "-fx-text-fill: #10B981; -fx-font-weight: bold;");
+            }
+        });
+
+        table.getColumns().addAll(nameCol, ingresosCol, costosCol, margenCol, utilidadCol);
+
+        Label pageInfoLabel = new Label(String.format("Mostrando 1-%d de %d registros",
+                Math.min(ROWS_PER_PAGE, data.size()), data.size()));
+        pageInfoLabel.getStyleClass().add("page-info-label");
+
+        Pagination pagination = createDynamicPaginationWithSorting(data, table, pageInfoLabel);
+
+        card.getChildren().addAll(title, table, pageInfoLabel, pagination);
+        return card;
     }
 
     /**
@@ -300,201 +558,6 @@ public class ProfitController {
         return "#EF4444";
     }
 
-    private VBox createIndicatorCard(String emoji, String name, String formula,
-                                     List<String> inputLabels, String indicatorType) {
-        VBox card = new VBox(14);
-        card.getStyleClass().add("indicator-card");
-
-        Label icon = new Label(emoji);
-        icon.getStyleClass().add("indicator-icon");
-
-        Label titleLabel = new Label(name);
-        titleLabel.getStyleClass().add("indicator-title");
-
-        Label formulaLabel = new Label(formula);
-        formulaLabel.getStyleClass().add("indicator-formula");
-        formulaLabel.setWrapText(true);
-
-        VBox inputsContainer = new VBox(8);
-        inputsContainer.getStyleClass().add("indicator-inputs");
-
-        List<TextField> inputs = new ArrayList<>();
-        for (String labelText : inputLabels) {
-            VBox fieldBox = new VBox(4);
-
-            Label fieldLabel = new Label(labelText);
-            fieldLabel.getStyleClass().add("input-label");
-
-            TextField field = new TextField();
-            field.setPromptText("0.00");
-            field.getStyleClass().add("indicator-input");
-            inputs.add(field);
-
-            fieldBox.getChildren().addAll(fieldLabel, field);
-            inputsContainer.getChildren().add(fieldBox);
-        }
-
-        Button calculateBtn = new Button("Calcular");
-        calculateBtn.getStyleClass().add("calculate-btn");
-        calculateBtn.setMaxWidth(Double.MAX_VALUE);
-
-        Separator sep = new Separator();
-        sep.getStyleClass().add("indicator-separator");
-
-        HBox resultContainer = new HBox(8);
-        resultContainer.setAlignment(Pos.CENTER_LEFT);
-        resultContainer.getStyleClass().add("result-container");
-
-        Label resultLabel = new Label("—");
-        resultLabel.getStyleClass().add("indicator-result");
-
-        Label trendIcon = new Label("");
-        trendIcon.getStyleClass().add("trend-icon");
-        trendIcon.setVisible(false);
-
-        resultContainer.getChildren().addAll(resultLabel, trendIcon);
-
-        Label statusPill = new Label("Pendiente");
-        statusPill.getStyleClass().addAll("status-pill", "pill-neutral");
-
-        Label interpretation = new Label("Ingresa los valores y presiona Calcular");
-        interpretation.getStyleClass().add("indicator-interpretation");
-        interpretation.setWrapText(true);
-        interpretation.setMaxWidth(280);
-
-        calculateBtn.setOnAction(e -> {
-            calculateIndicator(inputs, resultLabel, trendIcon, statusPill,
-                    interpretation, indicatorType);
-        });
-
-        card.getChildren().addAll(
-                icon, titleLabel, formulaLabel,
-                inputsContainer, calculateBtn, sep,
-                resultContainer, statusPill, interpretation
-        );
-
-        return card;
-    }
-
-    private void calculateIndicator(List<TextField> inputs, Label resultLabel,
-                                    Label trendIcon, Label statusPill,
-                                    Label interpretation, String type) {
-        try {
-            List<Double> values = new ArrayList<>();
-            for (TextField input : inputs) {
-                String text = input.getText().trim();
-                if (text.isEmpty()) {
-                    showError("Por favor completa todos los campos");
-                    return;
-                }
-                values.add(Double.parseDouble(text.replace(",", "")));
-            }
-
-            double result = 0;
-            String interpText = "";
-            String status = "";
-
-            switch (type) {
-                case "MARGIN":
-                    if (values.get(1) == 0) {
-                        showError("Los ingresos no pueden ser cero");
-                        return;
-                    }
-                    result = (values.get(0) / values.get(1)) * 100;
-                    interpText = String.format("Por cada $100 en ventas, ganas $%.2f de utilidad",
-                            result);
-
-                    if (result >= 20) {
-                        status = "Excelente";
-                        statusPill.getStyleClass().setAll("status-pill", "pill-excellent");
-                    } else if (result >= 10) {
-                        status = "Bueno";
-                        statusPill.getStyleClass().setAll("status-pill", "pill-good");
-                    } else if (result >= 5) {
-                        status = "Regular";
-                        statusPill.getStyleClass().setAll("status-pill", "pill-warning");
-                    } else if (result > 0) {
-                        status = "Bajo";
-                        statusPill.getStyleClass().setAll("status-pill", "pill-low");
-                    } else {
-                        status = "Negativo";
-                        statusPill.getStyleClass().setAll("status-pill", "pill-negative");
-                    }
-                    break;
-
-                case "ROA":
-                    if (values.get(1) == 0) {
-                        showError("Los activos no pueden ser cero");
-                        return;
-                    }
-                    result = (values.get(0) / values.get(1)) * 100;
-                    interpText = String.format("Tus activos generan un retorno de %.1f%% anual",
-                            result);
-
-                    if (result >= 15) {
-                        status = "Excelente";
-                        statusPill.getStyleClass().setAll("status-pill", "pill-excellent");
-                    } else if (result >= 8) {
-                        status = "Bueno";
-                        statusPill.getStyleClass().setAll("status-pill", "pill-good");
-                    } else if (result >= 3) {
-                        status = "Regular";
-                        statusPill.getStyleClass().setAll("status-pill", "pill-warning");
-                    } else if (result > 0) {
-                        status = "Bajo";
-                        statusPill.getStyleClass().setAll("status-pill", "pill-low");
-                    } else {
-                        status = "Negativo";
-                        statusPill.getStyleClass().setAll("status-pill", "pill-negative");
-                    }
-                    break;
-
-                case "ROE":
-                    if (values.get(1) == 0) {
-                        showError("El patrimonio no puede ser cero");
-                        return;
-                    }
-                    result = (values.get(0) / values.get(1)) * 100;
-                    interpText = String.format("El capital invertido genera un retorno de %.1f%% anual",
-                            result);
-
-                    if (result >= 20) {
-                        status = "Excelente";
-                        statusPill.getStyleClass().setAll("status-pill", "pill-excellent");
-                    } else if (result >= 12) {
-                        status = "Bueno";
-                        statusPill.getStyleClass().setAll("status-pill", "pill-good");
-                    } else if (result >= 6) {
-                        status = "Regular";
-                        statusPill.getStyleClass().setAll("status-pill", "pill-warning");
-                    } else if (result > 0) {
-                        status = "Bajo";
-                        statusPill.getStyleClass().setAll("status-pill", "pill-low");
-                    } else {
-                        status = "Negativo";
-                        statusPill.getStyleClass().setAll("status-pill", "pill-negative");
-                    }
-                    break;
-            }
-
-            resultLabel.setText(pct.format(result) + "%");
-            statusPill.setText(status);
-            interpretation.setText(interpText);
-
-            trendIcon.setVisible(true);
-            if (result > 0) {
-                trendIcon.setText("↑");
-                trendIcon.getStyleClass().setAll("trend-icon", "trend-positive");
-            } else {
-                trendIcon.setText("↓");
-                trendIcon.getStyleClass().setAll("trend-icon", "trend-negative");
-            }
-
-        } catch (NumberFormatException ex) {
-            showError("Por favor ingresa valores numéricos válidos");
-        }
-    }
-
     private void showError(String message) {
         Alert alert = new Alert(Alert.AlertType.ERROR);
         alert.setTitle("Error");
@@ -530,60 +593,64 @@ public class ProfitController {
         loading.getStyleClass().add("main-subtitle");
         container.getChildren().add(loading);
 
-        profitabilityService.getProductProfitability(from, to).thenAccept(response -> {
+        CompletableFuture<IndicatorsResponseDTO> indFuture =
+                profitabilityService.calculateIndicators(from, to, null, null);
+        CompletableFuture<ProductsResponseDTO> prodFuture =
+                profitabilityService.getProductProfitability(from, to);
+
+        indFuture.thenAcceptBoth(prodFuture, (indResp, prodResp) ->
             Platform.runLater(() -> {
                 container.getChildren().clear();
 
-                if (response == null || !response.isSuccess()) {
+                if (indResp == null || !indResp.isSuccess()) {
                     Label err = new Label("⚠ No se pudieron cargar los datos. Verifique la conexión.");
                     err.getStyleClass().add("main-subtitle");
                     container.getChildren().add(err);
                     return;
                 }
 
-                // Filtrar solo productos con ventas en el período
-                List<com.app.model.profitability.ProductProfitDTO> conVentas =
-                        response.getProductos().stream()
-                                .filter(p -> p.getIngresos() > 0)
-                                .toList();
+                IndicatorsResponseDTO.IndicatorsData ind = indResp.getIndicators();
+                IndicatorsResponseDTO.SummaryData sum = indResp.getSummary();
 
-                if (conVentas.isEmpty()) {
+                if (sum != null && sum.getTotalVentas() == 0) {
                     Label noData = new Label("Sin ventas registradas para el período seleccionado.");
                     noData.getStyleClass().add("main-subtitle");
                     container.getChildren().add(noData);
                     return;
                 }
 
-                List<ProductProfit> productList = mapProductDTOs(conVentas);
-                VBox tableCard = createProductTableCardWithData(productList);
+                if (sum != null && sum.getPeriodo() != null) {
+                    Label period = new Label("Período: " + sum.getPeriodo()
+                            + "  ·  " + sum.getTotalVentas() + " ventas registradas");
+                    period.getStyleClass().add("main-subtitle");
+                    container.getChildren().add(period);
+                }
 
-                HBox summaryRow = new HBox(20);
-                summaryRow.setAlignment(Pos.TOP_LEFT);
+                VBox panel1 = buildTresRazonesPanel(ind);
+                VBox panel2 = buildUtilidadBrutaPanel(ind);
+                HBox panelsRow = new HBox(20);
+                HBox.setHgrow(panel1, Priority.ALWAYS);
+                HBox.setHgrow(panel2, Priority.ALWAYS);
+                panelsRow.getChildren().addAll(panel1, panel2);
+                container.getChildren().add(panelsRow);
 
-                List<TopProduct> topList = conVentas.stream()
-                        .sorted((a, b) -> Double.compare(b.getMargen(), a.getMargen()))
-                        .limit(4)
-                        .map(p -> new TopProduct(p.getNombre(), p.getMargenFormateado()))
-                        .toList();
-
-                List<TopProduct> lossList = conVentas.stream()
-                        .filter(p -> p.getUtilidad() < 0)
-                        .sorted(Comparator.comparingDouble(com.app.model.profitability.ProductProfitDTO::getUtilidad))
-                        .limit(4)
-                        .map(p -> new TopProduct(p.getNombre(), p.getUtilidadFormateada()))
-                        .toList();
-
-                VBox topProducts = createSummaryTable(
-                        "🏆 Top 4 Productos Más Rentables", "Margen", topList);
-                VBox attentionProducts = createAttentionTable(
-                        "⚠ Productos que Requieren Atención", "Pérdida", lossList);
-
-                HBox.setHgrow(topProducts, Priority.ALWAYS);
-                HBox.setHgrow(attentionProducts, Priority.ALWAYS);
-                summaryRow.getChildren().addAll(topProducts, attentionProducts);
-
-                container.getChildren().addAll(tableCard, summaryRow);
+                if (prodResp != null && prodResp.isSuccess()) {
+                    List<ProductProfitDTO> products = prodResp.getProductos().stream()
+                            .filter(p -> p.getIngresos() > 0)
+                            .toList();
+                    if (!products.isEmpty()) {
+                        container.getChildren().add(createProductsDetailTable(products));
+                    }
+                }
+            })
+        ).exceptionally(ex -> {
+            Platform.runLater(() -> {
+                container.getChildren().clear();
+                Label err = new Label("⚠ Error al cargar los datos: " + ex.getMessage());
+                err.getStyleClass().add("main-subtitle");
+                container.getChildren().add(err);
             });
+            return null;
         });
     }
 
@@ -780,60 +847,64 @@ public class ProfitController {
         loading.getStyleClass().add("main-subtitle");
         container.getChildren().add(loading);
 
-        profitabilityService.getCategoryProfitability(from, to).thenAccept(response -> {
+        CompletableFuture<IndicatorsResponseDTO> indFuture =
+                profitabilityService.calculateIndicators(from, to, null, null);
+        CompletableFuture<CategoriesResponseDTO> catFuture =
+                profitabilityService.getCategoryProfitability(from, to);
+
+        indFuture.thenAcceptBoth(catFuture, (indResp, catResp) ->
             Platform.runLater(() -> {
                 container.getChildren().clear();
 
-                if (response == null || !response.isSuccess()) {
+                if (indResp == null || !indResp.isSuccess()) {
                     Label err = new Label("⚠ No se pudieron cargar los datos. Verifique la conexión.");
                     err.getStyleClass().add("main-subtitle");
                     container.getChildren().add(err);
                     return;
                 }
 
-                // Filtrar solo categorías con ventas en el período
-                List<com.app.model.profitability.CategoryProfitDTO> conVentas =
-                        response.getCategorias().stream()
-                                .filter(c -> c.getIngresos() > 0)
-                                .toList();
+                IndicatorsResponseDTO.IndicatorsData ind = indResp.getIndicators();
+                IndicatorsResponseDTO.SummaryData sum = indResp.getSummary();
 
-                if (conVentas.isEmpty()) {
+                if (sum != null && sum.getTotalVentas() == 0) {
                     Label noData = new Label("Sin ventas registradas para el período seleccionado.");
                     noData.getStyleClass().add("main-subtitle");
                     container.getChildren().add(noData);
                     return;
                 }
 
-                List<ProductProfit> categoryList = mapCategoryDTOs(conVentas);
-                VBox tableCard = createTableCard("Detalle de Categorías", categoryList);
+                if (sum != null && sum.getPeriodo() != null) {
+                    Label period = new Label("Período: " + sum.getPeriodo()
+                            + "  ·  " + sum.getTotalVentas() + " ventas registradas");
+                    period.getStyleClass().add("main-subtitle");
+                    container.getChildren().add(period);
+                }
 
-                HBox summaryRow = new HBox(20);
-                summaryRow.setAlignment(Pos.TOP_LEFT);
+                VBox panel1 = buildTresRazonesPanel(ind);
+                VBox panel2 = buildUtilidadBrutaPanel(ind);
+                HBox panelsRow = new HBox(20);
+                HBox.setHgrow(panel1, Priority.ALWAYS);
+                HBox.setHgrow(panel2, Priority.ALWAYS);
+                panelsRow.getChildren().addAll(panel1, panel2);
+                container.getChildren().add(panelsRow);
 
-                List<TopProduct> topList = conVentas.stream()
-                        .sorted((a, b) -> Double.compare(b.getMargen(), a.getMargen()))
-                        .limit(4)
-                        .map(c -> new TopProduct(c.getNombre(), c.getMargenFormateado()))
-                        .toList();
-
-                List<TopProduct> lossList = conVentas.stream()
-                        .filter(c -> c.getUtilidad() < 0)
-                        .sorted(Comparator.comparingDouble(com.app.model.profitability.CategoryProfitDTO::getUtilidad))
-                        .limit(4)
-                        .map(c -> new TopProduct(c.getNombre(), c.getUtilidadFormateada()))
-                        .toList();
-
-                VBox topCategories = createSummaryTable(
-                        "🏆 Top 4 Categorías Más Rentables", "Margen", topList);
-                VBox attentionCategories = createAttentionTable(
-                        "⚠ Categorías que Requieren Atención", "Pérdida", lossList);
-
-                HBox.setHgrow(topCategories, Priority.ALWAYS);
-                HBox.setHgrow(attentionCategories, Priority.ALWAYS);
-                summaryRow.getChildren().addAll(topCategories, attentionCategories);
-
-                container.getChildren().addAll(tableCard, summaryRow);
+                if (catResp != null && catResp.isSuccess()) {
+                    List<CategoryProfitDTO> categories = catResp.getCategorias().stream()
+                            .filter(c -> c.getIngresos() > 0)
+                            .toList();
+                    if (!categories.isEmpty()) {
+                        container.getChildren().add(createCategoriesDetailTable(categories));
+                    }
+                }
+            })
+        ).exceptionally(ex -> {
+            Platform.runLater(() -> {
+                container.getChildren().clear();
+                Label err = new Label("⚠ Error al cargar los datos: " + ex.getMessage());
+                err.getStyleClass().add("main-subtitle");
+                container.getChildren().add(err);
             });
+            return null;
         });
     }
 
@@ -1478,27 +1549,320 @@ public class ProfitController {
        ========================= */
 
     private void buildProjectionUI() {
-        Label title = new Label("📈 Proyección de Rentabilidad Futura");
+        Label title = new Label("Proyección de Rentabilidad Futura");
         title.getStyleClass().add("section-title");
 
-        VBox comingSoon = new VBox(40);
-        comingSoon.setAlignment(Pos.CENTER);
-        comingSoon.getStyleClass().add("coming-soon-card");
+        VBox contentContainer = new VBox(16);
 
-        Label icon = new Label("🚧");
-        icon.setStyle("-fx-font-size: 64px;");
+        // Selector de período (30d / 90d / 180d)
+        String[] labels = {"30 días", "3 meses", "6 meses"};
+        int[]    days   = {30, 90, 180};
 
-        Label message = new Label("Funcionalidad en Desarrollo");
-        message.getStyleClass().add("coming-soon-title");
+        HBox periodRow = new HBox(8);
+        periodRow.setAlignment(Pos.CENTER_LEFT);
+        periodRow.getStyleClass().add("period-selector-row");
 
-        Label description = new Label("La proyección de rentabilidad futura estará disponible próximamente");
-        description.getStyleClass().add("coming-soon-text");
-        description.setWrapText(true);
-        description.setMaxWidth(400);
+        Button[] btns = new Button[labels.length];
+        for (int i = 0; i < labels.length; i++) {
+            Button btn = new Button(labels[i]);
+            btn.getStyleClass().add("period-btn");
+            btns[i] = btn;
+            periodRow.getChildren().add(btn);
+        }
 
-        comingSoon.getChildren().addAll(icon, message, description);
+        for (int i = 0; i < labels.length; i++) {
+            final int d = days[i];
+            final Button btn = btns[i];
+            btn.setOnAction(e -> {
+                for (Button b : btns) b.getStyleClass().remove("period-btn-active");
+                btn.getStyleClass().add("period-btn-active");
+                loadProjection(contentContainer, d);
+            });
+        }
+        btns[0].getStyleClass().add("period-btn-active");
 
-        projectionView.getChildren().addAll(title, comingSoon);
+        projectionView.getChildren().addAll(title, periodRow, contentContainer);
+        loadProjection(contentContainer, 30);
+    }
+
+    private void loadProjection(VBox container, int periods) {
+        container.getChildren().clear();
+        Label loading = new Label("Generando proyección con el mejor pack disponible...");
+        loading.getStyleClass().add("main-subtitle");
+        container.getChildren().add(loading);
+
+        profitabilityService.getProjection(periods).thenAccept(resp ->
+            Platform.runLater(() -> {
+                container.getChildren().clear();
+
+                if (resp == null || !resp.isSuccess()) {
+                    VBox errBox = new VBox(12);
+                    errBox.setAlignment(Pos.CENTER);
+                    errBox.getStyleClass().add("coming-soon-card");
+                    Label errIcon = new Label("⚠");
+                    errIcon.setStyle("-fx-font-size: 48px; -fx-text-fill: #F59E0B;");
+                    Label errMsg = new Label(
+                            resp == null
+                            ? "No se pudo conectar con el servidor."
+                            : "No hay packs de modelos activos. Entrena un pack en el módulo de Predicciones.");
+                    errMsg.getStyleClass().add("coming-soon-text");
+                    errMsg.setWrapText(true);
+                    errMsg.setMaxWidth(480);
+                    errBox.getChildren().addAll(errIcon, errMsg);
+                    container.getChildren().add(errBox);
+                    return;
+                }
+
+                ProjectionGeneralDTO gen = resp.getGeneral();
+
+                // ── Info del pack ──────────────────────────────────────────
+                HBox packCard = buildPackInfoCard(resp);
+                container.getChildren().add(packCard);
+
+                // ── Período de proyección ──────────────────────────────────
+                Label period = new Label(
+                        "Proyección: " + resp.getFechaInicioProyeccion()
+                        + " → " + resp.getFechaFinProyeccion()
+                        + "  (" + resp.getPeriods() + " días)");
+                period.getStyleClass().add("main-subtitle");
+                container.getChildren().add(period);
+
+                // ── Panel 1: Tres razones proyectadas ──────────────────────
+                VBox panel1 = buildTresRazonesProyectadasPanel(gen);
+
+                // ── Panel 2: Utilidad bruta proyectada ────────────────────
+                VBox panel2 = buildUtilidadBrutaProyectadaPanel(gen);
+
+                HBox panelsRow = new HBox(20);
+                HBox.setHgrow(panel1, Priority.ALWAYS);
+                HBox.setHgrow(panel2, Priority.ALWAYS);
+                panelsRow.getChildren().addAll(panel1, panel2);
+                container.getChildren().add(panelsRow);
+
+                // ── Tabla por categoría ────────────────────────────────────
+                List<ProjectionItemDTO> cats = resp.getPorCategoria().stream()
+                        .filter(c -> c.getIngresosProyectados() > 0)
+                        .toList();
+                if (!cats.isEmpty()) {
+                    container.getChildren().add(
+                            createProjectionTable("Proyección por Categoría", "Categoría", cats));
+                }
+
+                // ── Tabla por producto ─────────────────────────────────────
+                List<ProjectionItemDTO> prods = resp.getPorProducto().stream()
+                        .filter(p -> p.getIngresosProyectados() > 0)
+                        .toList();
+                if (!prods.isEmpty()) {
+                    container.getChildren().add(
+                            createProjectionTable("Proyección por Producto", "Producto", prods));
+                }
+            })
+        ).exceptionally(ex -> {
+            Platform.runLater(() -> {
+                container.getChildren().clear();
+                Label err = new Label("⚠ Error al generar la proyección: " + ex.getMessage());
+                err.getStyleClass().add("main-subtitle");
+                container.getChildren().add(err);
+            });
+            return null;
+        });
+    }
+
+    /** Tarjeta con info del pack usado y su precisión. */
+    private HBox buildPackInfoCard(ProjectionResponseDTO resp) {
+        HBox card = new HBox(24);
+        card.getStyleClass().add("kpi-card");
+        card.setAlignment(Pos.CENTER_LEFT);
+
+        Label iconLbl = new Label("🤖");
+        iconLbl.setStyle("-fx-font-size: 28px;");
+
+        VBox info = new VBox(4);
+        Label nameLbl = new Label("Pack: " + resp.getPackNombre());
+        nameLbl.getStyleClass().add("card-title");
+
+        Label precLbl = new Label(String.format(
+                "Precisión — Ventas: %.1f%%  ·  Compras: %.1f%%",
+                resp.getPrecisionVentas(), resp.getPrecisionCompras()));
+        precLbl.getStyleClass().add("main-subtitle");
+
+        info.getChildren().addAll(nameLbl, precLbl);
+
+        HBox spacer = new HBox();
+        HBox.setHgrow(spacer, Priority.ALWAYS);
+
+        Label badgeLbl = new Label("Proyección basada en ML");
+        badgeLbl.getStyleClass().addAll("status-pill", "pill-good");
+
+        card.getChildren().addAll(iconLbl, info, spacer, badgeLbl);
+        return card;
+    }
+
+    /** Panel 1: Tres razones simples proyectadas. */
+    private VBox buildTresRazonesProyectadasPanel(ProjectionGeneralDTO gen) {
+        VBox card = new VBox(14);
+        card.getStyleClass().add("kpi-card");
+
+        Label title = new Label("Rentabilidad Proyectada — Tres Razones Simples");
+        title.getStyleClass().add("card-title");
+
+        Label sub = new Label("Razones calculadas sobre los ingresos proyectados del período");
+        sub.getStyleClass().add("main-subtitle");
+        sub.setWrapText(true);
+
+        HBox ratiosRow = new HBox(12);
+        VBox r1 = buildRatioCard("Razón Bruta",
+                "Utilidad Bruta / Ingresos",
+                pct.format(gen.getMargenBruto()) + "%",
+                gen.getMargenBruto());
+        VBox r2 = buildRatioCard("Razón Operativa",
+                "Utilidad Operativa / Ingresos",
+                pct.format(gen.getMargenOperativo()) + "%",
+                gen.getMargenOperativo());
+        VBox r3 = buildRatioCard("Razón Neta",
+                "Utilidad Neta / Ingresos",
+                pct.format(gen.getMargenNeto()) + "%",
+                gen.getMargenNeto());
+        HBox.setHgrow(r1, Priority.ALWAYS);
+        HBox.setHgrow(r2, Priority.ALWAYS);
+        HBox.setHgrow(r3, Priority.ALWAYS);
+        ratiosRow.getChildren().addAll(r1, r2, r3);
+
+        card.getChildren().addAll(title, sub, ratiosRow);
+        return card;
+    }
+
+    /** Panel 2: Utilidad bruta proyectada con variación vs histórico. */
+    private VBox buildUtilidadBrutaProyectadaPanel(ProjectionGeneralDTO gen) {
+        VBox card = new VBox(14);
+        card.getStyleClass().add("kpi-card");
+
+        Label title = new Label("Utilidad Bruta Proyectada");
+        title.getStyleClass().add("card-title");
+
+        Label valueLbl = new Label(fmtMoney(gen.getUtilidadProyectada()));
+        valueLbl.getStyleClass().add("kpi-value");
+        valueLbl.setStyle("-fx-font-size: 28px; -fx-text-fill: "
+                + marginColor(gen.getMargenBruto()) + ";");
+
+        Label pill = new Label(marginPill(gen.getMargenBruto()));
+        pill.getStyleClass().addAll("status-pill", statusPillClass(marginPill(gen.getMargenBruto())));
+
+        HBox breakdown = new HBox(20);
+        breakdown.setAlignment(Pos.CENTER_LEFT);
+        Label ingLbl = new Label("Ingresos: " + fmtMoney(gen.getIngresosProyectados()));
+        ingLbl.setStyle("-fx-text-fill: #10B981; -fx-font-size: 12px;");
+        Label cosLbl = new Label("Costos: " + fmtMoney(gen.getCostosProyectados()));
+        cosLbl.setStyle("-fx-text-fill: #EF4444; -fx-font-size: 12px;");
+        breakdown.getChildren().addAll(ingLbl, cosLbl);
+
+        // Variación vs período histórico equivalente
+        HBox varRow = new HBox(16);
+        varRow.setAlignment(Pos.CENTER_LEFT);
+        varRow.getChildren().add(buildVariacionLabel("Ingresos", gen.getVariacionIngresos()));
+        varRow.getChildren().add(buildVariacionLabel("Utilidad", gen.getVariacionUtilidad()));
+
+        card.getChildren().addAll(title, valueLbl, pill, breakdown, varRow);
+        return card;
+    }
+
+    private Label buildVariacionLabel(String name, double pct) {
+        boolean positive = pct >= 0;
+        String arrow = positive ? "▲" : "▼";
+        String color = positive ? "#10B981" : "#EF4444";
+        Label lbl = new Label(String.format("%s vs histórico: %s %.1f%%", name, arrow, Math.abs(pct)));
+        lbl.setStyle("-fx-text-fill: " + color + "; -fx-font-size: 11px; -fx-font-weight: bold;");
+        return lbl;
+    }
+
+    /** Tabla de proyección genérica: Ingresos, Costos, Margen, Utilidad. */
+    private VBox createProjectionTable(String cardTitle, String firstColHeader,
+                                       List<ProjectionItemDTO> dtos) {
+        VBox card = new VBox(12);
+        card.getStyleClass().add("table-card");
+
+        Label title = new Label(cardTitle);
+        title.getStyleClass().add("card-title");
+
+        List<ProductProfit> data = new ArrayList<>();
+        for (var dto : dtos) {
+            data.add(new ProductProfit(
+                    dto.getNombre(),
+                    dto.getIngresosFormateado(),
+                    dto.getCostosFormateado(),
+                    dto.getMargenFormateado(),
+                    dto.getUtilidadFormateada(),
+                    dto.getEstado()
+            ));
+        }
+
+        TableView<ProductProfit> table = new TableView<>();
+        table.getStyleClass().add("profit-table");
+        table.setPrefHeight(dtos.size() <= 10 ? 300 : 500);
+
+        TableColumn<ProductProfit, String> nameCol = new TableColumn<>(firstColHeader);
+        nameCol.setCellValueFactory(new PropertyValueFactory<>("name"));
+        nameCol.prefWidthProperty().bind(table.widthProperty().multiply(0.27));
+        nameCol.setSortable(true);
+
+        TableColumn<ProductProfit, String> ingresosCol = new TableColumn<>("Ingresos Proyectados");
+        ingresosCol.setCellValueFactory(new PropertyValueFactory<>("sales"));
+        ingresosCol.prefWidthProperty().bind(table.widthProperty().multiply(0.20));
+        ingresosCol.setStyle("-fx-alignment: CENTER-RIGHT;");
+        ingresosCol.setSortable(true);
+
+        TableColumn<ProductProfit, String> costosCol = new TableColumn<>("Costos Proyectados");
+        costosCol.setCellValueFactory(new PropertyValueFactory<>("costs"));
+        costosCol.prefWidthProperty().bind(table.widthProperty().multiply(0.20));
+        costosCol.setStyle("-fx-alignment: CENTER-RIGHT;");
+        costosCol.setSortable(true);
+
+        TableColumn<ProductProfit, String> margenCol = new TableColumn<>("Margen Proyectado");
+        margenCol.setCellValueFactory(new PropertyValueFactory<>("margin"));
+        margenCol.prefWidthProperty().bind(table.widthProperty().multiply(0.16));
+        margenCol.setStyle("-fx-alignment: CENTER;");
+        margenCol.setSortable(true);
+        margenCol.setCellFactory(col -> new TableCell<>() {
+            @Override protected void updateItem(String item, boolean empty) {
+                super.updateItem(item, empty);
+                if (empty || item == null) { setText(null); setStyle(""); return; }
+                setText(item);
+                try {
+                    double v = Double.parseDouble(item.replace("%", ""));
+                    if (v >= 20)      setStyle("-fx-text-fill: #10B981; -fx-font-weight: bold;");
+                    else if (v >= 10) setStyle("-fx-text-fill: #3B82F6; -fx-font-weight: bold;");
+                    else if (v < 0)   setStyle("-fx-text-fill: #EF4444; -fx-font-weight: bold;");
+                    else              setStyle("-fx-text-fill: #F59E0B;");
+                } catch (NumberFormatException e) { setStyle(""); }
+            }
+        });
+
+        TableColumn<ProductProfit, String> utilidadCol = new TableColumn<>("Utilidad Proyectada");
+        utilidadCol.setCellValueFactory(new PropertyValueFactory<>("profit"));
+        utilidadCol.prefWidthProperty().bind(table.widthProperty().multiply(0.17));
+        utilidadCol.setStyle("-fx-alignment: CENTER-RIGHT;");
+        utilidadCol.setSortable(true);
+        utilidadCol.setCellFactory(col -> new TableCell<>() {
+            @Override protected void updateItem(String item, boolean empty) {
+                super.updateItem(item, empty);
+                if (empty || item == null) { setText(null); setStyle(""); return; }
+                setText(item);
+                setStyle(item.startsWith("-")
+                        ? "-fx-text-fill: #EF4444; -fx-font-weight: bold;"
+                        : "-fx-text-fill: #10B981; -fx-font-weight: bold;");
+            }
+        });
+
+        table.getColumns().addAll(nameCol, ingresosCol, costosCol, margenCol, utilidadCol);
+
+        Label pageInfoLabel = new Label(String.format("Mostrando 1-%d de %d registros",
+                Math.min(ROWS_PER_PAGE, data.size()), data.size()));
+        pageInfoLabel.getStyleClass().add("page-info-label");
+
+        Pagination pagination = createDynamicPaginationWithSorting(data, table, pageInfoLabel);
+
+        card.getChildren().addAll(title, table, pageInfoLabel, pagination);
+        return card;
     }
 
     /* =========================
@@ -1632,20 +1996,30 @@ public class ProfitController {
     public static class ProductProfit {
         private final SimpleStringProperty name;
         private final SimpleStringProperty sales;
+        private final SimpleStringProperty costs;
         private final SimpleStringProperty margin;
         private final SimpleStringProperty profit;
         private final SimpleStringProperty status;
 
-        public ProductProfit(String name, String sales, String margin, String profit, String status) {
-            this.name = new SimpleStringProperty(name);
-            this.sales = new SimpleStringProperty(sales);
+        /** Constructor completo (con costos). */
+        public ProductProfit(String name, String sales, String costs,
+                             String margin, String profit, String status) {
+            this.name   = new SimpleStringProperty(name);
+            this.sales  = new SimpleStringProperty(sales);
+            this.costs  = new SimpleStringProperty(costs);
             this.margin = new SimpleStringProperty(margin);
             this.profit = new SimpleStringProperty(profit);
             this.status = new SimpleStringProperty(status);
         }
 
-        public String getName() { return name.get(); }
-        public String getSales() { return sales.get(); }
+        /** Constructor legacy (sin costos — para la vista por categoría y otros usos). */
+        public ProductProfit(String name, String sales, String margin, String profit, String status) {
+            this(name, sales, "", margin, profit, status);
+        }
+
+        public String getName()   { return name.get(); }
+        public String getSales()  { return sales.get(); }
+        public String getCosts()  { return costs.get(); }
         public String getMargin() { return margin.get(); }
         public String getProfit() { return profit.get(); }
         public String getStatus() { return status.get(); }

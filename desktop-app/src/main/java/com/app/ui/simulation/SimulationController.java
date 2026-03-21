@@ -1,7 +1,7 @@
 package com.app.ui.simulation;
 
 import com.app.model.data.api.ProductoCatalogDTO;
-import com.app.model.predictions.UserModelDTO;
+import com.app.model.predictions.PackInfoDTO;
 import com.app.model.simulation.*;
 import com.app.model.simulation.ScenarioDTO.VariableValue;
 import com.app.service.data.DataApiService;
@@ -78,6 +78,7 @@ public class SimulationController {
     @FXML private TextField txtProductSearch;
     @FXML private VBox      productSearchResults;
     @FXML private VBox      overridesContainer;
+    @FXML private Label     overrideCountLabel;
 
     // Estado de overrides: producto → sliders
     private final Map<Integer, ProductoCatalogDTO> productOverrides = new LinkedHashMap<>();
@@ -98,7 +99,7 @@ public class SimulationController {
     private DataApiService             dataApiService;
 
     // ─── Estado de API ────────────────────────────────────────────────────────
-    private List<UserModelDTO>     userModels        = new ArrayList<>();
+    private List<PackInfoDTO>      userPacks         = new ArrayList<>();
     private SimulationRunResultDTO lastRunResult     = null;
     private Map<String, Object>    lastCompareResult = null;
 
@@ -204,29 +205,31 @@ public class SimulationController {
         p.setOpacity(1);    p.setTranslateY(0);
     }
 
-    // ─── Carga de modelos del usuario ─────────────────────────────────────────
+    // ─── Carga de packs del usuario ───────────────────────────────────────────
 
     private void loadUserModels() {
-        predictionService.getUserModels()
-                .thenAccept(models -> Platform.runLater(() -> {
-                    userModels = new ArrayList<>(models);
+        predictionService.getUserPacks()
+                .thenAccept(packs -> Platform.runLater(() -> {
+                    userPacks = new ArrayList<>(packs);
                     cmbTrainedModel.getItems().clear();
-                    if (models.isEmpty()) {
-                        cmbTrainedModel.getItems().add("— Sin modelos entrenados —");
+                    if (packs.isEmpty()) {
+                        cmbTrainedModel.getItems().add("— Sin packs entrenados —");
                         cmbTrainedModel.setDisable(true);
                     } else {
                         cmbTrainedModel.setDisable(false);
-                        models.forEach(m -> cmbTrainedModel.getItems().add(buildModelDisplayName(m)));
+                        packs.forEach(p -> cmbTrainedModel.getItems().add(buildPackDisplayName(p)));
                     }
                 }))
-                .exceptionally(ex -> null); // silently ignore
+                .exceptionally(ex -> null);
     }
 
-    private String buildModelDisplayName(UserModelDTO m) {
-        String nombre = (m.getNombre() != null && !m.getNombre().isBlank())
-                ? m.getNombre() : m.getModelType();
-        String r2 = m.getPrecision() > 0 ? String.format(" — R²=%.2f", m.getPrecision()) : "";
-        return nombre + r2;
+    private String buildPackDisplayName(PackInfoDTO p) {
+        String nombre = (p.getNombre() != null && !p.getNombre().isBlank())
+                ? p.getNombre() : p.getPack_key();
+        double r2v = p.getVentas()  != null ? p.getVentas().getR2Score()  : 0.0;
+        double r2c = p.getCompras() != null ? p.getCompras().getR2Score() : 0.0;
+        String r2Str = r2v > 0 ? String.format(" — V:%.2f / C:%.2f", r2v, r2c) : "";
+        return nombre + r2Str;
     }
 
     // ═════════════════════════════════════════════════════════════════════════
@@ -321,7 +324,7 @@ public class SimulationController {
                 chip("⚙ " + s.modifiedVars() + " vars"),
                 chip("👤 " + s.author()));
         if (s.modelName() != null && !s.modelName().isBlank()) {
-            Label mc = chip("🧠 " + s.modelName().split("—")[0].trim());
+            Label mc = chip("📦 " + s.modelName().split("—")[0].trim());
             mc.getStyleClass().add("chip-model");
             chips.getChildren().add(mc);
         }
@@ -351,20 +354,23 @@ public class SimulationController {
 
     private void onModelSelected(String displayName) {
         if (displayName == null || displayName.startsWith("—")) return;
-        userModels.stream()
-                .filter(m -> buildModelDisplayName(m).equals(displayName))
+
+        userPacks.stream()
+                .filter(p -> buildPackDisplayName(p).equals(displayName))
                 .findFirst()
-                .ifPresent(info -> {
-                    String nombre = (info.getNombre() != null && !info.getNombre().isBlank())
-                            ? info.getNombre() : info.getModelType();
-                    modelInfoName.setText(nombre);
-                    String r2Str = info.getPrecision() > 0 ? String.format("%.4f", info.getPrecision()) : "N/A";
-                    modelInfoMeta.setText("Tipo: " + info.getModelType()
-                            + "  ·  R² " + r2Str
-                            + "  ·  Entrenado " + info.getFechaEntrenamiento());
+                .ifPresent(pack -> {
+                    modelInfoName.setText(pack.getDisplayName());
+                    double r2Ventas  = pack.getVentas()  != null ? pack.getVentas().getR2Score()  : 0.0;
+                    double r2Compras = pack.getCompras() != null ? pack.getCompras().getR2Score() : 0.0;
+                    String fecha = pack.getCreado_en() != null
+                            ? pack.getCreado_en().substring(0, Math.min(10, pack.getCreado_en().length())) : "—";
+                    modelInfoMeta.setText(
+                            "Ventas R²=" + String.format("%.4f", r2Ventas)
+                            + "  ·  Compras R²=" + String.format("%.4f", r2Compras)
+                            + "  ·  Creado: " + fecha);
                     modelInfoBox.setVisible(true); modelInfoBox.setManaged(true);
                     buildVariablesEditor(getSimulationVariables());
-                    logEvent(ActionType.MODEL_SELECTED, Map.of("model", displayName, "type", info.getModelType()));
+                    logEvent(ActionType.MODEL_SELECTED, Map.of("model", displayName, "type", "pack"));
                 });
     }
 
@@ -381,50 +387,94 @@ public class SimulationController {
     }
 
     private void setupProductSearch() {
-        // Listener con debounce de 250ms sobre el TextField de búsqueda
-        PauseTransition debounce = new PauseTransition(Duration.millis(250));
-        debounce.setOnFinished(e -> filterProductDropdown(
-                txtProductSearch != null ? txtProductSearch.getText() : ""));
+        if (txtProductSearch == null) return;
 
-        if (txtProductSearch != null) {
-            txtProductSearch.textProperty().addListener((obs, o, nv) -> {
+        PauseTransition debounce = new PauseTransition(Duration.millis(250));
+        debounce.setOnFinished(e -> filterProductDropdown(txtProductSearch.getText()));
+
+        txtProductSearch.textProperty().addListener((obs, o, nv) -> {
+            if (nv == null || nv.isBlank()) {
+                hideDropdown();
+            } else {
                 debounce.playFromStart();
-                if ((nv == null || nv.isBlank()) && productSearchResults != null) {
-                    productSearchResults.getChildren().clear();
-                }
-            });
-            txtProductSearch.focusedProperty().addListener((obs, o, nv) -> {
-                if (!nv && productSearchResults != null) {
-                    Platform.runLater(() -> productSearchResults.getChildren().clear());
-                }
-            });
-        }
+            }
+        });
+        // Cerrar dropdown solo cuando el foco sale y NO hay un click en curso
+        // Usamos un delay para dar tiempo al MOUSE_PRESSED del item a procesar
+        txtProductSearch.focusedProperty().addListener((obs, o, focused) -> {
+            if (!focused) {
+                PauseTransition delay = new PauseTransition(Duration.millis(200));
+                delay.setOnFinished(e -> hideDropdown());
+                delay.play();
+            }
+        });
+    }
+
+    private void hideDropdown() {
+        if (productSearchResults == null) return;
+        productSearchResults.getChildren().clear();
+        productSearchResults.setVisible(false);
+        productSearchResults.setManaged(false);
     }
 
     private void filterProductDropdown(String query) {
         if (productSearchResults == null) return;
         productSearchResults.getChildren().clear();
-        if (query == null || query.isBlank()) return;
+        if (query == null || query.isBlank()) { hideDropdown(); return; }
+
+        // Recargar productos si la lista está vacía (p.ej. la API tardó al iniciar)
+        if (allProductos.isEmpty()) {
+            loadAllProductos();
+        }
 
         String q = query.toLowerCase();
         List<ProductoCatalogDTO> matches = allProductos.stream()
                 .filter(p -> !productOverrides.containsKey(p.getIdProducto()))
-                .filter(p -> p.getNombre().toLowerCase().contains(q)
-                        || p.getSku().toLowerCase().contains(q))
-                .limit(5)
+                .filter(p -> {
+                    String nombre = p.getNombre() != null ? p.getNombre().toLowerCase() : "";
+                    String sku    = p.getSku()    != null ? p.getSku().toLowerCase()    : "";
+                    return nombre.contains(q) || sku.contains(q);
+                })
+                .limit(6)
                 .collect(Collectors.toList());
 
-        for (ProductoCatalogDTO p : matches) {
-            Label item = new Label(p.getNombre() + "  ·  " + p.getSku());
-            item.getStyleClass().add("search-result-item");
-            item.setMaxWidth(Double.MAX_VALUE);
-            item.setOnMouseClicked(e -> {
-                addProductOverride(p);
-                productSearchResults.getChildren().clear();
-                txtProductSearch.clear();
-            });
-            productSearchResults.getChildren().add(item);
+        if (matches.isEmpty()) {
+            Label noResult = new Label("Sin resultados para \"" + query + "\"");
+            noResult.getStyleClass().add("search-no-result");
+            noResult.setMaxWidth(Double.MAX_VALUE);
+            productSearchResults.getChildren().add(noResult);
+        } else {
+            for (ProductoCatalogDTO p : matches) {
+                String nombre = p.getNombre() != null ? p.getNombre() : "—";
+                String sku    = p.getSku()    != null ? p.getSku()    : "—";
+
+                HBox item = new HBox(8);
+                item.getStyleClass().add("search-result-item");
+                item.setAlignment(Pos.CENTER_LEFT);
+
+                Label nameLbl = new Label(nombre);
+                nameLbl.getStyleClass().add("search-result-name");
+                HBox.setHgrow(nameLbl, Priority.ALWAYS);
+
+                Label skuLbl = new Label(sku);
+                skuLbl.getStyleClass().add("search-result-sku");
+
+                item.getChildren().addAll(nameLbl, skuLbl);
+                // MOUSE_PRESSED en lugar de MOUSE_CLICKED: se dispara antes de que
+                // el TextField pierda el foco, garantizando que el handler se ejecute.
+                item.setOnMousePressed(e -> {
+                    e.consume();
+                    addProductOverride(p);
+                    hideDropdown();
+                    txtProductSearch.clear();
+                    txtProductSearch.requestFocus();
+                });
+                productSearchResults.getChildren().add(item);
+            }
         }
+
+        productSearchResults.setVisible(true);
+        productSearchResults.setManaged(true);
     }
 
     private void addProductOverride(ProductoCatalogDTO product) {
@@ -434,12 +484,14 @@ public class SimulationController {
         if (overridesContainer != null) {
             overridesContainer.getChildren().add(buildOverrideCard(product));
         }
+        updateOverrideCountBadge();
     }
 
     private VBox buildOverrideCard(ProductoCatalogDTO product) {
         int pid = product.getIdProducto();
         VBox card = new VBox(12);
         card.getStyleClass().add("override-card");
+        card.setUserData(pid);   // permite identificar la card en removeProductOverride
 
         // Header con nombre + botón ✕
         HBox header = new HBox(10);
@@ -500,17 +552,23 @@ public class SimulationController {
         overrideSliders.remove("costo_"   + productId);
         overrideSliders.remove("demanda_" + productId);
         if (overridesContainer != null) {
-            overridesContainer.getChildren().removeIf(node -> {
-                if (node instanceof VBox card) {
-                    return card.getUserData() != null
-                            && card.getUserData().equals(productId);
-                }
-                return false;
-            });
-            // Re-render: rebuild all cards (simpler than tracking nodes by id)
-            overridesContainer.getChildren().clear();
-            productOverrides.forEach((pid, p) ->
-                    overridesContainer.getChildren().add(buildOverrideCard(p)));
+            overridesContainer.getChildren().removeIf(node ->
+                    node instanceof VBox card
+                    && Integer.valueOf(productId).equals(card.getUserData()));
+        }
+        updateOverrideCountBadge();
+    }
+
+    private void updateOverrideCountBadge() {
+        if (overrideCountLabel == null) return;
+        int count = productOverrides.size();
+        if (count == 0) {
+            overrideCountLabel.setVisible(false);
+            overrideCountLabel.setManaged(false);
+        } else {
+            overrideCountLabel.setText(count + (count == 1 ? " producto" : " productos"));
+            overrideCountLabel.setVisible(true);
+            overrideCountLabel.setManaged(true);
         }
     }
 
@@ -518,8 +576,9 @@ public class SimulationController {
         productOverrides.clear();
         overrideSliders.clear();
         if (overridesContainer != null) overridesContainer.getChildren().clear();
-        if (txtProductSearch  != null) txtProductSearch.clear();
-        if (productSearchResults != null) productSearchResults.getChildren().clear();
+        if (txtProductSearch   != null) txtProductSearch.clear();
+        hideDropdown();
+        updateOverrideCountBadge();
     }
 
     // ═════════════════════════════════════════════════════════════════════════
@@ -802,8 +861,8 @@ public class SimulationController {
 
     private boolean validateForm(boolean requireModel) {
         if (requireModel && cmbTrainedModel.getSelectionModel().isEmpty()) {
-            showAlert(Alert.AlertType.WARNING, "Modelo requerido",
-                    "Selecciona un modelo predictivo entrenado."); return false;
+            showAlert(Alert.AlertType.WARNING, "Pack requerido",
+                    "Selecciona un pack de modelos entrenado."); return false;
         }
         if (txtScenarioName.getText().isBlank()) {
             showAlert(Alert.AlertType.WARNING, "Nombre requerido",

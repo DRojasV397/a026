@@ -134,3 +134,25 @@ class ResultadoEscenario(Base):
 
     def __repr__(self):
         return f"<ResultadoEscenario(escenario={self.idEscenario}, kpi={self.kpi})>"
+
+
+class ModeloPack(Base):
+    """Pack de modelos predictivos: un modelo de ventas + uno de compras entrenados juntos."""
+
+    __tablename__ = 'ModeloPack'
+
+    idPack           = Column(Integer, primary_key=True, autoincrement=True)
+    packKey          = Column(String(120), unique=True, nullable=False)
+    nombre           = Column(String(150), nullable=True)
+    idVersionVentas  = Column(Integer, ForeignKey('VersionModelo.idVersion'), nullable=False)
+    idVersionCompras = Column(Integer, ForeignKey('VersionModelo.idVersion'), nullable=False)
+    creadoPor        = Column(Integer, ForeignKey('Usuario.idUsuario'), nullable=True)
+    creadoEn         = Column(DateTime, default=datetime.now)
+    estado           = Column(String(20), default='Activo')
+
+    # Relaciones
+    version_ventas  = relationship("VersionModelo", foreign_keys=[idVersionVentas])
+    version_compras = relationship("VersionModelo", foreign_keys=[idVersionCompras])
+
+    def __repr__(self):
+        return f"<ModeloPack(id={self.idPack}, key={self.packKey}, estado={self.estado})>"

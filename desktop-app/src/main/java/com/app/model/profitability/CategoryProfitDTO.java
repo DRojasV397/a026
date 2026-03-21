@@ -32,6 +32,10 @@ public class CategoryProfitDTO {
         return String.format("$%,.2f", ingresos);
     }
 
+    public String getCostoFormateado() {
+        return String.format("$%,.2f", costo_total);
+    }
+
     public String getUtilidadFormateada() {
         if (utilidad < 0) return String.format("-$%,.2f", Math.abs(utilidad));
         return String.format("$%,.2f", utilidad);

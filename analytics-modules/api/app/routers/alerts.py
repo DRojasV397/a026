@@ -220,7 +220,8 @@ async def analyze_and_generate_alerts(
     service = AlertService(db)
     result = service.evaluate_all_alerts(
         fecha_inicio=fecha_inicio,
-        fecha_fin=fecha_fin
+        fecha_fin=fecha_fin,
+        user_id=current_user.idUsuario
     )
     return result
 

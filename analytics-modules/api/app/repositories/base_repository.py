@@ -89,7 +89,7 @@ class BaseRepository(Generic[ModelType]):
             self.db.add(db_obj)
             self.db.commit()
             self.db.refresh(db_obj)
-            logger.info(f"Registro creado exitosamente en {self.model.__name__}")
+            logger.debug(f"Registro creado exitosamente en {self.model.__name__}")
             return db_obj
         except Exception as e:
             self.db.rollback()

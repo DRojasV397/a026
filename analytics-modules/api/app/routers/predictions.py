@@ -9,11 +9,17 @@ from sqlalchemy.orm import Session
 from typing import Optional, List
 from datetime import datetime, date
 from pydantic import BaseModel, Field
+import pandas as pd
 
 from app.database import get_db
 from app.services.prediction_service import PredictionService
 from app.middleware.auth_middleware import get_current_user
 from app.schemas.auth import TokenData
+from app.schemas.prediction import (
+    PackTrainRequest, PackTrainResponse, PackMetrics,
+    PackForecastRequest, PackForecastResponse, PackForecastSeries,
+    PackVersionInfo, PackInfoResponse,
+)
 
 router = APIRouter(prefix="/predictions", tags=["Predicciones"])
 
@@ -379,6 +385,57 @@ async def get_sales_data(
 
 
 @router.post(
+    "/purchases-data",
+    summary="Obtener datos de compras para analisis",
+    description="""
+    Obtiene datos de compras agregados para analisis y visualizacion.
+
+    Niveles de agregacion:
+    - D: Diario
+    - W: Semanal
+    - M: Mensual
+    """
+)
+async def get_purchases_data(
+    request: SalesDataRequest,
+    db: Session = Depends(get_db),
+    current_user: TokenData = Depends(get_current_user)
+):
+    """Obtiene datos de compras agregados."""
+    service = PredictionService(db)
+
+    fecha_inicio = datetime.combine(request.fecha_inicio, datetime.min.time()) if request.fecha_inicio else None
+    fecha_fin = datetime.combine(request.fecha_fin, datetime.min.time()) if request.fecha_fin else None
+
+    df = service.get_compras_data(
+        fecha_inicio=fecha_inicio,
+        fecha_fin=fecha_fin,
+        user_id=current_user.idUsuario
+    )
+
+    # Aplicar agregacion igual que sales-data
+    if not df.empty:
+        df['fecha'] = pd.to_datetime(df['fecha'])
+        agg = request.aggregation
+        if agg == 'W':
+            df = df.set_index('fecha').resample('W-SUN')['total'].sum().reset_index()
+        elif agg == 'M':
+            df = df.set_index('fecha').resample('ME')['total'].sum().reset_index()
+
+    data = df.to_dict(orient='records')
+    for row in data:
+        if 'fecha' in row and hasattr(row['fecha'], 'isoformat'):
+            row['fecha'] = row['fecha'].isoformat()
+
+    return {
+        "success": True,
+        "data": data,
+        "count": len(data),
+        "aggregation": request.aggregation
+    }
+
+
+@router.post(
     "/validate-data",
     summary="Validar datos para prediccion",
     description="""
@@ -614,3 +671,102 @@ async def delete_model(
     service = PredictionService(db)
     result = service.delete_model(model_key)
     return DeleteModelResponse(**result)
+
+
+# Pack schemas imported from app.schemas.prediction
+
+@router.post(
+    "/train-pack",
+    response_model=PackTrainResponse,
+    summary="Entrenar pack de modelos (ventas + compras)",
+    description="""
+    Entrena dos modelos en un solo paso:
+    - Modelo de ventas (multiple_regression con compras como exógena)
+    - Modelo de compras (multiple_regression con ventas como exógena)
+
+    Ambos se guardan juntos en un ModeloPack para forecast coordinado.
+    Timeout recomendado en cliente: 240s (dos entrenamientos).
+    """
+)
+async def train_pack(
+    request: PackTrainRequest,
+    db: Session = Depends(get_db),
+    current_user: TokenData = Depends(get_current_user)
+):
+    """Entrena pack de modelos ventas+compras."""
+    service = PredictionService(db)
+
+    fecha_inicio = datetime.combine(request.fecha_inicio, datetime.min.time()) if request.fecha_inicio else None
+    fecha_fin    = datetime.combine(request.fecha_fin,    datetime.min.time()) if request.fecha_fin    else None
+
+    result = service.train_pack(
+        nombre=request.nombre,
+        fecha_inicio=fecha_inicio,
+        fecha_fin=fecha_fin,
+        hyperparameters=request.hyperparameters,
+        user_id=current_user.idUsuario,
+        ventas_model_type=request.ventas_model_type or "multiple_regression"
+    )
+
+    if not result.get("success"):
+        return PackTrainResponse(**result)
+
+    return PackTrainResponse(
+        success=True,
+        pack_id=result["pack_id"],
+        pack_key=result["pack_key"],
+        ventas=PackMetrics(**result["ventas"]),
+        compras=PackMetrics(**result["compras"])
+    )
+
+
+@router.get(
+    "/packs",
+    response_model=List[PackInfoResponse],
+    summary="Listar packs del usuario",
+    description="Obtiene los packs activos entrenados por el usuario autenticado."
+)
+async def get_user_packs(
+    db: Session = Depends(get_db),
+    current_user: TokenData = Depends(get_current_user)
+):
+    """Lista packs del usuario."""
+    service = PredictionService(db)
+    packs = service.get_user_packs(current_user.idUsuario)
+    return [PackInfoResponse(**p) for p in packs]
+
+
+@router.post(
+    "/forecast-pack",
+    response_model=PackForecastResponse,
+    summary="Forecast coordinado de un pack",
+    description="""
+    Genera predicciones coordinadas:
+    1. forecast compras (independiente)
+    2. forecast ventas usando compras predichas (mayor precisión)
+
+    Retorna dos series: ventas y compras para los próximos N períodos.
+    """
+)
+async def forecast_pack(
+    request: PackForecastRequest,
+    db: Session = Depends(get_db),
+    current_user: TokenData = Depends(get_current_user)
+):
+    """Genera forecast coordinado del pack."""
+    service = PredictionService(db)
+    result = service.forecast_pack(
+        pack_key=request.pack_key,
+        periods=request.periods
+    )
+
+    if not result.get("success"):
+        return PackForecastResponse(**result)
+
+    return PackForecastResponse(
+        success=True,
+        pack_key=result["pack_key"],
+        periods=result["periods"],
+        ventas=PackForecastSeries(**result["ventas"]),
+        compras=PackForecastSeries(**result["compras"])
+    )

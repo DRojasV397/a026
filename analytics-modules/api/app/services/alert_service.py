@@ -16,6 +16,7 @@ import logging
 import json
 
 from app.models import Alerta, Prediccion, Venta, DetalleVenta, Compra, DetalleCompra, Producto, VersionModelo
+from app.models.prediccion import ModeloPack
 from app.repositories import VentaRepository
 from app.repositories.alerta_repository import AlertaRepository
 from app.repositories.prediccion_repository import PrediccionRepository
@@ -324,7 +325,8 @@ class AlertService:
     ) -> Optional[Alerta]:
         """Crea alerta por tasa de anomalias alta (RN-04.03)."""
         try:
-            best_precision = self._get_best_model_precision() / 100.0
+            # Las anomalías se detectan en la serie de ventas → usar precisión de ventas
+            best_precision = self._get_best_pack_precisions()["ventas"] / 100.0
             alerta = Alerta(
                 idPred=1,
                 tipo=AlertType.ANOMALIA.value,
@@ -396,27 +398,60 @@ class AlertService:
             "creada_en": alerta.creadaEn.isoformat() if alerta.creadaEn else None
         }
 
-    def _get_best_model_precision(self) -> float:
+    def _get_best_pack_precisions(self) -> Dict[str, float]:
         """
-        Obtiene la precisión (R²×100) del mejor modelo predictivo activo.
+        Obtiene las precisiones (R²×100) de AMBOS modelos del mejor pack activo.
 
-        Consulta VersionModelo ordenado por precision DESC y retorna el valor
-        como porcentaje (0-100). Si no hay modelos entrenados, retorna 75.0
-        como valor conservador por defecto.
+        El mejor pack se selecciona por el mayor R² del modelo de ventas.
+
+        Retorna un dict con:
+          - 'ventas'  : precisión del modelo de ventas  [50, 99]
+          - 'compras' : precisión del modelo de compras [50, 99]
+          - 'combined': promedio de ambas               [50, 99]
+
+        En ausencia de packs entrenados los tres valores son 75.0.
         """
+        DEFAULT = {"ventas": 75.0, "compras": 75.0, "combined": 75.0}
         try:
-            best = self.db.query(VersionModelo).filter(
-                VersionModelo.estado == 'Activo',
-                VersionModelo.precision.isnot(None)
-            ).order_by(desc(VersionModelo.precision)).first()
-            if best and best.precision:
-                # precision almacenada en DECIMAL(5,4) como fracción 0-1
-                precision_pct = float(best.precision) * 100
-                # Limitar a rango razonable [50, 99] para evitar extremos
-                return max(50.0, min(99.0, precision_pct))
+            # Pack activo con mayor R² en el modelo de ventas
+            best_pack = (
+                self.db.query(ModeloPack)
+                .join(VersionModelo, ModeloPack.idVersionVentas == VersionModelo.idVersion)
+                .filter(
+                    ModeloPack.estado == 'Activo',
+                    VersionModelo.precision.isnot(None)
+                )
+                .order_by(desc(VersionModelo.precision))
+                .first()
+            )
+            if not best_pack:
+                return DEFAULT
+
+            def _to_pct(version: Optional[VersionModelo]) -> float:
+                if version and version.precision:
+                    return max(50.0, min(99.0, float(version.precision) * 100))
+                return 75.0
+
+            v_ventas = self.db.query(VersionModelo).filter(
+                VersionModelo.idVersion == best_pack.idVersionVentas
+            ).first()
+            v_compras = self.db.query(VersionModelo).filter(
+                VersionModelo.idVersion == best_pack.idVersionCompras
+            ).first()
+
+            p_ventas  = _to_pct(v_ventas)
+            p_compras = _to_pct(v_compras)
+            combined  = (p_ventas + p_compras) / 2.0
+
+            return {"ventas": p_ventas, "compras": p_compras, "combined": combined}
+
         except Exception as e:
-            logger.warning(f"No se pudo obtener precision del mejor modelo: {e}")
-        return 75.0
+            logger.warning(f"No se pudo obtener precisiones del mejor pack: {e}")
+        return DEFAULT
+
+    def _get_best_model_precision(self) -> float:
+        """Retorna la precisión combinada del mejor pack (promedio ventas+compras)."""
+        return self._get_best_pack_precisions()["combined"]
 
     # ─────────────────────────────────────────────────────────────────────────
     #  HELPER: PERSISTIR ALERTA
@@ -523,7 +558,8 @@ class AlertService:
 
         cambio_pct = ((avg_reciente - avg_historico) / avg_historico) * 100
 
-        best_precision = self._get_best_model_precision() / 100.0
+        # Comparación histórica de ventas → usar precisión del modelo de ventas
+        best_precision = self._get_best_pack_precisions()["ventas"] / 100.0
 
         alertas = []
         if cambio_pct <= -self.config.risk_threshold:
@@ -581,7 +617,8 @@ class AlertService:
         costos   = float(result.costos or 0)
         margen   = ((ingresos - costos) / ingresos) * 100
 
-        best_precision = self._get_best_model_precision() / 100.0
+        # Margen depende de ingresos (ventas) y costos (compras) → usar precisión combinada
+        best_precision = self._get_best_pack_precisions()["combined"] / 100.0
 
         alertas = []
         if margen < self.config.margen_minimo:
@@ -670,7 +707,8 @@ class AlertService:
         cambios.sort(key=lambda x: abs(x["cambio_pct"]) * x["volumen"], reverse=True)
         cambios = cambios[:3]
 
-        best_precision = self._get_best_model_precision() / 100.0
+        # Alertas de precios de compra → usar precisión del modelo de compras
+        best_precision = self._get_best_pack_precisions()["compras"] / 100.0
 
         alertas = []
         for c in cambios:
@@ -692,13 +730,264 @@ class AlertService:
         return alertas
 
     # ─────────────────────────────────────────────────────────────────────────
+    #  EVALUACIÓN: COMPRAS PREDICHAS vs REALES (Pack de modelos)
+    # ─────────────────────────────────────────────────────────────────────────
+
+    def _get_best_active_pack(self, user_id: Optional[int] = None) -> Optional[ModeloPack]:
+        """
+        Retorna el pack activo con mejor rendimiento (mayor R² del modelo de ventas).
+        Si ningún pack tiene precisión registrada, devuelve el más reciente como fallback.
+        """
+        try:
+            q = (
+                self.db.query(ModeloPack)
+                .join(VersionModelo, ModeloPack.idVersionVentas == VersionModelo.idVersion)
+                .filter(
+                    ModeloPack.estado == 'Activo',
+                    VersionModelo.precision.isnot(None)
+                )
+            )
+            if user_id is not None:
+                q = q.filter(ModeloPack.creadoPor == user_id)
+            result = q.order_by(desc(VersionModelo.precision)).first()
+            if result:
+                return result
+            # Fallback: ningún pack tiene precisión registrada → el más reciente
+            q2 = self.db.query(ModeloPack).filter(ModeloPack.estado == 'Activo')
+            if user_id is not None:
+                q2 = q2.filter(ModeloPack.creadoPor == user_id)
+            return q2.order_by(desc(ModeloPack.creadoEn)).first()
+        except Exception as e:
+            logger.warning(f"No se pudo obtener mejor pack activo: {e}")
+            return None
+
+    def _evaluar_alertas_compras_predichas(
+        self,
+        fecha_fin: date,
+        pack: ModeloPack
+    ) -> List[Alerta]:
+        """
+        Compara compras reales de los últimos 30d vs las compras predichas para ese periodo.
+
+        Flujo:
+        1. Cargar el modelo de compras del pack
+        2. Generar forecast de 30 días
+        3. Sumar compras reales del mismo periodo
+        4. Si desviación > risk_threshold  → RIESGO "compras_predichas"
+           Si desviación < -opportunity_threshold → OPORTUNIDAD (ahorro inesperado)
+        """
+        from app.services.prediction_service import PredictionService, _global_trained_models
+        import os, pickle
+
+        # Resolver model_key del modelo de compras del pack
+        try:
+            version_compras = self.db.query(VersionModelo).filter(
+                VersionModelo.idVersion == pack.idVersionCompras
+            ).first()
+            if not version_compras:
+                return []
+
+            from app.models.prediccion import Modelo
+            modelo_compras = self.db.query(Modelo).filter(
+                Modelo.idModelo == version_compras.idModelo
+            ).first()
+            if not modelo_compras or not modelo_compras.modelKey:
+                return []
+
+            compras_key = modelo_compras.modelKey
+        except Exception as e:
+            logger.warning(f"No se pudo resolver model_key de compras: {e}")
+            return []
+
+        # Cargar modelo de compras (primero en memoria global, luego disco)
+        from app.analytics.models.multiple_regression import MultipleRegressionModel
+
+        compras_model = _global_trained_models.get(compras_key)
+        if compras_model is None:
+            model_path = os.path.join(PredictionService.MODELS_DIR, f"{compras_key}.pkl")
+            if not os.path.exists(model_path):
+                logger.info(f"Modelo de compras del pack no encontrado en disco: {model_path}")
+                return []
+            try:
+                compras_model = MultipleRegressionModel(target_column='total', date_column='fecha')
+                compras_model.load(model_path)
+                _global_trained_models[compras_key] = compras_model
+            except Exception as e:
+                logger.warning(f"Error cargando modelo de compras: {e}")
+                return []
+
+        # Generar forecast de 30 días
+        try:
+            result = compras_model.forecast(periods=30)
+            forecast_values = result.predictions
+            if not forecast_values:
+                return []
+            total_predicho = float(np.sum(forecast_values))
+        except Exception as e:
+            logger.warning(f"Error en forecast de compras del pack: {e}")
+            return []
+
+        # Compras reales de los últimos 30 días
+        reciente_inicio = fecha_fin - timedelta(days=29)
+        suma_real = self.db.query(func.sum(Compra.total)).filter(
+            Compra.fecha >= reciente_inicio,
+            Compra.fecha <= fecha_fin
+        ).scalar()
+        total_real = float(suma_real or 0)
+
+        if total_real == 0 or total_predicho == 0:
+            return []
+
+        desviacion_pct = ((total_real - total_predicho) / total_predicho) * 100
+        # Comparación real vs predicción del modelo de compras → usar precisión de compras
+        best_precision = self._get_best_pack_precisions()["compras"] / 100.0
+
+        alertas = []
+        if desviacion_pct >= self.config.risk_threshold:
+            # Compras reales superan las predichas → posible exceso de inventario / gasto inesperado
+            alerta = self._persistir_alerta(
+                tipo=AlertType.RIESGO.value,
+                importancia=AlertImportance.MEDIA.value,
+                metrica="compras_predichas",
+                valor_actual=total_real,
+                valor_esperado=total_predicho,
+                confianza=best_precision * 0.90
+            )
+            if alerta:
+                alertas.append(alerta)
+        elif desviacion_pct <= -self.config.opportunity_threshold:
+            # Compras reales mucho menores a las predichas → ahorro / eficiencia
+            alerta = self._persistir_alerta(
+                tipo=AlertType.OPORTUNIDAD.value,
+                importancia=AlertImportance.BAJA.value,
+                metrica="compras_predichas",
+                valor_actual=total_real,
+                valor_esperado=total_predicho,
+                confianza=best_precision * 0.90
+            )
+            if alerta:
+                alertas.append(alerta)
+
+        return alertas
+
+    def _evaluar_alertas_ventas_predichas(
+        self,
+        fecha_fin: date,
+        pack: ModeloPack
+    ) -> List[Alerta]:
+        """
+        Compara ventas reales de los últimos 30d vs las ventas predichas para ese periodo.
+
+        Flujo:
+        1. Cargar el modelo de ventas del pack
+        2. Generar forecast de 30 días
+        3. Sumar ventas reales del mismo periodo
+        4. Si desviación <= -risk_threshold     → RIESGO "ventas_predichas" (ventas por debajo de lo predicho)
+           Si desviación >= opportunity_threshold → OPORTUNIDAD (ventas superan predicciones)
+        """
+        from app.services.prediction_service import PredictionService, _global_trained_models
+        import os, pickle
+
+        # Resolver model_key del modelo de ventas del pack
+        try:
+            version_ventas = self.db.query(VersionModelo).filter(
+                VersionModelo.idVersion == pack.idVersionVentas
+            ).first()
+            if not version_ventas:
+                return []
+
+            from app.models.prediccion import Modelo
+            modelo_ventas = self.db.query(Modelo).filter(
+                Modelo.idModelo == version_ventas.idModelo
+            ).first()
+            if not modelo_ventas or not modelo_ventas.modelKey:
+                return []
+
+            ventas_key = modelo_ventas.modelKey
+        except Exception as e:
+            logger.warning(f"No se pudo resolver model_key de ventas: {e}")
+            return []
+
+        # Cargar modelo de ventas (primero en memoria global, luego disco)
+        from app.analytics.models.multiple_regression import MultipleRegressionModel
+
+        ventas_model = _global_trained_models.get(ventas_key)
+        if ventas_model is None:
+            model_path = os.path.join(PredictionService.MODELS_DIR, f"{ventas_key}.pkl")
+            if not os.path.exists(model_path):
+                logger.info(f"Modelo de ventas del pack no encontrado en disco: {model_path}")
+                return []
+            try:
+                ventas_model = MultipleRegressionModel(target_column='total', date_column='fecha')
+                ventas_model.load(model_path)
+                _global_trained_models[ventas_key] = ventas_model
+            except Exception as e:
+                logger.warning(f"Error cargando modelo de ventas: {e}")
+                return []
+
+        # Generar forecast de 30 días
+        try:
+            result = ventas_model.forecast(periods=30)
+            forecast_values = result.predictions
+            if not forecast_values:
+                return []
+            total_predicho = float(np.sum(forecast_values))
+        except Exception as e:
+            logger.warning(f"Error en forecast de ventas del pack: {e}")
+            return []
+
+        # Ventas reales de los últimos 30 días
+        reciente_inicio = fecha_fin - timedelta(days=29)
+        suma_real = self.db.query(func.sum(Venta.total)).filter(
+            Venta.fecha >= reciente_inicio,
+            Venta.fecha <= fecha_fin
+        ).scalar()
+        total_real = float(suma_real or 0)
+
+        if total_real == 0 or total_predicho == 0:
+            return []
+
+        desviacion_pct = ((total_real - total_predicho) / total_predicho) * 100
+        # Comparación real vs predicción del modelo de ventas → usar precisión de ventas
+        best_precision = self._get_best_pack_precisions()["ventas"] / 100.0
+
+        alertas = []
+        if desviacion_pct <= -self.config.risk_threshold:
+            # Ventas reales muy por debajo de las predichas → bajo rendimiento
+            alerta = self._persistir_alerta(
+                tipo=AlertType.RIESGO.value,
+                importancia=AlertImportance.MEDIA.value,
+                metrica="ventas_predichas",
+                valor_actual=total_real,
+                valor_esperado=total_predicho,
+                confianza=best_precision * 0.90
+            )
+            if alerta:
+                alertas.append(alerta)
+        elif desviacion_pct >= self.config.opportunity_threshold:
+            # Ventas reales superan las predichas → mejor mes de lo esperado
+            alerta = self._persistir_alerta(
+                tipo=AlertType.OPORTUNIDAD.value,
+                importancia=AlertImportance.BAJA.value,
+                metrica="ventas_predichas",
+                valor_actual=total_real,
+                valor_esperado=total_predicho,
+                confianza=best_precision * 0.90
+            )
+            if alerta:
+                alertas.append(alerta)
+
+        return alertas
+
+    # ─────────────────────────────────────────────────────────────────────────
     #  EVALUACIÓN INTEGRAL (combina todos los tipos)
     # ─────────────────────────────────────────────────────────────────────────
 
     def evaluate_all_alerts(
         self,
         fecha_inicio: Optional[date] = None,
-        fecha_fin: Optional[date] = None
+        fecha_fin: Optional[date] = None,
+        user_id: Optional[int] = None
     ) -> Dict[str, Any]:
         """
         Ejecuta todas las evaluaciones de alertas en secuencia:
@@ -748,6 +1037,30 @@ class AlertService:
         except Exception as e:
             logger.error(f"Error en precios_compra: {e}")
             resultados["precios_compra"] = {"success": False, "error": str(e)}
+
+        # 5. Compras predichas (solo si hay pack activo)
+        pack = None
+        try:
+            pack = self._get_best_active_pack(user_id=user_id)
+            if pack:
+                alertas = self._evaluar_alertas_compras_predichas(fecha_fin, pack)
+                resultados["compras_predichas"] = {"success": True, "alertas_generadas": len(alertas)}
+            else:
+                resultados["compras_predichas"] = {"success": True, "alertas_generadas": 0, "info": "Sin pack activo"}
+        except Exception as e:
+            logger.error(f"Error en compras_predichas: {e}")
+            resultados["compras_predichas"] = {"success": False, "error": str(e)}
+
+        # 6. Ventas predichas (solo si hay pack activo)
+        try:
+            if pack:
+                alertas = self._evaluar_alertas_ventas_predichas(fecha_fin, pack)
+                resultados["ventas_predichas"] = {"success": True, "alertas_generadas": len(alertas)}
+            else:
+                resultados["ventas_predichas"] = {"success": True, "alertas_generadas": 0, "info": "Sin pack activo"}
+        except Exception as e:
+            logger.error(f"Error en ventas_predichas: {e}")
+            resultados["ventas_predichas"] = {"success": False, "error": str(e)}
 
         total = sum(v.get("alertas_generadas", 0) for v in resultados.values())
 

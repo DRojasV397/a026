@@ -526,6 +526,204 @@ class ProfitabilityService:
             }
         }
 
+    def get_profitability_projection(
+        self,
+        user_id: int,
+        periods: int = 30
+    ) -> Dict[str, Any]:
+        """
+        Proyecta la rentabilidad futura usando el mejor pack activo del usuario.
+
+        Metodología:
+        1. Obtiene el mejor pack activo (mayor R² de ventas).
+        2. Llama a forecast_pack para obtener ventas y compras proyectadas (aggregate).
+        3. Obtiene mix histórico de productos (últimos N días) para desagregar el total.
+        4. Distribuye la proyección total por producto usando su share histórico.
+        5. Agrega por categoría y calcula indicadores generales.
+
+        Args:
+            user_id: ID del usuario autenticado.
+            periods: Días a proyectar (7–180).
+
+        Returns:
+            Dict con proyecciones generales, por categoría y por producto.
+        """
+        from app.services.prediction_service import PredictionService
+        from app.models.prediccion import ModeloPack, VersionModelo
+        from sqlalchemy import desc
+
+        # ── 1. Mejor pack activo ──────────────────────────────────────────────
+        best_pack = (
+            self.db.query(ModeloPack)
+            .join(VersionModelo, ModeloPack.idVersionVentas == VersionModelo.idVersion)
+            .filter(
+                ModeloPack.estado == 'Activo',
+                ModeloPack.creadoPor == user_id,
+                VersionModelo.precision.isnot(None)
+            )
+            .order_by(desc(VersionModelo.precision))
+            .first()
+        )
+        if not best_pack:
+            # Fallback: cualquier pack activo (sin filtro de usuario)
+            best_pack = (
+                self.db.query(ModeloPack)
+                .join(VersionModelo, ModeloPack.idVersionVentas == VersionModelo.idVersion)
+                .filter(ModeloPack.estado == 'Activo', VersionModelo.precision.isnot(None))
+                .order_by(desc(VersionModelo.precision))
+                .first()
+            )
+        if not best_pack:
+            return {"success": False, "error": "No hay packs de modelos activos disponibles"}
+
+        # ── 2. Forecast coordinado del pack ───────────────────────────────────
+        try:
+            pred_service = PredictionService(self.db)
+            forecast_result = pred_service.forecast_pack(best_pack.packKey, periods)
+        except Exception as e:
+            logger.error(f"Error en forecast_pack: {e}")
+            return {"success": False, "error": f"Error al generar forecast: {str(e)}"}
+
+        if not forecast_result.get("success"):
+            return {"success": False, "error": forecast_result.get("error", "Error en forecast")}
+
+        total_forecast_ventas = sum(forecast_result["ventas"]["predictions"]["values"])
+
+        # ── 3. Mix histórico anual para shares y ratios de costo estables ───────
+        # Usamos 1 año completo para obtener un mix representativo de todos los
+        # productos.  Comparar contra "últimos N días" genera variaciones enormes
+        # cuando el seed-data tiene pocas transacciones recientes.
+        fecha_fin_hist = date.today()
+        fecha_ini_hist = fecha_fin_hist - timedelta(days=365)
+
+        productos = self.producto_repo.get_all()
+        hist_data = []
+        hist_total_ingresos_1yr = 0.0
+        hist_total_costos_1yr   = 0.0
+
+        for producto in productos:
+            prof = self._calculate_product_profitability(producto, fecha_ini_hist, fecha_fin_hist)
+            if prof and prof.ingresos > 0:
+                hist_total_ingresos_1yr += prof.ingresos
+                hist_total_costos_1yr   += prof.costo_total
+                hist_data.append(prof)
+
+        if hist_total_ingresos_1yr <= 0:
+            return {"success": False, "error": "Sin datos históricos de ventas para proyectar"}
+
+        # Baseline esperado para el período de proyección (escalado desde 1 año)
+        # Representa lo que el histórico esperaría para N días, sin crecimiento
+        hist_baseline_ing  = hist_total_ingresos_1yr * (periods / 365)
+        hist_baseline_cos  = hist_total_costos_1yr   * (periods / 365)
+        hist_baseline_util = hist_baseline_ing - hist_baseline_cos
+
+        # ── 4. Proyección por producto ─────────────────────────────────────────
+        por_producto = []
+        category_map: Dict[str, Dict[str, float]] = {}
+
+        for prof in hist_data:
+            # Share calculado sobre el año completo → más estable
+            share      = prof.ingresos / hist_total_ingresos_1yr
+            cost_ratio = (prof.costo_total / prof.ingresos) if prof.ingresos > 0 else 0.6
+
+            proj_ing  = total_forecast_ventas * share
+            proj_cos  = proj_ing * cost_ratio
+            proj_util = proj_ing - proj_cos
+            proj_marg = (proj_util / proj_ing * 100) if proj_ing > 0 else 0.0
+
+            por_producto.append({
+                "id_producto":          prof.id_producto,
+                "nombre":               prof.nombre,
+                "categoria":            prof.categoria or "Sin Categoría",
+                "ingresos_proyectados": round(proj_ing,  2),
+                "costos_proyectados":   round(proj_cos,  2),
+                "utilidad_proyectada":  round(proj_util, 2),
+                "margen_proyectado":    round(proj_marg, 2),
+            })
+
+            cat = prof.categoria or "Sin Categoría"
+            if cat not in category_map:
+                category_map[cat] = {"ingresos": 0.0, "costos": 0.0}
+            category_map[cat]["ingresos"] += proj_ing
+            category_map[cat]["costos"]   += proj_cos
+
+        # ── 5. Proyección por categoría ────────────────────────────────────────
+        por_categoria = []
+        for cat_nombre, cat_vals in sorted(
+            category_map.items(), key=lambda x: x[1]["ingresos"], reverse=True
+        ):
+            cat_ing  = cat_vals["ingresos"]
+            cat_cos  = cat_vals["costos"]
+            cat_util = cat_ing - cat_cos
+            cat_marg = (cat_util / cat_ing * 100) if cat_ing > 0 else 0.0
+            por_categoria.append({
+                "nombre":               cat_nombre,
+                "ingresos_proyectados": round(cat_ing,  2),
+                "costos_proyectados":   round(cat_cos,  2),
+                "utilidad_proyectada":  round(cat_util, 2),
+                "margen_proyectado":    round(cat_marg, 2),
+            })
+
+        # ── 6. Indicadores generales proyectados ──────────────────────────────
+        total_proj_ing   = sum(p["ingresos_proyectados"] for p in por_producto)
+        total_proj_cos   = sum(p["costos_proyectados"]   for p in por_producto)
+        util_bruta       = total_proj_ing - total_proj_cos
+        margen_bruto     = (util_bruta / total_proj_ing * 100) if total_proj_ing > 0 else 0.0
+
+        gastos_op        = total_proj_ing * self.OPERATING_EXPENSES_RATE
+        util_operativa   = util_bruta - gastos_op
+        margen_operativo = (util_operativa / total_proj_ing * 100) if total_proj_ing > 0 else 0.0
+
+        util_neta  = util_operativa
+        margen_neto = (util_neta / total_proj_ing * 100) if total_proj_ing > 0 else 0.0
+
+        # Variación vs baseline histórico escalado al mismo período
+        # Representa crecimiento/decrecimiento esperado según el modelo
+        var_ingresos = (
+            (total_proj_ing - hist_baseline_ing) / hist_baseline_ing * 100
+            if hist_baseline_ing > 0 else 0.0
+        )
+        var_utilidad = (
+            (util_bruta - hist_baseline_util) / abs(hist_baseline_util) * 100
+            if hist_baseline_util != 0 else 0.0
+        )
+
+        # ── 7. Metadatos del pack ──────────────────────────────────────────────
+        v_ventas  = best_pack.version_ventas
+        v_compras = best_pack.version_compras
+        prec_ventas  = float(v_ventas.precision)  * 100 if (v_ventas  and v_ventas.precision)  else 0.0
+        prec_compras = float(v_compras.precision) * 100 if (v_compras and v_compras.precision) else 0.0
+
+        start_date = date.today() + timedelta(days=1)
+        end_date   = start_date   + timedelta(days=periods - 1)
+
+        return {
+            "success":                 True,
+            "pack_key":                best_pack.packKey,
+            "pack_nombre":             best_pack.nombre or best_pack.packKey,
+            "precision_ventas":        round(prec_ventas,  2),
+            "precision_compras":       round(prec_compras, 2),
+            "periods":                 periods,
+            "fecha_inicio_proyeccion": start_date.isoformat(),
+            "fecha_fin_proyeccion":    end_date.isoformat(),
+            "general": {
+                "ingresos_proyectados": round(total_proj_ing,   2),
+                "costos_proyectados":   round(total_proj_cos,   2),
+                "utilidad_proyectada":  round(util_bruta,       2),
+                "margen_bruto":         round(margen_bruto,     2),
+                "margen_operativo":     round(margen_operativo, 2),
+                "margen_neto":          round(margen_neto,      2),
+                "variacion_ingresos":   round(var_ingresos,     2),
+                "variacion_utilidad":   round(var_utilidad,     2),
+            },
+            "por_categoria": por_categoria,
+            "por_producto":  sorted(
+                por_producto,
+                key=lambda x: x["ingresos_proyectados"],
+                reverse=True
+            ),
+        }
+
     def get_profitability_trends(
         self,
         fecha_inicio: Optional[date] = None,

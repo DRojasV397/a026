@@ -6,7 +6,10 @@ import com.app.model.ResultKpiDTO;
 import com.app.model.TrainingResult;
 import com.app.model.predictions.ForecastRequestDTO;
 import com.app.model.predictions.ForecastResponseDTO;
-import com.app.model.predictions.TrainModelRequestDTO;
+import com.app.model.predictions.PackForecastResponseDTO;
+import com.app.model.predictions.PackInfoDTO;
+import com.app.model.predictions.PackTrainRequestDTO;
+import com.app.model.predictions.PackTrainResponseDTO;
 import com.app.model.predictions.TrainModelResponseDTO;
 import com.app.model.predictions.UserModelDTO;
 import com.app.service.alerts.WarningService;
@@ -76,7 +79,6 @@ public class PredictiveController {
     private ComboBox<String> regularizationCombo;
     private Slider alphaSlider;
     private Label alphaValueLabel;
-    private CheckBox useComprasCheck;
     private ComboBox<String> polynomialCombo;
     private CheckBox logTransformCheck;
     private CheckBox autoTuneCheck;
@@ -84,7 +86,6 @@ public class PredictiveController {
     // Controles de hiperparámetros avanzados (Ensemble)
     private List<CheckBox> ensembleBaseModelChecks;
     private ComboBox<String> ensembleMetaLearnerCombo;
-    private CheckBox ensembleUseComprasCheck;
 
     // Controles de hiperparámetros avanzados (XGBoost)
     private Slider xgboostNEstimatorsSlider;
@@ -96,6 +97,14 @@ public class PredictiveController {
     private Slider prophetChangepointSlider;
     private CheckBox prophetYearlySeasonalityCheck;
     private CheckBox prophetWeeklySeasonalityCheck;
+
+    // Controles de hiperparámetros avanzados (Pack Ventas + Compras)
+    private ComboBox<String> packVentasRegularizationCombo;
+    private Slider packVentasAlphaSlider;
+    private Label packVentasAlphaValueLabel;
+    private ComboBox<String> packComprasRegularizationCombo;
+    private Slider packComprasAlphaSlider;
+    private Label packComprasAlphaValueLabel;
 
     @FXML private HBox predictiveFooter;
 
@@ -128,6 +137,10 @@ public class PredictiveController {
     private final PredictionService predictionService = new PredictionService();
     private TrainModelResponseDTO lastTrainResponse;
     private ForecastResponseDTO lastForecastResponse;
+    private PackTrainResponseDTO lastPackTrainResponse;
+    private PackForecastResponseDTO lastPackForecastResponse;
+    private PackInfoDTO selectedSavedPack;
+    private final List<VBox> savedPackCards = new ArrayList<>();
     private String lastPreviewDateRange = null;
 
     @FXML
@@ -258,18 +271,16 @@ public class PredictiveController {
 
     private void loadUserModels() {
         if (savedModelsContainer == null || savedModelsSection == null) return;
+
+        // Cargar modelos individuales
         predictionService.getUserModels()
                 .thenAccept(models -> Platform.runLater(() -> {
                     savedModelCards.clear();
                     savedModelsContainer.getChildren().clear();
-                    if (models == null || models.isEmpty()) {
-                        if (savedModelsEmptyLabel != null) {
-                            savedModelsEmptyLabel.setVisible(true);
-                            savedModelsEmptyLabel.setManaged(true);
-                        }
-                        savedModelsContainer.setVisible(false);
-                        savedModelsContainer.setManaged(false);
-                    } else {
+                    savedPackCards.clear();
+
+                    boolean hasContent = (models != null && !models.isEmpty());
+                    if (hasContent) {
                         if (savedModelsEmptyLabel != null) {
                             savedModelsEmptyLabel.setVisible(false);
                             savedModelsEmptyLabel.setManaged(false);
@@ -282,6 +293,35 @@ public class PredictiveController {
                             savedModelsContainer.getChildren().add(card);
                         }
                     }
+
+                    // Cargar packs del usuario en la misma sección
+                    predictionService.getUserPacks()
+                            .thenAccept(packs -> Platform.runLater(() -> {
+                                if (packs != null && !packs.isEmpty()) {
+                                    if (savedModelsEmptyLabel != null) {
+                                        savedModelsEmptyLabel.setVisible(false);
+                                        savedModelsEmptyLabel.setManaged(false);
+                                    }
+                                    savedModelsContainer.setVisible(true);
+                                    savedModelsContainer.setManaged(true);
+                                    for (PackInfoDTO pack : packs) {
+                                        VBox card = createSavedPackCard(pack);
+                                        savedPackCards.add(card);
+                                        savedModelsContainer.getChildren().add(card);
+                                    }
+                                } else if (!hasContent) {
+                                    if (savedModelsEmptyLabel != null) {
+                                        savedModelsEmptyLabel.setVisible(true);
+                                        savedModelsEmptyLabel.setManaged(true);
+                                    }
+                                    savedModelsContainer.setVisible(false);
+                                    savedModelsContainer.setManaged(false);
+                                }
+                            }))
+                            .exceptionally(ex -> {
+                                System.out.println("Error cargando packs del usuario: " + ex.getMessage());
+                                return null;
+                            });
                 }))
                 .exceptionally(ex -> {
                     System.out.println("Error cargando modelos del usuario: " + ex.getMessage());
@@ -335,11 +375,79 @@ public class PredictiveController {
         return card;
     }
 
+    private VBox createSavedPackCard(PackInfoDTO pack) {
+        VBox card = new VBox(10);
+        card.getStyleClass().add("model-card");
+        card.setMaxWidth(280);
+
+        Label badgePack = new Label("📦 Pack");
+        badgePack.setStyle("-fx-background-color: #fef9e7; -fx-text-fill: #e67e22; "
+                + "-fx-padding: 2 8; -fx-background-radius: 10; -fx-font-size: 10px; -fx-font-weight: bold;");
+
+        Label nameLabel = new Label(pack.getDisplayName());
+        nameLabel.getStyleClass().add("model-title");
+        nameLabel.setWrapText(true);
+
+        String ventasR2 = pack.getVentas() != null
+                ? String.format("Ventas R²=%.4f", pack.getVentas().getR2Score()) : "Ventas: N/A";
+        String comprasR2 = pack.getCompras() != null
+                ? String.format("Compras R²=%.4f", pack.getCompras().getR2Score()) : "Compras: N/A";
+        Label metricsLabel = new Label(ventasR2 + "\n" + comprasR2);
+        metricsLabel.setStyle("-fx-font-size: 11px; -fx-font-weight: bold; -fx-text-fill: #27ae60;");
+        metricsLabel.setWrapText(true);
+
+        String fecha = pack.getCreado_en() != null
+                ? pack.getCreado_en().substring(0, Math.min(10, pack.getCreado_en().length())) : "—";
+        Label fechaLabel = new Label("Creado: " + fecha);
+        fechaLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: #95a5a6;");
+
+        Button useBtn = new Button("Usar este pack");
+        useBtn.setMaxWidth(Double.MAX_VALUE);
+        useBtn.getStyleClass().add("select-button");
+        useBtn.setOnAction(e -> {
+            selectSavedPack(pack, card, useBtn);
+            e.consume();
+        });
+        card.setOnMouseClicked(e -> selectSavedPack(pack, card, useBtn));
+
+        card.getChildren().addAll(badgePack, nameLabel, metricsLabel, fechaLabel, new Separator(), useBtn);
+        return card;
+    }
+
+    private void selectSavedPack(PackInfoDTO pack, VBox card, Button btn) {
+        selectedSavedPack = pack;
+        selectedSavedModel = null;
+        selectedModel = null;
+
+        savedPackCards.forEach(c -> c.getStyleClass().remove("selected"));
+        savedModelCards.forEach(c -> {
+            c.getStyleClass().remove("selected");
+            Button b = (Button) c.lookup(".select-button");
+            if (b != null) b.setText("Usar este modelo");
+        });
+        modelCards.forEach(c -> {
+            c.getStyleClass().remove("selected");
+            Button b = (Button) c.lookup(".select-button");
+            if (b != null) b.setText("Seleccionar");
+        });
+
+        card.getStyleClass().add("selected");
+        btn.setText("Seleccionado");
+
+        updateFooterState();
+    }
+
     private void selectSavedModel(UserModelDTO model, VBox card, Button btn) {
         selectedSavedModel = model;
+        selectedSavedPack = null;
         selectedModel = findModelDTOByType(model.getModelType());
 
         savedModelCards.forEach(c -> c.getStyleClass().remove("selected"));
+        savedPackCards.forEach(c -> {
+            c.getStyleClass().remove("selected");
+            Button b = (Button) c.lookup(".select-button");
+            if (b != null) b.setText("Usar este pack");
+        });
         card.getStyleClass().add("selected");
         btn.setText("Seleccionado");
 
@@ -453,7 +561,8 @@ public class PredictiveController {
                 !selectedModel.title().equals(model.title()));
 
         selectedModel = model;
-        selectedSavedModel = null; // limpiar selección de modelo guardado
+        selectedSavedModel = null;
+        selectedSavedPack = null;
 
         modelCards.forEach(card -> card.getStyleClass().remove("selected"));
         modelCards.forEach(card ->
@@ -465,6 +574,11 @@ public class PredictiveController {
             c.getStyleClass().remove("selected");
             Button btn = (Button) c.lookup(".select-button");
             if (btn != null) btn.setText("Usar este modelo");
+        });
+        savedPackCards.forEach(c -> {
+            c.getStyleClass().remove("selected");
+            Button btn = (Button) c.lookup(".select-button");
+            if (btn != null) btn.setText("Usar este pack");
         });
 
         selectedCard.getStyleClass().add("selected");
@@ -581,6 +695,19 @@ public class PredictiveController {
         // Saltar directo a Fase 4 si hay un modelo guardado seleccionado
         if (currentPhaseIndex == 0 && selectedSavedModel != null) {
             lastTrainResponse = buildTrainResponseFromSavedModel(selectedSavedModel);
+            lastPackTrainResponse = null;
+            currentPhaseIndex = 3;
+            updatePhases();
+            updatePhaseView();
+            updateFooterState();
+            showPhase4Results();
+            return;
+        }
+
+        // Saltar directo a Fase 4 si hay un pack guardado seleccionado
+        if (currentPhaseIndex == 0 && selectedSavedPack != null) {
+            lastPackTrainResponse = buildPackResponseFromSavedPack(selectedSavedPack);
+            lastTrainResponse = null;
             currentPhaseIndex = 3;
             updatePhases();
             updatePhaseView();
@@ -628,7 +755,7 @@ public class PredictiveController {
 
     private boolean canProceed() {
         return switch (currentPhaseIndex) {
-            case 0 -> selectedModel != null || selectedSavedModel != null; // Fase 1
+            case 0 -> selectedModel != null || selectedSavedModel != null || selectedSavedPack != null; // Fase 1
             case 1 -> validPhase2;                  // Fase 2
             case 2 -> validPhase3;                  // Fase 3
             case 3 -> true;                  // Fase 4
@@ -918,23 +1045,7 @@ public class PredictiveController {
 
         alphaBox.getChildren().addAll(alphaHeader, alphaSlider, alphaLabelsRow);
 
-        // ── Fila 3: Usar datos de compras ───────────────────────────────────
-        HBox comprasRow = new HBox(10);
-        comprasRow.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
-        comprasRow.setStyle("-fx-padding: 8; -fx-background-color: #fef9e7; -fx-background-radius: 6;");
-
-        useComprasCheck = new CheckBox("Incluir datos de compras como variable exógena");
-        useComprasCheck.setSelected(true);
-        useComprasCheck.setStyle("-fx-font-size: 12px; -fx-text-fill: #2c3e50;");
-
-        Label comprasHint = new Label("🛒 Las compras del negocio correlacionan con las ventas futuras");
-        comprasHint.setStyle("-fx-font-size: 10px; -fx-text-fill: #7f8c8d;");
-        comprasHint.setWrapText(true);
-
-        VBox comprasContent = new VBox(3, useComprasCheck, comprasHint);
-        comprasRow.getChildren().add(comprasContent);
-
-        // ── Fila 4: Grado polinomial ────────────────────────────────────────
+        // ── Fila 3: Grado polinomial ────────────────────────────────────────
         VBox polyBox = new VBox(6);
         Label polyLabel = new Label("Tendencia Temporal");
         polyLabel.setStyle("-fx-font-size: 12px; -fx-font-weight: bold; -fx-text-fill: #2c3e50;");
@@ -977,7 +1088,7 @@ public class PredictiveController {
         );
 
         card.getChildren().addAll(title, note, new Separator(), regBox, alphaBox,
-                new Separator(), comprasRow, new Separator(), polyBox,
+                new Separator(), polyBox,
                 new Separator(), trainingOptsBox);
         return card;
     }
@@ -1044,20 +1155,8 @@ public class PredictiveController {
 
         metaBox.getChildren().addAll(metaLabel, ensembleMetaLearnerCombo, metaHint);
 
-        // ── Usar compras ────────────────────────────────────────────────────
-        HBox comprasRow = new HBox(10);
-        comprasRow.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
-        comprasRow.setStyle("-fx-padding: 8; -fx-background-color: #fef9e7; -fx-background-radius: 6;");
-
-        ensembleUseComprasCheck = new CheckBox("Incluir datos de compras (usado por Regresión Múltiple en el ensemble)");
-        ensembleUseComprasCheck.setSelected(true);
-        ensembleUseComprasCheck.setStyle("-fx-font-size: 12px; -fx-text-fill: #2c3e50;");
-        ensembleUseComprasCheck.setWrapText(true);
-
-        comprasRow.getChildren().add(ensembleUseComprasCheck);
-
         card.getChildren().addAll(title, note, new Separator(), baseModelsBox,
-                new Separator(), metaBox, new Separator(), comprasRow);
+                new Separator(), metaBox);
         return card;
     }
 
@@ -1254,6 +1353,103 @@ public class PredictiveController {
                 seasonHint);
 
         card.getChildren().addAll(title, note, new Separator(), cpBox, new Separator(), seasonBox);
+        return card;
+    }
+
+    /**
+     * Card de hiperparámetros para el Pack Ventas + Compras.
+     * Permite configurar regularización y alpha para cada submodelo.
+     */
+    private VBox createPackParamsCard() {
+        VBox card = new VBox(14);
+        card.getStyleClass().add("param-card");
+
+        Label title = new Label("⚙️ Parámetros del Pack Ventas + Compras");
+        title.getStyleClass().add("param-card-title");
+
+        Label note = new Label("Configura la regularización para cada submodelo del pack");
+        note.setStyle("-fx-font-size: 11px; -fx-text-fill: #95a5a6; -fx-font-style: italic;");
+        note.setWrapText(true);
+
+        // ── Submodelo de VENTAS ─────────────────────────────────────────────
+        Label ventasHeader = new Label("Modelo de Ventas");
+        ventasHeader.setStyle("-fx-font-size: 13px; -fx-font-weight: bold; -fx-text-fill: #2980b9;");
+
+        Label ventasNote = new Label("Target: ventas diarias. Variable exógena: compras históricas (fijo).");
+        ventasNote.setStyle("-fx-font-size: 10px; -fx-text-fill: #7f8c8d;");
+        ventasNote.setWrapText(true);
+
+        VBox ventasRegBox = new VBox(6);
+        Label ventasRegLabel = new Label("Regularización (Ventas)");
+        ventasRegLabel.setStyle("-fx-font-size: 12px; -fx-font-weight: bold; -fx-text-fill: #2c3e50;");
+        packVentasRegularizationCombo = new ComboBox<>();
+        packVentasRegularizationCombo.getItems().addAll("Lasso (L1)", "Ridge (L2)", "ElasticNet (L1+L2)");
+        packVentasRegularizationCombo.setValue("Lasso (L1)");
+        packVentasRegularizationCombo.setMaxWidth(Double.MAX_VALUE);
+        packVentasRegularizationCombo.setStyle("-fx-font-size: 12px;");
+        ventasRegBox.getChildren().addAll(ventasRegLabel, packVentasRegularizationCombo);
+
+        VBox ventasAlphaBox = new VBox(6);
+        HBox ventasAlphaHeader = new HBox(8);
+        ventasAlphaHeader.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
+        Label ventasAlphaLbl = new Label("Alpha (Ventas)");
+        ventasAlphaLbl.setStyle("-fx-font-size: 12px; -fx-font-weight: bold; -fx-text-fill: #2c3e50;");
+        Region ventasSpacer = new Region();
+        HBox.setHgrow(ventasSpacer, Priority.ALWAYS);
+        packVentasAlphaValueLabel = new Label("1.00");
+        packVentasAlphaValueLabel.setStyle("-fx-font-size: 12px; -fx-font-weight: bold; -fx-text-fill: #3498db;");
+        ventasAlphaHeader.getChildren().addAll(ventasAlphaLbl, ventasSpacer, packVentasAlphaValueLabel);
+
+        packVentasAlphaSlider = new Slider(0.01, 10.0, 1.0);
+        packVentasAlphaSlider.setBlockIncrement(0.1);
+        packVentasAlphaSlider.valueProperty().addListener((obs, old, nv) ->
+                packVentasAlphaValueLabel.setText(String.format("%.2f", nv.doubleValue()))
+        );
+        ventasAlphaBox.getChildren().addAll(ventasAlphaHeader, packVentasAlphaSlider);
+
+        // ── Submodelo de COMPRAS ────────────────────────────────────────────
+        Separator midSep = new Separator();
+        midSep.setStyle("-fx-padding: 6 0;");
+
+        Label comprasHeader = new Label("Modelo de Compras");
+        comprasHeader.setStyle("-fx-font-size: 13px; -fx-font-weight: bold; -fx-text-fill: #27ae60;");
+
+        Label comprasNote = new Label("Target: compras diarias. Variable exógena: ventas históricas (fijo).");
+        comprasNote.setStyle("-fx-font-size: 10px; -fx-text-fill: #7f8c8d;");
+        comprasNote.setWrapText(true);
+
+        VBox comprasRegBox = new VBox(6);
+        Label comprasRegLabel = new Label("Regularización (Compras)");
+        comprasRegLabel.setStyle("-fx-font-size: 12px; -fx-font-weight: bold; -fx-text-fill: #2c3e50;");
+        packComprasRegularizationCombo = new ComboBox<>();
+        packComprasRegularizationCombo.getItems().addAll("Lasso (L1)", "Ridge (L2)", "ElasticNet (L1+L2)");
+        packComprasRegularizationCombo.setValue("Lasso (L1)");
+        packComprasRegularizationCombo.setMaxWidth(Double.MAX_VALUE);
+        packComprasRegularizationCombo.setStyle("-fx-font-size: 12px;");
+        comprasRegBox.getChildren().addAll(comprasRegLabel, packComprasRegularizationCombo);
+
+        VBox comprasAlphaBox = new VBox(6);
+        HBox comprasAlphaHeader = new HBox(8);
+        comprasAlphaHeader.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
+        Label comprasAlphaLbl = new Label("Alpha (Compras)");
+        comprasAlphaLbl.setStyle("-fx-font-size: 12px; -fx-font-weight: bold; -fx-text-fill: #2c3e50;");
+        Region comprasSpacer = new Region();
+        HBox.setHgrow(comprasSpacer, Priority.ALWAYS);
+        packComprasAlphaValueLabel = new Label("1.00");
+        packComprasAlphaValueLabel.setStyle("-fx-font-size: 12px; -fx-font-weight: bold; -fx-text-fill: #27ae60;");
+        comprasAlphaHeader.getChildren().addAll(comprasAlphaLbl, comprasSpacer, packComprasAlphaValueLabel);
+
+        packComprasAlphaSlider = new Slider(0.01, 10.0, 1.0);
+        packComprasAlphaSlider.setBlockIncrement(0.1);
+        packComprasAlphaSlider.valueProperty().addListener((obs, old, nv) ->
+                packComprasAlphaValueLabel.setText(String.format("%.2f", nv.doubleValue()))
+        );
+        comprasAlphaBox.getChildren().addAll(comprasAlphaHeader, packComprasAlphaSlider);
+
+        card.getChildren().addAll(title, note, new Separator(),
+                ventasHeader, ventasNote, ventasRegBox, ventasAlphaBox,
+                midSep,
+                comprasHeader, comprasNote, comprasRegBox, comprasAlphaBox);
         return card;
     }
 
@@ -1474,7 +1670,7 @@ public class PredictiveController {
         header.getStyleClass().add("preview-header");
         header.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
 
-        Label title = new Label("Vista Previa de Datos");
+        Label title = new Label("Vista Previa de Datos — Ventas y Compras");
         title.getStyleClass().add("preview-title");
 
         Region spacer = new Region();
@@ -1515,6 +1711,7 @@ public class PredictiveController {
 
     /**
      * Carga la vista previa de datos desde la API con datos reales.
+     * Para el modelo Pack, carga ventas Y compras en columnas separadas.
      */
     private void loadPreviewFromApi() {
         if (previewTable == null) return;
@@ -1528,51 +1725,81 @@ public class PredictiveController {
         previewTable.getItems().clear();
         previewTable.getColumns().clear();
 
-        predictionService.getSalesData(fechaInicio, fechaFin, "M")
-            .thenAccept(result -> Platform.runLater(() -> {
-                if (result == null || !Boolean.TRUE.equals(result.get("success"))) {
-                    previewTable.setPlaceholder(new Label("No se pudieron cargar los datos."));
-                    return;
-                }
+        {
+            // Siempre cargar ventas y compras en paralelo y combinar por fecha
+            java.util.concurrent.CompletableFuture<Map<String, Object>> ventasFuture =
+                    predictionService.getSalesData(fechaInicio, fechaFin, "M");
+            java.util.concurrent.CompletableFuture<Map<String, Object>> comprasFuture =
+                    predictionService.getPurchasesData(fechaInicio, fechaFin, "M");
+
+            ventasFuture.thenCombine(comprasFuture, (ventasResult, comprasResult) -> {
+                return new Map[]{ventasResult, comprasResult};
+            }).thenAccept(results -> Platform.runLater(() -> {
+                Map<String, Object> ventasResult = results[0];
+                Map<String, Object> comprasResult = results[1];
+
                 @SuppressWarnings("unchecked")
-                List<Map<String, Object>> rows = (List<Map<String, Object>>) result.get("data");
-                if (rows == null || rows.isEmpty()) {
+                List<Map<String, Object>> ventasRows = (ventasResult != null && Boolean.TRUE.equals(ventasResult.get("success")))
+                        ? (List<Map<String, Object>>) ventasResult.get("data") : List.of();
+                @SuppressWarnings("unchecked")
+                List<Map<String, Object>> comprasRows = (comprasResult != null && Boolean.TRUE.equals(comprasResult.get("success")))
+                        ? (List<Map<String, Object>>) comprasResult.get("data") : List.of();
+
+                if (ventasRows.isEmpty() && comprasRows.isEmpty()) {
                     previewTable.setPlaceholder(new Label("Sin datos en el rango seleccionado."));
                     return;
                 }
 
-                previewTable.getColumns().clear();
+                // Indexar compras por fecha para combinar
+                Map<String, Double> comprasPorFecha = new HashMap<>();
+                for (Map<String, Object> row : comprasRows) {
+                    String fecha = String.valueOf(row.getOrDefault("fecha", ""));
+                    Object total = row.get("total");
+                    comprasPorFecha.put(fecha, total instanceof Number ? ((Number) total).doubleValue() : 0.0);
+                }
 
                 TableColumn<Map<String, String>, String> fechaCol = new TableColumn<>("Fecha");
                 fechaCol.setCellValueFactory(d ->
-                    new javafx.beans.property.SimpleStringProperty(d.getValue().get("fecha")));
-                fechaCol.setPrefWidth(130);
+                        new javafx.beans.property.SimpleStringProperty(d.getValue().get("fecha")));
+                fechaCol.setPrefWidth(120);
 
-                TableColumn<Map<String, String>, String> totalCol = new TableColumn<>("Total Ventas");
-                totalCol.setCellValueFactory(d ->
-                    new javafx.beans.property.SimpleStringProperty(d.getValue().get("total")));
-                totalCol.setPrefWidth(140);
+                TableColumn<Map<String, String>, String> ventasCol = new TableColumn<>("Total Ventas");
+                ventasCol.setCellValueFactory(d ->
+                        new javafx.beans.property.SimpleStringProperty(d.getValue().get("ventas")));
+                ventasCol.setPrefWidth(140);
 
-                previewTable.getColumns().addAll(fechaCol, totalCol);
+                TableColumn<Map<String, String>, String> comprasCol = new TableColumn<>("Total Compras");
+                comprasCol.setCellValueFactory(d ->
+                        new javafx.beans.property.SimpleStringProperty(d.getValue().get("compras")));
+                comprasCol.setPrefWidth(140);
 
-                List<Map<String, String>> tableData = new ArrayList<>();
+                previewTable.getColumns().clear();
+                previewTable.getColumns().addAll(fechaCol, ventasCol, comprasCol);
+
                 java.text.NumberFormat nf = java.text.NumberFormat.getCurrencyInstance(
                         new java.util.Locale("es", "MX"));
-                for (Map<String, Object> row : rows) {
+                List<Map<String, String>> tableData = new ArrayList<>();
+                for (Map<String, Object> row : ventasRows) {
+                    String fecha = String.valueOf(row.getOrDefault("fecha", ""));
+                    Object ventasTotal = row.get("total");
+                    Double comprasTotal = comprasPorFecha.getOrDefault(fecha, null);
+
                     Map<String, String> r = new HashMap<>();
-                    r.put("fecha", String.valueOf(row.getOrDefault("fecha", "")));
-                    Object total = row.get("total");
-                    r.put("total", total instanceof Number
-                            ? nf.format(((Number) total).doubleValue()) : "N/A");
+                    r.put("fecha", fecha);
+                    r.put("ventas", ventasTotal instanceof Number
+                            ? nf.format(((Number) ventasTotal).doubleValue()) : "N/A");
+                    r.put("compras", comprasTotal != null
+                            ? nf.format(comprasTotal) : "—");
                     tableData.add(r);
                 }
                 previewTable.getItems().setAll(tableData);
-            }))
-            .exceptionally(ex -> {
+            })).exceptionally(ex -> {
                 Platform.runLater(() ->
-                    previewTable.setPlaceholder(new Label("Error al cargar datos.")));
+                        previewTable.setPlaceholder(new Label("Error al cargar datos.")));
                 return null;
             });
+
+        }
     }
 
     /**
@@ -1923,7 +2150,6 @@ public class PredictiveController {
         regularizationCombo = null;
         alphaSlider = null;
         alphaValueLabel = null;
-        useComprasCheck = null;
         polynomialCombo = null;
         logTransformCheck = null;
         autoTuneCheck = null;
@@ -1931,7 +2157,6 @@ public class PredictiveController {
         // Limpiar controles de Ensemble
         ensembleBaseModelChecks = null;
         ensembleMetaLearnerCombo = null;
-        ensembleUseComprasCheck = null;
 
         // Limpiar controles de XGBoost
         xgboostNEstimatorsSlider = null;
@@ -1943,6 +2168,14 @@ public class PredictiveController {
         prophetChangepointSlider = null;
         prophetYearlySeasonalityCheck = null;
         prophetWeeklySeasonalityCheck = null;
+
+        // Limpiar controles de Pack
+        packVentasRegularizationCombo = null;
+        packVentasAlphaSlider = null;
+        packVentasAlphaValueLabel = null;
+        packComprasRegularizationCombo = null;
+        packComprasAlphaSlider = null;
+        packComprasAlphaValueLabel = null;
 
         System.out.println("✓ Configuración de Fase 2 limpiada");
     }
@@ -2002,18 +2235,20 @@ public class PredictiveController {
                     // Paso 2: Datos válidos, proceder al entrenamiento
                     trainingTitleTxt.setText("Entrenando el modelo, este proceso puede tardar unos minutos...");
 
-                    TrainModelRequestDTO request = new TrainModelRequestDTO(modelType, fechaInicio, fechaFin);
-
-                    // Agregar nombre si fue especificado
+                    // ── Todos los modelos usan el flujo Pack (ventas + compras) ─────────
+                    PackTrainRequestDTO packRequest = new PackTrainRequestDTO();
                     if (phase2Config.getModelName() != null && !phase2Config.getModelName().isEmpty()) {
-                        request.setNombre(phase2Config.getModelName());
+                        packRequest.setNombre(phase2Config.getModelName());
                     }
+                    packRequest.setFecha_inicio(fechaInicio);
+                    packRequest.setFecha_fin(fechaFin);
+                    packRequest.setVentas_model_type(modelType);
 
-                    // Agregar hiperparámetros configurados para Regresión Múltiple
+                    Map<String, Map<String, Object>> hp = new HashMap<>();
+                    Map<String, Object> ventasHp = new HashMap<>();
+
+                    // Hiperparámetros específicos por modelo de ventas
                     if ("Regresión Múltiple".equals(selectedModel.title())) {
-                        Map<String, Object> hyperparams = new HashMap<>();
-
-                        // Regularización
                         if (regularizationCombo != null) {
                             String regVal = switch (regularizationCombo.getValue()) {
                                 case "Lasso (L1)" -> "lasso";
@@ -2021,40 +2256,18 @@ public class PredictiveController {
                                 case "Ninguna" -> "none";
                                 default -> "ridge";
                             };
-                            hyperparams.put("regularization", regVal);
+                            ventasHp.put("regularization", regVal);
                         }
-
-                        // Alpha
                         if (alphaSlider != null) {
-                            hyperparams.put("alpha", alphaSlider.getValue());
+                            ventasHp.put("alpha", alphaSlider.getValue());
                         }
-
-                        // Usar compras
-                        hyperparams.put("use_compras",
-                                useComprasCheck == null || useComprasCheck.isSelected());
-
-                        // Grado polinomial
                         if (polynomialCombo != null) {
                             int degree = polynomialCombo.getValue().contains("2") ? 2 : 1;
-                            hyperparams.put("polynomial_degree", degree);
+                            ventasHp.put("polynomial_degree", degree);
                         }
-
-                        // Transformación logarítmica (default: false)
-                        hyperparams.put("log_transform",
-                                logTransformCheck != null && logTransformCheck.isSelected());
-
-                        // Auto-tuning de alpha
-                        hyperparams.put("auto_tune",
-                                autoTuneCheck == null || autoTuneCheck.isSelected());
-
-                        request.setHyperparameters(hyperparams);
-                    }
-
-                    // Hiperparámetros para Ensemble
-                    if ("Modelo Ensemble".equals(selectedModel.title())) {
-                        Map<String, Object> hyperparams = new HashMap<>();
-
-                        // Modelos base seleccionados
+                        ventasHp.put("log_transform", logTransformCheck != null && logTransformCheck.isSelected());
+                        ventasHp.put("auto_tune", autoTuneCheck == null || autoTuneCheck.isSelected());
+                    } else if ("Modelo Ensemble".equals(selectedModel.title())) {
                         if (ensembleBaseModelChecks != null) {
                             List<String> baseModels = new ArrayList<>();
                             for (CheckBox cb : ensembleBaseModelChecks) {
@@ -2069,52 +2282,49 @@ public class PredictiveController {
                                 }
                             }
                             if (!baseModels.isEmpty()) {
-                                hyperparams.put("base_models", baseModels);
+                                ventasHp.put("base_models", baseModels);
                             }
                         }
-
-                        // Meta-learner
                         if (ensembleMetaLearnerCombo != null) {
                             String mlVal = ensembleMetaLearnerCombo.getValue() != null
                                     && ensembleMetaLearnerCombo.getValue().contains("Promedio")
                                     ? "weighted_avg" : "ridge";
-                            hyperparams.put("meta_learner", mlVal);
+                            ventasHp.put("meta_learner", mlVal);
                         }
-
-                        request.setHyperparameters(hyperparams);
-                    }
-
-                    // Hiperparámetros para XGBoost
-                    if ("XGBoost".equals(selectedModel.title()) && xgboostNEstimatorsSlider != null) {
-                        Map<String, Object> hyperparams = new HashMap<>();
-                        hyperparams.put("n_estimators", (int) xgboostNEstimatorsSlider.getValue());
-                        hyperparams.put("max_depth", Integer.parseInt(xgboostMaxDepthCombo.getValue()));
-                        hyperparams.put("learning_rate",
+                    } else if ("XGBoost".equals(selectedModel.title()) && xgboostNEstimatorsSlider != null) {
+                        ventasHp.put("n_estimators", (int) xgboostNEstimatorsSlider.getValue());
+                        ventasHp.put("max_depth", Integer.parseInt(xgboostMaxDepthCombo.getValue()));
+                        ventasHp.put("learning_rate",
                                 Math.round(xgboostLearningRateSlider.getValue() * 1000.0) / 1000.0);
-                        hyperparams.put("subsample",
+                        ventasHp.put("subsample",
                                 Math.round(xgboostSubsampleSlider.getValue() * 100.0) / 100.0);
-                        request.setHyperparameters(hyperparams);
-                    }
-
-                    // Hiperparámetros para Prophet
-                    if ("Prophet".equals(selectedModel.title()) && prophetChangepointSlider != null) {
-                        Map<String, Object> hyperparams = new HashMap<>();
-                        hyperparams.put("changepoint_prior_scale",
+                    } else if ("Prophet".equals(selectedModel.title()) && prophetChangepointSlider != null) {
+                        ventasHp.put("changepoint_prior_scale",
                                 Math.round(prophetChangepointSlider.getValue() * 1000.0) / 1000.0);
-                        hyperparams.put("yearly_seasonality", prophetYearlySeasonalityCheck.isSelected());
-                        hyperparams.put("weekly_seasonality", prophetWeeklySeasonalityCheck.isSelected());
-                        request.setHyperparameters(hyperparams);
+                        ventasHp.put("yearly_seasonality", prophetYearlySeasonalityCheck.isSelected());
+                        ventasHp.put("weekly_seasonality", prophetWeeklySeasonalityCheck.isSelected());
                     }
 
-                    predictionService.trainModel(request)
-                            .thenAccept(response -> Platform.runLater(() -> {
+                    ventasHp.put("use_compras", true);
+                    hp.put("ventas", ventasHp);
+
+                    Map<String, Object> comprasHp = new HashMap<>();
+                    comprasHp.put("use_ventas", true);
+                    comprasHp.put("auto_tune", true);
+                    hp.put("compras", comprasHp);
+
+                    packRequest.setHyperparameters(hp);
+
+                    predictionService.trainPack(packRequest)
+                            .thenAccept(packResponse -> Platform.runLater(() -> {
                                 stopLoadingAnimation();
-                                if (response != null && response.isSuccess()) {
-                                    lastTrainResponse = response;
-                                    showTrainingResultFromApi(response);
+                                if (packResponse != null && packResponse.isSuccess()) {
+                                    lastPackTrainResponse = packResponse;
+                                    lastTrainResponse = null;
+                                    showPackTrainingResultFromApi(packResponse);
                                 } else {
-                                    String errorMsg = response != null && response.getError() != null
-                                            ? response.getError()
+                                    String errorMsg = packResponse != null && packResponse.getError() != null
+                                            ? packResponse.getError()
                                             : "Error desconocido al entrenar el modelo";
                                     showTrainingErrorWithMessage(errorMsg);
                                 }
@@ -2171,6 +2381,40 @@ public class PredictiveController {
         updateFooterState();
 
         // Recargar lista de modelos del usuario para reflejar el nuevo modelo
+        loadUserModels();
+    }
+
+    /**
+     * Muestra resultado de entrenamiento de pack con métricas de ventas y compras.
+     */
+    private void showPackTrainingResultFromApi(PackTrainResponseDTO response) {
+        trainingIcon.setRotate(0);
+        trainingIcon.setImage(new Image(
+                Objects.requireNonNull(getClass().getResourceAsStream("/images/icons/check.png"))
+        ));
+
+        String ventasR2 = response.getVentas() != null
+                ? String.format("%.4f", response.getVentas().getR2Score()) : "N/A";
+        String comprasR2 = response.getCompras() != null
+                ? String.format("%.4f", response.getCompras().getR2Score()) : "N/A";
+
+        boolean ventasOk = response.getVentas() != null
+                && Boolean.TRUE.equals(response.getVentas().getMeets_r2_threshold());
+        boolean comprasOk = response.getCompras() != null
+                && Boolean.TRUE.equals(response.getCompras().getMeets_r2_threshold());
+
+        lblTrainingTime.setText("Pack: 2 modelos");
+        lblMetric.setText("Ventas R²=" + ventasR2 + " | Compras R²=" + comprasR2);
+        lblResult.setText(ventasOk && comprasOk ? "Aprobado" : ventasOk || comprasOk ? "Parcial" : "Bajo umbral");
+
+        loadMetricIcons();
+        trainingMetrics.setVisible(true);
+        trainingMetrics.setManaged(true);
+
+        trainingTitleTxt.setText("Pack entrenado correctamente. Clave: " + response.getPack_key());
+        validPhase3 = true;
+        updateFooterState();
+
         loadUserModels();
     }
 
@@ -2260,7 +2504,15 @@ public class PredictiveController {
      * Usa datos reales si hay un lastTrainResponse, sino usa mock.
      */
     private void showPhase4Results() {
-        if (lastTrainResponse != null) {
+        if (lastPackTrainResponse != null) {
+            loadPackResultsKpisFromApi();
+            loadPackTrainingSummaryFromApi();
+            loadPackModelInfoFromApi();
+            Label loadingLabel = new Label("Generando gráficas del pack...");
+            loadingLabel.setStyle("-fx-text-fill: #7f8c8d; -fx-font-style: italic; -fx-padding: 20;");
+            resultsChartsContainer.getChildren().setAll(loadingLabel);
+            requestPackForecastForCharts();
+        } else if (lastTrainResponse != null) {
             loadResultsKpisFromApi();
             loadTrainingSummaryFromApi();
             loadModelInfoFromApi();
@@ -2277,6 +2529,174 @@ public class PredictiveController {
         }
         predictiveFooter.setVisible(false);
         predictiveFooter.setManaged(false);
+    }
+
+    /** Carga KPIs del pack (ventas + compras). */
+    private void loadPackResultsKpisFromApi() {
+        resultsKpiContainer.getChildren().clear();
+        PackTrainResponseDTO.SubModelResult ventas = lastPackTrainResponse.getVentas();
+        PackTrainResponseDTO.SubModelResult compras = lastPackTrainResponse.getCompras();
+
+        String ventasR2 = ventas != null ? String.format("%.1f%%", ventas.getR2Score() * 100) : "N/A";
+        String ventasRmse = ventas != null ? String.format("$%.2f", ventas.getRmse()) : "N/A";
+        String comprasR2 = compras != null ? String.format("%.1f%%", compras.getR2Score() * 100) : "N/A";
+        String comprasRmse = compras != null ? String.format("$%.2f", compras.getRmse()) : "N/A";
+
+        boolean ventasOk = ventas != null && Boolean.TRUE.equals(ventas.getMeets_r2_threshold());
+        boolean comprasOk = compras != null && Boolean.TRUE.equals(compras.getMeets_r2_threshold());
+
+        List<ResultKpiDTO> kpis = List.of(
+                new ResultKpiDTO("🛍", ventasR2, "Precisión Ventas (R²)",
+                        ventasOk ? "Supera umbral 0.7" : "Bajo umbral 0.7",
+                        ventasOk ? "kpi-green" : "kpi-red",
+                        ventasOk ? ResultKpiDTO.TrendType.POSITIVE : ResultKpiDTO.TrendType.NEGATIVE),
+                new ResultKpiDTO("🛒", comprasR2, "Precisión Compras (R²)",
+                        comprasOk ? "Supera umbral 0.7" : "Bajo umbral 0.7",
+                        comprasOk ? "kpi-green" : "kpi-red",
+                        comprasOk ? ResultKpiDTO.TrendType.POSITIVE : ResultKpiDTO.TrendType.NEGATIVE),
+                new ResultKpiDTO("📉", ventasRmse, "RMSE Ventas",
+                        "Error cuadrático modelo ventas", "kpi-blue", ResultKpiDTO.TrendType.NEUTRAL),
+                new ResultKpiDTO("📊", comprasRmse, "RMSE Compras",
+                        "Error cuadrático modelo compras", "kpi-purple", ResultKpiDTO.TrendType.NEUTRAL)
+        );
+
+        for (ResultKpiDTO kpi : kpis) {
+            resultsKpiContainer.getChildren().add(ResultKpiCard.createKpiCard(kpi));
+        }
+    }
+
+    /** Carga resumen del entrenamiento del pack. */
+    private void loadPackTrainingSummaryFromApi() {
+        trainingSummaryContainer.getChildren().clear();
+        Map<String, String> summary = new LinkedHashMap<>();
+        summary.put("Pack Key", lastPackTrainResponse.getPack_key() != null
+                ? lastPackTrainResponse.getPack_key() : "N/A");
+        PackTrainResponseDTO.SubModelResult ventas = lastPackTrainResponse.getVentas();
+        PackTrainResponseDTO.SubModelResult compras = lastPackTrainResponse.getCompras();
+        if (ventas != null) {
+            summary.put("Clave Ventas", ventas.getModel_key() != null ? ventas.getModel_key() : "N/A");
+            summary.put("R² Ventas", String.format("%.4f", ventas.getR2Score()));
+            summary.put("RMSE Ventas", String.format("$%,.2f", ventas.getRmse()));
+        }
+        if (compras != null) {
+            summary.put("Clave Compras", compras.getModel_key() != null ? compras.getModel_key() : "N/A");
+            summary.put("R² Compras", String.format("%.4f", compras.getR2Score()));
+            summary.put("RMSE Compras", String.format("$%,.2f", compras.getRmse()));
+        }
+        for (Map.Entry<String, String> entry : summary.entrySet()) {
+            trainingSummaryContainer.getChildren().add(createSummaryItem(entry.getKey(), entry.getValue()));
+        }
+    }
+
+    /** Carga información del pack entrenado. */
+    private void loadPackModelInfoFromApi() {
+        modelInfoContainer.getChildren().clear();
+        Map<String, String> info = new LinkedHashMap<>();
+        info.put("Tipo", "Pack Ventas + Compras");
+        info.put("Pack Key", lastPackTrainResponse.getPack_key() != null
+                ? lastPackTrainResponse.getPack_key() : "N/A");
+        info.put("Entrenado", java.time.LocalDateTime.now()
+                .format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")));
+        PackTrainResponseDTO.SubModelResult ventas = lastPackTrainResponse.getVentas();
+        PackTrainResponseDTO.SubModelResult compras = lastPackTrainResponse.getCompras();
+        boolean ventasOk = ventas != null && Boolean.TRUE.equals(ventas.getMeets_r2_threshold());
+        boolean comprasOk = compras != null && Boolean.TRUE.equals(compras.getMeets_r2_threshold());
+        info.put("Estado Ventas", ventasOk ? "Activo" : "Bajo rendimiento");
+        info.put("Estado Compras", comprasOk ? "Activo" : "Bajo rendimiento");
+        for (Map.Entry<String, String> entry : info.entrySet()) {
+            modelInfoContainer.getChildren().add(createSummaryItem(entry.getKey(), entry.getValue()));
+        }
+    }
+
+    /** Solicita forecast del pack (ventas + compras) para los charts. */
+    private void requestPackForecastForCharts() {
+        String packKey = lastPackTrainResponse.getPack_key();
+        if (packKey == null) return;
+
+        int periods = phase2Config != null ? phase2Config.getPredictionHorizon() * 30 : 30;
+        periods = Math.min(periods, 180);
+
+        final int finalPeriods = periods;
+        predictionService.forecastPack(packKey, finalPeriods)
+                .thenAccept(response -> Platform.runLater(() -> {
+                    if (response != null && response.isSuccess()) {
+                        lastPackForecastResponse = response;
+                        resultsChartsContainer.getChildren().clear();
+                        loadPackForecastCharts();
+                    }
+                }))
+                .exceptionally(ex -> {
+                    System.out.println("Forecast pack no disponible: " + ex.getMessage());
+                    return null;
+                });
+    }
+
+    /** Carga dos gráficas: forecast de ventas y de compras del pack. */
+    private void loadPackForecastCharts() {
+        if (lastPackForecastResponse == null) return;
+
+        // Chart 1: Predicción de Ventas del pack
+        PackForecastResponseDTO.ForecastSeries ventasSeries = lastPackForecastResponse.getVentas();
+        if (ventasSeries != null && !ventasSeries.getDates().isEmpty()) {
+            try {
+                FXMLLoader loader = new FXMLLoader(
+                        getClass().getResource("/fxml/components/charts/LineChartCard.fxml"));
+                VBox chartNode = loader.load();
+                LineChartCardController controller = loader.getController();
+                controller.setTitle("Predicción de Ventas (Pack)");
+                controller.setSubtitle("Forecast ventas — " + lastPackForecastResponse.getPeriods() + " períodos");
+
+                XYChart.Series<String, Number> series = new XYChart.Series<>();
+                series.setName("Ventas predichas");
+                List<String> dates = ventasSeries.getDates();
+                List<Double> values = ventasSeries.getValues();
+                int step = Math.max(1, dates.size() / 30);
+                for (int i = 0; i < dates.size(); i += step) {
+                    String lbl = dates.get(i).length() > 10 ? dates.get(i).substring(5, 10) : dates.get(i);
+                    series.getData().add(new XYChart.Data<>(lbl, values.get(i)));
+                }
+                controller.loadCustomData(series);
+                resultsChartsContainer.getChildren().add(chartNode);
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+
+        // Chart 2: Predicción de Compras del pack
+        PackForecastResponseDTO.ForecastSeries comprasSeries = lastPackForecastResponse.getCompras();
+        if (comprasSeries != null && !comprasSeries.getDates().isEmpty()) {
+            try {
+                FXMLLoader loader = new FXMLLoader(
+                        getClass().getResource("/fxml/components/charts/LineChartCard.fxml"));
+                VBox chartNode = loader.load();
+                LineChartCardController controller = loader.getController();
+                controller.setTitle("Predicción de Compras (Pack)");
+                controller.setSubtitle("Forecast compras — " + lastPackForecastResponse.getPeriods() + " períodos");
+
+                XYChart.Series<String, Number> series = new XYChart.Series<>();
+                series.setName("Compras predichas");
+                List<String> dates = comprasSeries.getDates();
+                List<Double> values = comprasSeries.getValues();
+                int step = Math.max(1, dates.size() / 30);
+                for (int i = 0; i < dates.size(); i += step) {
+                    String lbl = dates.get(i).length() > 10 ? dates.get(i).substring(5, 10) : dates.get(i);
+                    series.getData().add(new XYChart.Data<>(lbl, values.get(i)));
+                }
+                controller.loadCustomData(series);
+                resultsChartsContainer.getChildren().add(chartNode);
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+    }
+
+    /** Construye un PackTrainResponseDTO mínimo desde un PackInfoDTO guardado (para saltar a fase 4). */
+    private PackTrainResponseDTO buildPackResponseFromSavedPack(PackInfoDTO pack) {
+        PackTrainResponseDTO r = new PackTrainResponseDTO();
+        r.setSuccess(true);
+        r.setPack_key(pack.getPack_key());
+        r.setPack_id(pack.getPack_id());
+        return r;
     }
 
     /**

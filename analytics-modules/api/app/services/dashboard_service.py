@@ -18,6 +18,7 @@ from app.models import (
     Rentabilidad, ResultadoFinanciero, Escenario,
     PreferenciaUsuario
 )
+from app.models.prediccion import ModeloPack
 from app.repositories import (
     VentaRepository, CompraRepository, ProductoRepository
 )
@@ -155,17 +156,28 @@ class DashboardService:
                 "variacion_periodo_anterior": 0, "tendencia": "sin_datos"
             }
 
+    # Tasa de gastos operativos estimada (alineada con profitability_service.py)
+    OPERATING_EXPENSES_RATE = 0.15
+
     def _calculate_financial_kpis(
         self,
         resumen_ventas: Dict,
         resumen_compras: Dict
     ) -> Dict[str, Any]:
-        """Calcula KPIs financieros principales."""
+        """Calcula KPIs financieros principales (tres razones simples)."""
         ingresos = resumen_ventas.get("total", 0)
         costos = resumen_compras.get("total", 0)
 
         utilidad_bruta = ingresos - costos
         margen_bruto = (utilidad_bruta / ingresos * 100) if ingresos > 0 else 0
+
+        # Margen operativo: deduce gastos operativos estimados
+        gastos_operativos = utilidad_bruta * self.OPERATING_EXPENSES_RATE
+        utilidad_operativa = utilidad_bruta - gastos_operativos
+        margen_operativo = (utilidad_operativa / ingresos * 100) if ingresos > 0 else 0
+
+        # Margen neto (simplificado = operativo, sin impuestos)
+        margen_neto = margen_operativo
 
         # ROI simplificado
         roi = (utilidad_bruta / costos * 100) if costos > 0 else 0
@@ -175,6 +187,8 @@ class DashboardService:
             "costos_totales": round(costos, 2),
             "utilidad_bruta": round(utilidad_bruta, 2),
             "margen_bruto_porcentaje": round(margen_bruto, 2),
+            "margen_operativo_porcentaje": round(margen_operativo, 2),
+            "margen_neto_porcentaje": round(margen_neto, 2),
             "roi_porcentaje": round(roi, 2),
             "estado_financiero": self._get_financial_status(margen_bruto)
         }
@@ -193,16 +207,13 @@ class DashboardService:
             return "critico"
 
     def _get_active_alerts(self, limit: int = 10) -> Dict[str, Any]:
-        """Obtiene alertas activas."""
+        """Obtiene alertas activas/leídas para la lista y conteos globales para los gráficos."""
         try:
             alertas = self.db.query(Alerta).filter(
-                Alerta.estado == 'Activa'
+                Alerta.estado.in_(['Activa', 'Leida'])
             ).order_by(
                 desc(Alerta.creadaEn)
             ).limit(limit).all()
-
-            alertas_por_tipo = {}
-            alertas_por_importancia = {"alta": 0, "media": 0, "baja": 0}
 
             alertas_lista = []
             for a in alertas:
@@ -216,14 +227,22 @@ class DashboardService:
                     "creada_en": a.creadaEn.isoformat() if a.creadaEn else None
                 })
 
-                # Conteo por tipo
-                tipo = a.tipo or "otro"
-                alertas_por_tipo[tipo] = alertas_por_tipo.get(tipo, 0) + 1
+            # Conteo por tipo: incluye TODOS los estados para mostrar distribución completa
+            tipo_rows = self.db.query(
+                Alerta.tipo,
+                func.count(Alerta.idAlerta).label('cnt')
+            ).group_by(Alerta.tipo).all()
+            alertas_por_tipo = {r.tipo: r.cnt for r in tipo_rows if r.tipo}
 
-                # Conteo por importancia
-                imp = (a.importancia or "media").lower()
-                if imp in alertas_por_importancia:
-                    alertas_por_importancia[imp] += 1
+            # Conteo por importancia: incluye TODOS los estados
+            imp_rows = self.db.query(
+                Alerta.importancia,
+                func.count(Alerta.idAlerta).label('cnt')
+            ).group_by(Alerta.importancia).all()
+            alertas_por_importancia = {
+                (r.importancia or "").lower(): r.cnt
+                for r in imp_rows if r.importancia
+            }
 
             return {
                 "total": len(alertas),
@@ -236,7 +255,7 @@ class DashboardService:
             return {
                 "total": 0,
                 "por_tipo": {},
-                "por_importancia": {"alta": 0, "media": 0, "baja": 0},
+                "por_importancia": {},
                 "alertas": []
             }
 
@@ -340,24 +359,38 @@ class DashboardService:
             return []
 
     def _get_precision_modelos(self) -> List[Dict]:
-        """Últimas versiones activas de modelos predictivos con su R²."""
-        try:
-            versiones = self.db.query(VersionModelo).join(
-                Modelo, VersionModelo.idModelo == Modelo.idModelo
-            ).filter(
-                VersionModelo.estado == 'Activo'
-            ).order_by(
-                desc(VersionModelo.fechaEntrenamiento)
-            ).limit(8).all()
+        """
+        Una entrada por pack activo.
 
-            return [{
-                "nombre": (v.modelo.nombre or v.modelo.tipoModelo or "Modelo"),
-                "tipo": v.modelo.tipoModelo or "",
-                "precision": round(float(v.precision or 0), 4),
-                "estado": v.estado or ""
-            } for v in versiones]
+        Cada pack aparece como una sola unidad identificada únicamente por
+        su nombre asignado (no se menciona "pack", "ventas" ni "compras").
+        La precisión es el promedio del R² de ambos modelos del pack.
+        Los modelos individuales (sin par en un pack) no se incluyen.
+        """
+        try:
+            packs = (
+                self.db.query(ModeloPack)
+                .filter(ModeloPack.estado == 'Activo')
+                .order_by(desc(ModeloPack.creadoEn))
+                .all()
+            )
+            result = []
+            for p in packs:
+                v = p.version_ventas
+                c = p.version_compras
+                p_ventas  = float(v.precision) if v and v.precision is not None else None
+                p_compras = float(c.precision) if c and c.precision is not None else None
+                precisions = [x for x in [p_ventas, p_compras] if x is not None]
+                combined   = sum(precisions) / len(precisions) if precisions else 0.0
+                result.append({
+                    "nombre":    p.nombre or p.packKey,
+                    "tipo":      "pack",
+                    "precision": round(combined, 4),
+                    "estado":    p.estado or "Activo",
+                })
+            return result
         except Exception as e:
-            logger.error(f"Error al obtener precisión de modelos: {str(e)}")
+            logger.error(f"Error al obtener precisión de modelos por pack: {str(e)}")
             return []
 
     def _get_top_products(

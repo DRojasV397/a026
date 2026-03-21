@@ -5,6 +5,7 @@ import com.app.core.session.UserSession;
 import com.app.model.predictions.*;
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
+import java.lang.reflect.Type;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -385,6 +386,146 @@ public class PredictionService {
                 .exceptionally(ex -> {
                     logger.error("Error al obtener modelos del usuario: {}", ex.getMessage());
                     return List.of();
+                });
+    }
+
+    // ──────────────────────────────────────────────────────────────────
+    // PACK DE MODELOS (Ventas + Compras)
+    // ──────────────────────────────────────────────────────────────────
+
+    /**
+     * Entrena un pack de modelos (ventas + compras).
+     * POST /predictions/train-pack
+     * Timeout 240s — dos entrenamientos simultáneos.
+     */
+    public CompletableFuture<PackTrainResponseDTO> trainPack(PackTrainRequestDTO request) {
+        String jsonBody = gson.toJson(request);
+
+        HttpRequest httpRequest = HttpRequest.newBuilder()
+                .uri(URI.create(ApiConfig.getTrainPackUrl()))
+                .header("Content-Type", "application/json")
+                .header("Authorization", "Bearer " + UserSession.getAccessToken())
+                .timeout(Duration.ofSeconds(240))
+                .POST(HttpRequest.BodyPublishers.ofString(jsonBody))
+                .build();
+
+        return httpClient.sendAsync(httpRequest, HttpResponse.BodyHandlers.ofString())
+                .thenApply(response -> {
+                    logger.info("TrainPack response HTTP {}: {}", response.statusCode(), response.body());
+                    if (response.statusCode() == 200 || response.statusCode() == 201) {
+                        return gson.fromJson(response.body(), PackTrainResponseDTO.class);
+                    }
+                    PackTrainResponseDTO error = new PackTrainResponseDTO();
+                    error.setSuccess(false);
+                    error.setError("HTTP " + response.statusCode());
+                    return error;
+                })
+                .exceptionally(ex -> {
+                    logger.error("Error al entrenar pack: {}", ex.getMessage());
+                    PackTrainResponseDTO error = new PackTrainResponseDTO();
+                    error.setSuccess(false);
+                    error.setError(ex.getMessage());
+                    return error;
+                });
+    }
+
+    /**
+     * Lista los packs activos del usuario autenticado.
+     * GET /predictions/packs
+     */
+    public CompletableFuture<List<PackInfoDTO>> getUserPacks() {
+        HttpRequest httpRequest = HttpRequest.newBuilder()
+                .uri(URI.create(ApiConfig.getUserPacksUrl()))
+                .header("Authorization", "Bearer " + UserSession.getAccessToken())
+                .timeout(Duration.ofSeconds(15))
+                .GET()
+                .build();
+
+        return httpClient.sendAsync(httpRequest, HttpResponse.BodyHandlers.ofString())
+                .thenApply(response -> {
+                    if (response.statusCode() == 200) {
+                        Type listType = new TypeToken<List<PackInfoDTO>>(){}.getType();
+                        return gson.<List<PackInfoDTO>>fromJson(response.body(), listType);
+                    }
+                    logger.warn("GetUserPacks failed - HTTP {}", response.statusCode());
+                    return List.<PackInfoDTO>of();
+                })
+                .exceptionally(ex -> {
+                    logger.error("Error al obtener packs: {}", ex.getMessage());
+                    return List.of();
+                });
+    }
+
+    /**
+     * Genera forecast coordinado para un pack (compras → ventas).
+     * POST /predictions/forecast-pack
+     * Timeout 90s — dos forecasts encadenados.
+     */
+    public CompletableFuture<PackForecastResponseDTO> forecastPack(String packKey, int periods) {
+        Map<String, Object> body = Map.of("pack_key", packKey, "periods", periods);
+        String jsonBody = gson.toJson(body);
+
+        HttpRequest httpRequest = HttpRequest.newBuilder()
+                .uri(URI.create(ApiConfig.getForecastPackUrl()))
+                .header("Content-Type", "application/json")
+                .header("Authorization", "Bearer " + UserSession.getAccessToken())
+                .timeout(Duration.ofSeconds(90))
+                .POST(HttpRequest.BodyPublishers.ofString(jsonBody))
+                .build();
+
+        return httpClient.sendAsync(httpRequest, HttpResponse.BodyHandlers.ofString())
+                .thenApply(response -> {
+                    logger.info("ForecastPack response HTTP {}", response.statusCode());
+                    if (response.statusCode() == 200) {
+                        return gson.fromJson(response.body(), PackForecastResponseDTO.class);
+                    }
+                    logger.warn("ForecastPack failed - HTTP {}: {}", response.statusCode(), response.body());
+                    PackForecastResponseDTO error = new PackForecastResponseDTO();
+                    error.setSuccess(false);
+                    error.setError("HTTP " + response.statusCode());
+                    return error;
+                })
+                .exceptionally(ex -> {
+                    logger.error("Error en forecastPack: {}", ex.getMessage());
+                    PackForecastResponseDTO error = new PackForecastResponseDTO();
+                    error.setSuccess(false);
+                    error.setError(ex.getMessage());
+                    return error;
+                });
+    }
+
+    /**
+     * Obtiene datos de compras agregados para análisis.
+     * POST /predictions/purchases-data
+     */
+    public CompletableFuture<Map<String, Object>> getPurchasesData(String fechaInicio, String fechaFin, String aggregation) {
+        Map<String, Object> body = new HashMap<>();
+        if (fechaInicio != null) body.put("fecha_inicio", fechaInicio);
+        if (fechaFin != null) body.put("fecha_fin", fechaFin);
+        body.put("aggregation", aggregation != null ? aggregation : "D");
+        String jsonBody = gson.toJson(body);
+
+        HttpRequest httpRequest = HttpRequest.newBuilder()
+                .uri(URI.create(ApiConfig.getPredictionsPurchasesDataUrl()))
+                .header("Content-Type", "application/json")
+                .header("Authorization", "Bearer " + UserSession.getAccessToken())
+                .timeout(Duration.ofSeconds(30))
+                .POST(HttpRequest.BodyPublishers.ofString(jsonBody))
+                .build();
+
+        return httpClient.sendAsync(httpRequest, HttpResponse.BodyHandlers.ofString())
+                .thenApply(response -> {
+                    if (response.statusCode() == 200) {
+                        Map<String, Object> result = gson.fromJson(response.body(),
+                                new TypeToken<Map<String, Object>>(){}.getType());
+                        return result;
+                    }
+                    logger.warn("PurchasesData failed - HTTP {}", response.statusCode());
+                    return Map.<String, Object>of();
+                })
+                .exceptionally(ex -> {
+                    logger.error("Error al obtener datos de compras: {}", ex.getMessage());
+                    return Map.of();
                 });
     }
 

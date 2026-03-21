@@ -38,6 +38,11 @@ public class ProductProfitDTO {
         return String.format("$%,.2f", ingresos);
     }
 
+    /** Convierte costo_total a String formateado: "$1,234.56" */
+    public String getCostoFormateado() {
+        return String.format("$%,.2f", costo_total);
+    }
+
     /** Convierte utilidad a String formateado (con signo negativo si aplica) */
     public String getUtilidadFormateada() {
         if (utilidad < 0) return String.format("-$%,.2f", Math.abs(utilidad));

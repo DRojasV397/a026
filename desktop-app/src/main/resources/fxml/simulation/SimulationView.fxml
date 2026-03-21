@@ -48,22 +48,22 @@
 
                     <VBox spacing="24" styleClass="edition-body">
 
-                        <!-- Bloque 1: Modelo predictivo -->
+                        <!-- Bloque 1: Pack de modelos -->
                         <VBox spacing="0" styleClass="form-section">
                             <HBox styleClass="form-section-header" alignment="CENTER_LEFT" spacing="10">
-                                <Label text="🧠" styleClass="form-section-icon"/>
-                                <Label text="Modelo predictivo" styleClass="form-section-title"/>
+                                <Label text="📦" styleClass="form-section-icon"/>
+                                <Label text="Pack de modelos" styleClass="form-section-title"/>
                                 <Label text="Obligatorio" styleClass="required-badge"/>
                             </HBox>
                             <VBox spacing="12" styleClass="form-section-body">
-                                <Label text="Selecciona un modelo previamente entrenado como base para la simulación."
+                                <Label text="Selecciona un pack de modelos (Ventas + Compras) entrenado como base para la simulación."
                                        styleClass="form-block-hint"/>
                                 <ComboBox fx:id="cmbTrainedModel"
-                                          promptText="— Seleccionar modelo entrenado —"
+                                          promptText="— Seleccionar pack —"
                                           styleClass="form-combo-large" maxWidth="Infinity"/>
                                 <HBox fx:id="modelInfoBox" styleClass="model-info-box"
                                       spacing="12" alignment="CENTER_LEFT" visible="false" managed="false">
-                                    <Label fx:id="modelInfoIcon" text="🧠" styleClass="model-info-icon"/>
+                                    <Label fx:id="modelInfoIcon" text="📦" styleClass="model-info-icon"/>
                                     <VBox spacing="3">
                                         <Label fx:id="modelInfoName" text="" styleClass="model-info-name"/>
                                         <Label fx:id="modelInfoMeta" text="" styleClass="model-info-meta"/>
@@ -140,15 +140,20 @@
 
                                 <!-- Excepciones por producto -->
                                 <VBox spacing="10">
-                                    <Label text="Excepciones por producto" styleClass="form-label"/>
+                                    <HBox spacing="8" alignment="CENTER_LEFT">
+                                        <Label text="Excepciones por producto" styleClass="form-label" HBox.hgrow="ALWAYS"/>
+                                        <Label fx:id="overrideCountLabel" text="" styleClass="override-count-badge"
+                                               visible="false" managed="false"/>
+                                    </HBox>
                                     <Label text="Agrega productos para aplicarles variaciones distintas a las globales."
                                            styleClass="form-block-hint" wrapText="true"/>
                                     <HBox spacing="8" alignment="CENTER_LEFT">
                                         <TextField fx:id="txtProductSearch"
-                                                   promptText="Buscar producto por nombre o SKU…"
+                                                   promptText="🔍  Buscar producto por nombre o SKU…"
                                                    styleClass="form-input" HBox.hgrow="ALWAYS"/>
                                     </HBox>
-                                    <VBox fx:id="productSearchResults" styleClass="search-results-dropdown" spacing="0"/>
+                                    <VBox fx:id="productSearchResults" styleClass="search-results-dropdown"
+                                          spacing="0" visible="false" managed="false"/>
                                     <VBox fx:id="overridesContainer" spacing="12"/>
                                 </VBox>
                             </VBox>

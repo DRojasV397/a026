@@ -13,7 +13,9 @@ import logging
 import os
 import pickle
 
+from sqlalchemy import desc
 from app.models import Venta, Modelo, VersionModelo, Prediccion
+from app.models.prediccion import ModeloPack
 from app.repositories import VentaRepository, CompraRepository, ModeloRepository, VersionModeloRepository, PrediccionRepository
 from app.analytics.models import (
     BaseModel, ModelConfig, ModelMetrics, PredictionResult, ModelType,
@@ -93,7 +95,8 @@ class PredictionService:
             Tipo de modelo (ej: random_forest)
         """
         # Tipos de modelo conocidos (ordenados por longitud descendente para match correcto)
-        known_types = ['multiple_regression', 'random_forest', 'ensemble', 'xgboost', 'prophet', 'linear', 'sarima', 'arima']
+        known_types = ['multiple_regression', 'pack_ventas', 'pack_compras', 'random_forest',
+                       'ensemble', 'xgboost', 'prophet', 'compras', 'linear', 'sarima', 'arima']
 
         for model_type in known_types:
             if model_key.startswith(model_type + '_'):
@@ -351,7 +354,8 @@ class PredictionService:
         self,
         model_type: str,
         hyperparameters: Optional[Dict[str, Any]] = None,
-        compras_data=None
+        compras_data=None,
+        ventas_data=None
     ) -> BaseModel:
         """Crea una instancia del modelo especificado."""
         params = hyperparameters or {}
@@ -415,6 +419,54 @@ class PredictionService:
             valid_keys = {'changepoint_prior_scale', 'yearly_seasonality', 'weekly_seasonality'}
             filtered_params = {k: v for k, v in params.items() if k in valid_keys}
             return ProphetModel(target_column='total', date_column='fecha', **filtered_params)
+        elif model_type == 'compras':
+            from app.analytics.models.multiple_regression import MultipleRegressionModel
+            valid_keys = {
+                'regularization', 'alpha', 'l1_ratio', 'use_ventas',
+                'lag_periods', 'rolling_windows', 'include_calendar', 'polynomial_degree',
+                'log_transform', 'auto_tune', 'test_size', 'random_state'
+            }
+            filtered_params = {k: v for k, v in params.items() if k in valid_keys}
+            # Modelos de compras no usan compras propias como exógena
+            filtered_params.setdefault('use_compras', False)
+            return MultipleRegressionModel(
+                target_column='total',
+                date_column='fecha',
+                ventas_data=ventas_data,
+                **filtered_params
+            )
+        elif model_type == 'pack_ventas':
+            # Modelo de ventas de un pack — MultipleRegression con compras como exógena
+            from app.analytics.models.multiple_regression import MultipleRegressionModel
+            valid_keys = {
+                'regularization', 'alpha', 'l1_ratio', 'use_compras',
+                'lag_periods', 'rolling_windows', 'include_calendar', 'polynomial_degree',
+                'log_transform', 'auto_tune', 'test_size', 'random_state'
+            }
+            filtered_params = {k: v for k, v in params.items() if k in valid_keys}
+            filtered_params.setdefault('use_compras', True)
+            return MultipleRegressionModel(
+                target_column='total',
+                date_column='fecha',
+                compras_data=compras_data,
+                **filtered_params
+            )
+        elif model_type == 'pack_compras':
+            # Modelo de compras de un pack — MultipleRegression con ventas como exógena
+            from app.analytics.models.multiple_regression import MultipleRegressionModel
+            valid_keys = {
+                'regularization', 'alpha', 'l1_ratio', 'use_ventas',
+                'lag_periods', 'rolling_windows', 'include_calendar', 'polynomial_degree',
+                'log_transform', 'auto_tune', 'test_size', 'random_state'
+            }
+            filtered_params = {k: v for k, v in params.items() if k in valid_keys}
+            filtered_params.setdefault('use_compras', False)
+            return MultipleRegressionModel(
+                target_column='total',
+                date_column='fecha',
+                ventas_data=ventas_data,
+                **filtered_params
+            )
         else:
             raise ValueError(f"Tipo de modelo no soportado: {model_type}")
 
@@ -844,6 +896,7 @@ class PredictionService:
     def get_user_models(self, user_id: int) -> List[Dict[str, Any]]:
         """
         Obtiene los modelos entrenados por un usuario, con su última versión.
+        Excluye los modelos que pertenecen a un pack activo (se acceden solo via el pack).
 
         Args:
             user_id: ID del usuario
@@ -852,11 +905,24 @@ class PredictionService:
             Lista de dicts con info del modelo y versión
         """
         try:
+            # Recopilar los idVersion que ya forman parte de un pack activo
+            pack_version_ids: set = set()
+            packs = self.db.query(ModeloPack).filter(
+                ModeloPack.creadoPor == user_id,
+                ModeloPack.estado == 'Activo'
+            ).all()
+            for pack in packs:
+                pack_version_ids.add(pack.idVersionVentas)
+                pack_version_ids.add(pack.idVersionCompras)
+
             modelos = self.modelo_repo.get_by_usuario(user_id)
             result = []
             for modelo in modelos:
                 version = self.version_repo.get_ultima_version(modelo.idModelo)
                 if version is None:
+                    continue
+                # Omitir modelos que pertenecen a un pack activo
+                if version.idVersion in pack_version_ids:
                     continue
                 metricas = None
                 if version.metricas:
@@ -919,3 +985,228 @@ class PredictionService:
             "deleted_from_memory": deleted_from_memory,
             "deleted_from_disk": deleted_from_disk
         }
+
+    # ──────────────────────────────────────────────────────────────────────────
+    # PACK DE MODELOS (Ventas + Compras)
+    # ──────────────────────────────────────────────────────────────────────────
+
+    def train_pack(
+        self,
+        nombre: Optional[str] = None,
+        fecha_inicio: Optional[datetime] = None,
+        fecha_fin: Optional[datetime] = None,
+        hyperparameters: Optional[Dict[str, Any]] = None,
+        user_id: Optional[int] = None,
+        ventas_model_type: str = "multiple_regression"
+    ) -> Dict[str, Any]:
+        """
+        Entrena un pack de modelos (ventas + compras) en un solo paso.
+
+        - Modelo de ventas: multiple_regression con compras como exógena (use_compras=True)
+        - Modelo de compras: multiple_regression con ventas como exógena (use_ventas=True)
+
+        Returns:
+            Dict con métricas de ambos modelos y el pack_key para forecast coordinado.
+        """
+        hp = hyperparameters or {}
+
+        # ── Obtener datos ──────────────────────────────────────────────────
+        ventas_df  = self.get_sales_data(fecha_inicio, fecha_fin, aggregation='D', user_id=user_id)
+        compras_df = self.get_compras_data(fecha_inicio, fecha_fin, user_id=user_id)
+
+        # Validar mínimo de días en ambas series
+        valid_v, issues_v = self.validate_data_requirements(ventas_df)
+        valid_c, issues_c = self.validate_data_requirements(compras_df)
+
+        if not valid_v:
+            return {"success": False, "error": "Datos de ventas insuficientes", "issues": issues_v}
+        if not valid_c:
+            return {"success": False, "error": "Datos de compras insuficientes", "issues": issues_c}
+
+        timestamp = datetime.now().strftime('%Y%m%d%H%M%S')
+
+        try:
+            # ── 1. Modelo de VENTAS (con compras como exógena) ──────────────
+            ventas_hp = {**hp.get('ventas', {}), 'use_compras': True}
+            ventas_model = self._create_model(ventas_model_type, ventas_hp, compras_data=compras_df)
+            ventas_metrics = ventas_model.train_from_dataframe(ventas_df)
+
+            ventas_key = f"pack_ventas_{timestamp}"
+            ventas_version = self._save_model_to_db(
+                ventas_model, ventas_key, ventas_metrics,
+                user_id=user_id,
+                nombre=f"{nombre} — Ventas" if nombre else "Pack — Ventas"
+            )
+            self._trained_models[ventas_key] = ventas_model
+            self._trained_model_ids[ventas_key] = ventas_version.idVersion if ventas_version else None
+            ventas_model.save(os.path.join(self.MODELS_DIR, f"{ventas_key}.pkl"))
+
+            # ── 2. Modelo de COMPRAS (con ventas como exógena) ─────────────
+            compras_hp = {**hp.get('compras', {}), 'use_ventas': True}
+            compras_model = self._create_model('compras', compras_hp, ventas_data=ventas_df)
+            compras_metrics = compras_model.train_from_dataframe(compras_df)
+
+            compras_key = f"pack_compras_{timestamp}"
+            compras_version = self._save_model_to_db(
+                compras_model, compras_key, compras_metrics,
+                user_id=user_id,
+                nombre=f"{nombre} — Compras" if nombre else "Pack — Compras"
+            )
+            self._trained_models[compras_key] = compras_model
+            self._trained_model_ids[compras_key] = compras_version.idVersion if compras_version else None
+            compras_model.save(os.path.join(self.MODELS_DIR, f"{compras_key}.pkl"))
+
+            # ── 3. Guardar ModeloPack en BD ────────────────────────────────
+            pack_key = f"pack_{timestamp}"
+            pack = ModeloPack(
+                packKey=pack_key,
+                nombre=nombre,
+                idVersionVentas=ventas_version.idVersion,
+                idVersionCompras=compras_version.idVersion,
+                creadoPor=user_id
+            )
+            self.db.add(pack)
+            self.db.commit()
+            self.db.refresh(pack)
+
+            logger.info(f"Pack entrenado: {pack_key}, ventas R2={ventas_metrics.r2_score:.4f}, compras R2={compras_metrics.r2_score:.4f}")
+
+            return {
+                "success": True,
+                "pack_key": pack_key,
+                "pack_id": pack.idPack,
+                "ventas": {
+                    "model_key": ventas_key,
+                    "metrics": ventas_metrics.to_dict(),
+                    "meets_r2_threshold": ventas_metrics.r2_score >= self.R2_THRESHOLD
+                },
+                "compras": {
+                    "model_key": compras_key,
+                    "metrics": compras_metrics.to_dict(),
+                    "meets_r2_threshold": compras_metrics.r2_score >= self.R2_THRESHOLD
+                }
+            }
+
+        except Exception as e:
+            logger.error(f"Error entrenando pack: {str(e)}")
+            return {"success": False, "error": str(e)}
+
+    def forecast_pack(
+        self,
+        pack_key: str,
+        periods: int = 30
+    ) -> Dict[str, Any]:
+        """
+        Genera predicciones coordinadas para un pack (compras → ventas).
+
+        Flujo:
+        1. forecast compras independientemente
+        2. forecast ventas usando compras predichas como future_compras_values
+           (mayor precisión que usar proxy por promedio)
+        """
+        periods = min(periods, 180)
+
+        pack = self.db.query(ModeloPack).filter(ModeloPack.packKey == pack_key).first()
+        if not pack:
+            return {"success": False, "error": f"Pack no encontrado: {pack_key}"}
+
+        try:
+            # Resolver model_keys desde VersionModelo → Modelo.modelKey
+            version_ventas  = self.db.query(VersionModelo).filter(VersionModelo.idVersion == pack.idVersionVentas).first()
+            version_compras = self.db.query(VersionModelo).filter(VersionModelo.idVersion == pack.idVersionCompras).first()
+
+            if not version_ventas or not version_compras:
+                return {"success": False, "error": "Versiones del pack no encontradas en BD"}
+
+            ventas_modelo  = self.db.query(Modelo).filter(Modelo.idModelo == version_ventas.idModelo).first()
+            compras_modelo = self.db.query(Modelo).filter(Modelo.idModelo == version_compras.idModelo).first()
+
+            ventas_key  = ventas_modelo.modelKey  if ventas_modelo  else None
+            compras_key = compras_modelo.modelKey if compras_modelo else None
+
+            if not ventas_key or not compras_key:
+                return {"success": False, "error": "No se encontraron model_keys del pack"}
+
+            # Obtener/cargar modelos
+            ventas_model  = self._get_model(ventas_key)
+            compras_model = self._get_model(compras_key)
+
+            if not ventas_model or not compras_model:
+                return {"success": False, "error": "No se pudieron cargar los modelos del pack"}
+
+            # 1. Forecast de compras (independiente)
+            compras_result = compras_model.forecast(periods=periods)
+            compras_raw = compras_result.to_dict().get("predictions", [])
+            flat_compras = {
+                "dates":    [p["date"]  for p in compras_raw],
+                "values":   [p["value"] for p in compras_raw],
+                "lower_ci": [p.get("confidence_lower") for p in compras_raw],
+                "upper_ci": [p.get("confidence_upper") for p in compras_raw],
+            }
+
+            # 2. Forecast de ventas usando valores de compras predichos
+            compras_values = [p["value"] for p in compras_raw]
+            ventas_result = ventas_model.forecast(periods=periods, future_compras_values=compras_values)
+            ventas_raw = ventas_result.to_dict().get("predictions", [])
+            flat_ventas = {
+                "dates":    [p["date"]  for p in ventas_raw],
+                "values":   [p["value"] for p in ventas_raw],
+                "lower_ci": [p.get("confidence_lower") for p in ventas_raw],
+                "upper_ci": [p.get("confidence_upper") for p in ventas_raw],
+            }
+
+            return {
+                "success": True,
+                "pack_key": pack_key,
+                "periods": periods,
+                "ventas": {"predictions": flat_ventas, "model_key": ventas_key},
+                "compras": {"predictions": flat_compras, "model_key": compras_key},
+            }
+
+        except Exception as e:
+            logger.error(f"Error en forecast_pack {pack_key}: {str(e)}")
+            return {"success": False, "error": str(e)}
+
+    def get_user_packs(self, user_id: int) -> List[Dict[str, Any]]:
+        """
+        Lista los packs activos del usuario con métricas de ambos modelos.
+        """
+        try:
+            packs = (
+                self.db.query(ModeloPack)
+                .filter(ModeloPack.creadoPor == user_id, ModeloPack.estado == 'Activo')
+                .order_by(desc(ModeloPack.creadoEn))
+                .all()
+            )
+
+            result = []
+            for p in packs:
+                def _metricas(version: VersionModelo) -> Optional[dict]:
+                    if version and version.metricas:
+                        try:
+                            return json.loads(version.metricas)
+                        except Exception:
+                            pass
+                    return None
+
+                result.append({
+                    "pack_id":    p.idPack,
+                    "pack_key":   p.packKey,
+                    "nombre":     p.nombre,
+                    "creado_en":  p.creadoEn.isoformat() if p.creadoEn else None,
+                    "ventas": {
+                        "version_id": p.idVersionVentas,
+                        "precision":  float(p.version_ventas.precision) if p.version_ventas and p.version_ventas.precision else None,
+                        "metricas":   _metricas(p.version_ventas)
+                    },
+                    "compras": {
+                        "version_id": p.idVersionCompras,
+                        "precision":  float(p.version_compras.precision) if p.version_compras and p.version_compras.precision else None,
+                        "metricas":   _metricas(p.version_compras)
+                    },
+                })
+            return result
+
+        except Exception as e:
+            logger.error(f"Error obteniendo packs del usuario {user_id}: {str(e)}")
+            return []

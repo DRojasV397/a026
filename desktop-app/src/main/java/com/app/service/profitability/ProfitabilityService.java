@@ -228,4 +228,35 @@ public class ProfitabilityService {
     public CompletableFuture<IndicatorsResponseDTO> calculateIndicators() {
         return calculateIndicators(null, null, null, null);
     }
+
+    // ── Proyección Futura ─────────────────────────────────────────────────────
+
+    /**
+     * GET /profitability/projection?periods=N
+     * Genera proyección de rentabilidad usando el mejor pack activo.
+     */
+    public CompletableFuture<ProjectionResponseDTO> getProjection(int periods) {
+        String url = ApiConfig.getProfitabilityProjectionUrl() + "?periods=" + periods;
+
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(url))
+                .header("Authorization", authHeader())
+                .timeout(Duration.ofSeconds(90))
+                .GET()
+                .build();
+
+        return httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofString())
+                .thenApply(response -> {
+                    logger.debug("GET /profitability/projection → HTTP {}", response.statusCode());
+                    if (response.statusCode() == 200) {
+                        return gson.fromJson(response.body(), ProjectionResponseDTO.class);
+                    }
+                    logger.warn("getProjection falló - HTTP {}: {}", response.statusCode(), response.body());
+                    return null;
+                })
+                .exceptionally(ex -> {
+                    logger.error("Error en getProjection: {}", ex.getMessage());
+                    return null;
+                });
+    }
 }

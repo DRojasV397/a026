@@ -90,6 +90,8 @@ public class ExecutiveDashboardDTO {
         private double costos_totales;
         private double utilidad_bruta;
         private double margen_bruto_porcentaje;
+        private double margen_operativo_porcentaje;
+        private double margen_neto_porcentaje;
         private double roi_porcentaje;
         private String estado_financiero;
 
@@ -97,6 +99,8 @@ public class ExecutiveDashboardDTO {
         public double getCostosTotales()         { return costos_totales; }
         public double getUtilidadBruta()         { return utilidad_bruta; }
         public double getMargenBrutoPct()        { return margen_bruto_porcentaje; }
+        public double getMargenOperativoPct()    { return margen_operativo_porcentaje; }
+        public double getMargenNetoPct()         { return margen_neto_porcentaje; }
         public double getRoiPorcentaje()         { return roi_porcentaje; }
         public String getEstadoFinanciero()      { return estado_financiero != null ? estado_financiero : "sin_datos"; }
     }

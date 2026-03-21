@@ -501,18 +501,42 @@
 /* Dropdown de resultados de búsqueda */
 .search-results-dropdown {
     -fx-background-color: white;
-    -fx-border-color: #E2E8F0; -fx-border-radius: 6; -fx-border-width: 1;
-    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.10), 10, 0, 0, 3);
+    -fx-border-color: #CBD5E1; -fx-border-radius: 8; -fx-border-width: 1;
+    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.13), 12, 0, 0, 4);
+    -fx-padding: 4 0;
 }
 
+/* Items del dropdown — ahora son HBox */
 .search-result-item {
-    -fx-padding: 8 12; -fx-cursor: hand;
-    -fx-font-size: 13px; -fx-text-fill: #1E293B;
+    -fx-padding: 9 14; -fx-cursor: hand;
     -fx-background-color: white;
+    -fx-background-radius: 4;
 }
 .search-result-item:hover { -fx-background-color: #F1F5F9; }
 
-/* Badge opcional (SKU) */
+.search-result-name {
+    -fx-font-size: 13px; -fx-text-fill: #1E293B;
+}
+.search-result-sku {
+    -fx-font-size: 11px; -fx-text-fill: #64748B;
+    -fx-background-color: #F1F5F9;
+    -fx-padding: 2 7; -fx-background-radius: 8;
+}
+
+/* Fila "Sin resultados" */
+.search-no-result {
+    -fx-padding: 10 14; -fx-font-size: 12px; -fx-text-fill: #94A3B8;
+    -fx-font-style: italic;
+}
+
+/* Badge contador de overrides activos */
+.override-count-badge {
+    -fx-background-color: #DBEAFE; -fx-text-fill: #1D4ED8;
+    -fx-padding: 2 10; -fx-background-radius: 10;
+    -fx-font-size: 11px; -fx-font-weight: bold;
+}
+
+/* Badge opcional (SKU en card) */
 .optional-badge {
     -fx-background-color: #DBEAFE; -fx-text-fill: #1D4ED8;
     -fx-padding: 2 8; -fx-background-radius: 10;

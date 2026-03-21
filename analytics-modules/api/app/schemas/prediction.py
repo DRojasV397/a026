@@ -5,7 +5,7 @@ Esquemas DTO (Pydantic) para el modulo de Predicciones y Modelos ML.
 from pydantic import BaseModel, Field, ConfigDict
 from typing import Optional, List, Dict, Any
 from decimal import Decimal
-from datetime import datetime
+from datetime import datetime, date
 from enum import Enum
 
 
@@ -20,6 +20,7 @@ class TipoModelo(str, Enum):
     KMEANS = "kmeans"
     ENSEMBLE = "ensemble"
     PROPHET = "prophet"
+    PACK = "pack"
 
 
 class EstadoModelo(str, Enum):
@@ -189,3 +190,77 @@ class CompareModelsResponse(BaseModel):
     """Respuesta de comparacion de modelos."""
     comparaciones: List[ModelComparison]
     mejorModelo: int = Field(..., description="ID de la version con mejor desempeno")
+
+
+# ── Pack de Modelos (Ventas + Compras) ───────────────────────────────────────
+
+class PackMetrics(BaseModel):
+    """Métricas de un submodelo del pack."""
+    model_key: Optional[str] = None
+    metrics: Optional[Dict[str, Any]] = None
+    meets_r2_threshold: Optional[bool] = None
+
+
+class PackTrainRequest(BaseModel):
+    """Request para entrenar un pack ventas+compras."""
+    nombre: Optional[str] = Field(None, description="Nombre descriptivo del pack")
+    fecha_inicio: Optional[date] = Field(None, description="Fecha inicio de datos de entrenamiento")
+    fecha_fin: Optional[date] = Field(None, description="Fecha fin de datos de entrenamiento")
+    hyperparameters: Optional[Dict[str, Any]] = Field(
+        None,
+        description="HP por submodelo: {ventas: {...}, compras: {...}}"
+    )
+    ventas_model_type: Optional[str] = Field(
+        "multiple_regression",
+        description="Tipo de modelo para ventas (linear, arima, ensemble, xgboost, prophet, etc.)"
+    )
+
+
+class PackTrainResponse(BaseModel):
+    """Respuesta del entrenamiento de un pack."""
+    success: bool
+    pack_id: Optional[int] = None
+    pack_key: Optional[str] = None
+    ventas: Optional[PackMetrics] = None
+    compras: Optional[PackMetrics] = None
+    error: Optional[str] = None
+    issues: Optional[List[str]] = None
+
+
+class PackForecastRequest(BaseModel):
+    """Request para forecast coordinado de un pack."""
+    pack_key: str = Field(..., description="Clave del pack")
+    periods: int = Field(30, ge=1, le=180, description="Períodos a predecir (max 180)")
+
+
+class PackForecastSeries(BaseModel):
+    """Serie de predicciones de un submodelo del pack."""
+    predictions: Optional[Dict[str, Any]] = None
+    model_key: Optional[str] = None
+
+
+class PackForecastResponse(BaseModel):
+    """Respuesta de forecast coordinado de un pack."""
+    success: bool
+    pack_key: Optional[str] = None
+    periods: Optional[int] = None
+    ventas: Optional[PackForecastSeries] = None
+    compras: Optional[PackForecastSeries] = None
+    error: Optional[str] = None
+
+
+class PackVersionInfo(BaseModel):
+    """Información de la versión de un submodelo del pack."""
+    version_id: Optional[int] = None
+    precision: Optional[float] = None
+    metricas: Optional[Dict[str, Any]] = None
+
+
+class PackInfoResponse(BaseModel):
+    """Información de un pack entrenado."""
+    pack_id: int
+    pack_key: str
+    nombre: Optional[str] = None
+    creado_en: Optional[str] = None
+    ventas: Optional[PackVersionInfo] = None
+    compras: Optional[PackVersionInfo] = None

@@ -40,7 +40,7 @@
         <!-- Mensaje -->
         <Label fx:id="alertMessage"
                styleClass="alert-message"
-               wrapText="true"/>
+               wrapText="false"/>
     </VBox>
 
     <!-- Botón dismiss -->

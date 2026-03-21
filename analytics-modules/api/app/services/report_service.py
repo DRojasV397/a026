@@ -14,8 +14,10 @@ import io
 
 from app.models import (
     Venta, DetalleVenta, Compra, DetalleCompra,
-    Producto, Categoria, Reporte, Usuario
+    Producto, Categoria, Reporte, Usuario,
+    Modelo, VersionModelo,
 )
+from app.models.prediccion import ModeloPack
 from app.repositories import (
     VentaRepository, CompraRepository, ProductoRepository
 )
@@ -687,4 +689,143 @@ class ReportService:
             }
         except Exception as e:
             logger.error(f"Error al obtener reporte: {str(e)}")
+            return {"success": False, "error": str(e)}
+
+    def generate_predictions_report(
+        self,
+        fecha_inicio: date,
+        fecha_fin: date,
+        formato: str = "json",
+        generado_por: Optional[int] = None,
+        user_id: Optional[int] = None
+    ) -> Dict[str, Any]:
+        """
+        Genera un reporte de modelos predictivos y packs del usuario.
+
+        Incluye:
+        - Lista de modelos individuales entrenados (VersionModelo + Modelo)
+        - Lista de packs activos con precisión de ventas y compras
+        - Comparación de real vs predicho para el periodo solicitado (ventas)
+        """
+        try:
+            # ── Modelos individuales ──────────────────────────────────────────
+            query = self.db.query(
+                VersionModelo.idVersion,
+                VersionModelo.precision,
+                VersionModelo.estado,
+                VersionModelo.fechaEntrenamiento,
+                Modelo.nombre.label('nombre'),
+                Modelo.tipoModelo.label('tipoModelo'),
+                Modelo.modelKey.label('modelKey'),
+            ).join(
+                Modelo, VersionModelo.idModelo == Modelo.idModelo
+            ).filter(
+                VersionModelo.estado == 'Activo',
+                ~Modelo.modelKey.like('pack_%')
+            )
+
+            if user_id is not None:
+                query = query.filter(Modelo.creadoPor == user_id)
+
+            modelos_rows = query.order_by(desc(VersionModelo.idVersion)).all()
+
+            modelos_data = [{
+                "id_version":          row.idVersion,
+                "nombre":              row.nombre or row.tipoModelo or "Modelo",
+                "tipo":                row.tipoModelo or "",
+                "model_key":           row.modelKey or "",
+                "precision":           round(float(row.precision or 0), 4),
+                "estado":              row.estado or "",
+                "fecha_entrenamiento": row.fechaEntrenamiento.isoformat() if row.fechaEntrenamiento else None,
+            } for row in modelos_rows]
+
+            # ── Packs ─────────────────────────────────────────────────────────
+            packs_query = self.db.query(ModeloPack).filter(ModeloPack.estado == 'Activo')
+            if user_id is not None:
+                packs_query = packs_query.filter(ModeloPack.creadoPor == user_id)
+            packs = packs_query.order_by(desc(ModeloPack.creadoEn)).all()
+
+            packs_data = []
+            for p in packs:
+                v = p.version_ventas
+                c = p.version_compras
+                packs_data.append({
+                    "pack_id":           p.idPack,
+                    "pack_key":          p.packKey,
+                    "nombre":            p.nombre or p.packKey,
+                    "creado_en":         p.creadoEn.isoformat() if p.creadoEn else None,
+                    "ventas_precision":  round(float(v.precision or 0), 4) if v and v.precision is not None else None,
+                    "compras_precision": round(float(c.precision or 0), 4) if c and c.precision is not None else None,
+                    "estado":            p.estado,
+                })
+
+            # ── Ventas reales del periodo (para contexto) ─────────────────────
+            ventas_reales = self.db.query(
+                func.sum(Venta.total).label('total'),
+                func.count(Venta.idVenta).label('transacciones')
+            ).filter(
+                Venta.fecha >= fecha_inicio,
+                Venta.fecha <= fecha_fin
+            ).first()
+
+            total_ventas_real = float(ventas_reales.total or 0) if ventas_reales else 0
+            num_transacciones = int(ventas_reales.transacciones or 0) if ventas_reales else 0
+
+            # ── Compras reales del periodo ────────────────────────────────────
+            compras_reales = self.db.query(
+                func.sum(Compra.total).label('total')
+            ).filter(
+                Compra.fecha >= fecha_inicio,
+                Compra.fecha <= fecha_fin
+            ).scalar()
+            total_compras_real = float(compras_reales or 0)
+
+            reporte_data = {
+                "tipo_reporte": "predicciones",
+                "periodo": {
+                    "inicio": fecha_inicio.isoformat(),
+                    "fin":    fecha_fin.isoformat()
+                },
+                "resumen": {
+                    "total_modelos":     len(modelos_data),
+                    "total_packs":       len(packs_data),
+                    "ventas_reales":     round(total_ventas_real, 2),
+                    "compras_reales":    round(total_compras_real, 2),
+                    "num_transacciones": num_transacciones,
+                },
+                "modelos":    modelos_data,
+                "packs":      packs_data,
+                "generado_en": datetime.now().isoformat(),
+            }
+
+            reporte_db = self._registrar_reporte(
+                tipo="predicciones",
+                formato=formato,
+                parametros={
+                    "fecha_inicio": fecha_inicio.isoformat(),
+                    "fecha_fin":    fecha_fin.isoformat(),
+                },
+                generado_por=generado_por
+            )
+
+            if formato == "csv":
+                columnas_modelos = ["nombre", "tipo", "precision", "estado", "fecha_entrenamiento"]
+                csv_content = self._to_csv(modelos_data, columnas_modelos)
+                return {
+                    "success": True,
+                    "formato": "csv",
+                    "id_reporte": reporte_db.idReporte if reporte_db else None,
+                    "contenido": csv_content,
+                    "nombre_archivo": f"predicciones_{fecha_inicio}_{fecha_fin}.csv"
+                }
+            else:
+                return {
+                    "success": True,
+                    "formato": "json",
+                    "id_reporte": reporte_db.idReporte if reporte_db else None,
+                    "reporte": reporte_data
+                }
+
+        except Exception as e:
+            logger.error(f"Error al generar reporte de predicciones: {str(e)}")
             return {"success": False, "error": str(e)}

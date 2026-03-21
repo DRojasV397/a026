@@ -12,6 +12,7 @@ Forecast futuro:
   cada modelo base genera predicciones -> se apilan -> meta-learner combina.
 """
 
+import inspect
 import pickle
 import logging
 import time
@@ -450,11 +451,16 @@ class EnsembleModel(BaseModel):
         self,
         periods: int,
         last_date=None,
-        freq: str = "D"
+        freq: str = "D",
+        future_compras_values: Optional[List[float]] = None,
     ) -> PredictionResult:
         """
         Genera predicciones futuras combinando los modelos base
         via el meta-learner entrenado.
+
+        Args:
+            future_compras_values: Valores predichos de compras. Se pasan a los
+                modelos base que soporten este parámetro (ej. MultipleRegressionModel).
         """
         if not self.is_fitted:
             raise ValueError(
@@ -477,8 +483,13 @@ class EnsembleModel(BaseModel):
         for name in base_names:
             base_model = self._fitted_bases[name]
             try:
+                extra = {}
+                if future_compras_values is not None:
+                    sig = inspect.signature(base_model.forecast)
+                    if "future_compras_values" in sig.parameters:
+                        extra["future_compras_values"] = future_compras_values
                 result = base_model.forecast(
-                    periods=periods, last_date=last_date, freq=freq
+                    periods=periods, last_date=last_date, freq=freq, **extra
                 )
                 base_results[name] = result
             except Exception as exc:

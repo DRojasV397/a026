@@ -26,13 +26,18 @@
     -fx-background-color: transparent;
 }
 
-/* Ocultar todas las partes del scrollbar */
+/* Ocultar todas las partes del scrollbar y eliminar su espacio ocupado */
 .alerts-scroll .scroll-bar:horizontal {
     -fx-opacity: 0;
+    -fx-pref-height: 0;
+    -fx-min-height: 0;
+    -fx-max-height: 0;
 }
 
 .alerts-scroll .scroll-bar:vertical {
     -fx-opacity: 0;
+    -fx-pref-width: 0;
+    -fx-min-width: 0;
     -fx-max-width: 0;
 }
 
@@ -73,8 +78,54 @@
     -fx-min-width: 300px;
     -fx-max-width: 400px;
     -fx-pref-width: 320px;
+    -fx-min-height: 100px;
     -fx-pref-height: 110px;
+    -fx-max-height: 110px;
     -fx-cursor: hand;
+}
+
+.alerts-container {
+    -fx-padding: 8 0 8 0;
+    -fx-min-height: 126px;
+}
+
+/* ============================================
+   CARRUSEL DE ALERTAS (Dashboard)
+   ============================================ */
+
+.carousel-nav-btn {
+    -fx-background-color: white;
+    -fx-border-color: #D1D5DB;
+    -fx-border-radius: 8px;
+    -fx-background-radius: 8px;
+    -fx-text-fill: #374151;
+    -fx-font-size: 20px;
+    -fx-font-weight: bold;
+    -fx-min-width: 30px;
+    -fx-max-width: 30px;
+    -fx-min-height: 30px;
+    -fx-max-height: 30px;
+    -fx-padding: 0;
+    -fx-cursor: hand;
+    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.06), 4, 0, 0, 1);
+}
+
+.carousel-nav-btn:hover {
+    -fx-background-color: #F3F4F6;
+    -fx-border-color: #9CA3AF;
+}
+
+.carousel-nav-btn:disabled {
+    -fx-opacity: 0.35;
+    -fx-cursor: default;
+}
+
+.carousel-page-label {
+    -fx-font-size: 12px;
+    -fx-text-fill: #6B7280;
+    -fx-font-weight: 600;
+    -fx-min-width: 42px;
+    -fx-alignment: center;
 }
 
 .alert-card:hover {

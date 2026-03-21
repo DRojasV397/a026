@@ -83,27 +83,27 @@
             <VBox fx:id="modulesChartsContainer" spacing="20"/>
         </VBox>
 
-        <!-- Sección de Alertas Recientes -->
-        <VBox styleClass="alerts-section" VBox.vgrow="ALWAYS">
-            <VBox styleClass="alerts-section-header">
-                <Label text="Alertas Recientes"
-                       styleClass="alerts-section-title"/>
-            </VBox>
+        <!-- Sección de Alertas Recientes (carrusel) -->
+        <VBox styleClass="alerts-section">
 
-            <!-- ScrollPane horizontal para las alertas -->
-            <ScrollPane hbarPolicy="AS_NEEDED"
-                        vbarPolicy="NEVER"
-                        fitToHeight="false"
-                        fitToWidth="true"
-                        styleClass="alerts-scroll"
-                        prefViewportHeight="160">
-                <!-- Contenedor horizontal de alertas (se llena dinámicamente) -->
-                <HBox fx:id="alertsContainer"
-                      styleClass="alerts-container"
-                      spacing="12">
-                    <!-- Las alertas se cargan aquí dinámicamente -->
-                </HBox>
-            </ScrollPane>
+            <!-- Header: título + navegación del carrusel -->
+            <HBox styleClass="alerts-section-header" alignment="CENTER_LEFT" spacing="10">
+                <Label text="Alertas Recientes" styleClass="alerts-section-title"/>
+                <Region HBox.hgrow="ALWAYS"/>
+                <Button fx:id="btnAlertPrev" text="&#8249;" styleClass="carousel-nav-btn"
+                        onAction="#onAlertPrev" visible="false" managed="false"/>
+                <Label  fx:id="lblAlertPage" styleClass="carousel-page-label"
+                        visible="false" managed="false"/>
+                <Button fx:id="btnAlertNext" text="&#8250;" styleClass="carousel-nav-btn"
+                        onAction="#onAlertNext" visible="false" managed="false"/>
+            </HBox>
+
+            <!-- Fila de tarjetas (sin ScrollPane — el carrusel controla cuántas se muestran) -->
+            <HBox fx:id="alertsContainer"
+                  styleClass="alerts-container"
+                  spacing="12"
+                  alignment="CENTER_LEFT"/>
+
         </VBox>
 
     </VBox>

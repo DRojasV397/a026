@@ -181,6 +181,39 @@ async def get_category_profitability(
     return result
 
 
+@router.get("/projection", summary="Proyección de rentabilidad futura")
+async def get_profitability_projection(
+    periods: int = Query(default=30, ge=7, le=180, description="Días a proyectar (7–180)"),
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Proyecta la rentabilidad esperada usando el mejor pack de modelos activo.
+
+    Metodología:
+    - Selecciona el pack activo con mayor R² de ventas.
+    - Genera un forecast coordinado (ventas + compras) para los próximos N días.
+    - Desagrega el total proyectado por producto usando el mix histórico del mismo período.
+    - Agrega por categoría y calcula indicadores generales (tres razones simples).
+
+    Retorna:
+    - Información del pack utilizado (nombre, precisión)
+    - Indicadores generales proyectados (margen bruto, operativo, neto)
+    - Proyección por categoría
+    - Proyección por producto
+    """
+    service = ProfitabilityService(db)
+    result = service.get_profitability_projection(current_user.idUsuario, periods)
+
+    if not result.get("success"):
+        raise HTTPException(
+            status_code=404,
+            detail=result.get("error", "Error al generar proyección")
+        )
+
+    return result
+
+
 @router.get("/trends", summary="Tendencias de rentabilidad")
 async def get_profitability_trends(
     fecha_inicio: Optional[date] = Query(None, description="Fecha inicial"),

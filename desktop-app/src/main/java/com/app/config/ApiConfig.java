@@ -94,8 +94,24 @@ public class ApiConfig {
         return BASE_URL + "/predictions/sales-data";
     }
 
+    public static String getPredictionsPurchasesDataUrl() {
+        return BASE_URL + "/predictions/purchases-data";
+    }
+
     public static String getPredictionsUserModelsUrl() {
         return BASE_URL + "/predictions/models/user";
+    }
+
+    public static String getTrainPackUrl() {
+        return BASE_URL + "/predictions/train-pack";
+    }
+
+    public static String getUserPacksUrl() {
+        return BASE_URL + "/predictions/packs";
+    }
+
+    public static String getForecastPackUrl() {
+        return BASE_URL + "/predictions/forecast-pack";
     }
 
     // ── Data Management Module ──────────────────────────────────────────────
@@ -204,6 +220,10 @@ public class ApiConfig {
 
     public static String getProfitabilitySummaryUrl() {
         return BASE_URL + "/profitability/summary";
+    }
+
+    public static String getProfitabilityProjectionUrl() {
+        return BASE_URL + "/profitability/projection";
     }
 
     // ── Alerts Module ────────────────────────────────────────────────────────

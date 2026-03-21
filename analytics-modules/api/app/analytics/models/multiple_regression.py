@@ -41,6 +41,7 @@ class MultipleRegressionConfig(ModelConfig):
         alpha: float = 1.0,
         l1_ratio: float = 0.5,
         use_compras: bool = True,
+        use_ventas: bool = False,
         lag_periods: Optional[List[int]] = None,
         rolling_windows: Optional[List[int]] = None,
         include_calendar: bool = True,
@@ -60,6 +61,7 @@ class MultipleRegressionConfig(ModelConfig):
             "alpha": alpha,
             "l1_ratio": l1_ratio,
             "use_compras": use_compras,
+            "use_ventas": use_ventas,
             "lag_periods": lag_periods if lag_periods is not None else [1, 7, 14, 30],
             "rolling_windows": rolling_windows if rolling_windows is not None else [7, 14, 30],
             "include_calendar": include_calendar,
@@ -91,6 +93,7 @@ class MultipleRegressionModel(BaseModel):
         target_column: str,
         date_column: str = 'fecha',
         compras_data: Optional[pd.DataFrame] = None,
+        ventas_data: Optional[pd.DataFrame] = None,
         **kwargs
     ):
         config = MultipleRegressionConfig(
@@ -102,6 +105,7 @@ class MultipleRegressionModel(BaseModel):
 
         self.date_column = date_column
         self._compras_data = compras_data
+        self._ventas_data = ventas_data
 
         self.scaler: Optional[StandardScaler] = None
         self.coefficients: Dict[str, float] = {}
@@ -111,6 +115,7 @@ class MultipleRegressionModel(BaseModel):
         self.last_date = None
         self.last_known_values: List[float] = []   # siempre raw
         self.last_known_compras: List[float] = []  # siempre raw
+        self.last_known_ventas: List[float] = []   # siempre raw (para modelo de compras)
         self._base_feature_names: List[str] = []
 
         # EMA state para forecast — en el espacio apropiado (log o raw)
@@ -196,6 +201,7 @@ class MultipleRegressionModel(BaseModel):
         include_calendar: bool = hp.get("include_calendar", True)
         poly_degree: int = int(hp.get("polynomial_degree", 1))
         use_compras: bool = bool(hp.get("use_compras", True))
+        use_ventas: bool = bool(hp.get("use_ventas", False))
         use_log: bool = self._log_transform
 
         df = df.copy()
@@ -295,6 +301,25 @@ class MultipleRegressionModel(BaseModel):
                 self.last_known_compras = df['_ct'].iloc[-max_lag:].tolist()
 
             df.drop(columns=['_ct'], inplace=True)
+
+        # ── 8. Features de ventas (variable exogena para modelo de compras) ──
+        if use_ventas and self._ventas_data is not None and not self._ventas_data.empty:
+            v = self._ventas_data[['fecha', 'total']].copy()
+            v['fecha'] = pd.to_datetime(v['fecha'])
+            v = v.rename(columns={'total': '_vt'})
+            df = df.merge(v, on=self.date_column, how='left')
+            df['_vt'] = df['_vt'].fillna(0)
+
+            base_vt = self._log_series(df['_vt']) if use_log else df['_vt']
+            df['ventas_exog_lag1'] = base_vt.shift(1).fillna(0)
+            df['ventas_exog_lag7'] = base_vt.shift(7).fillna(0)
+            df['ventas_exog_rolling7'] = base_vt.rolling(7, min_periods=1).mean().fillna(0)
+
+            if fit:
+                max_lag = max(lag_periods) if lag_periods else 30
+                self.last_known_ventas = df['_vt'].iloc[-max_lag:].tolist()
+
+            df.drop(columns=['_vt'], inplace=True)
 
         return df
 
@@ -432,7 +457,9 @@ class MultipleRegressionModel(BaseModel):
         self,
         periods: int,
         last_date=None,
-        freq: str = 'D'
+        freq: str = 'D',
+        future_compras_values: Optional[List[float]] = None,
+        future_ventas_values: Optional[List[float]] = None,
     ) -> PredictionResult:
         """
         Genera predicciones futuras de forma iterativa.
@@ -440,6 +467,12 @@ class MultipleRegressionModel(BaseModel):
         Buffer interno: siempre valores RAW (para que el usuario vea cifras reales).
         Features: si log_transform=True, se aplica log1p al acceder al buffer.
         EMA: mantenido en el espacio apropiado (log o raw) segun log_transform.
+
+        Args:
+            future_compras_values: Valores predichos de compras para los periodos futuros.
+                Si se proveen, se usan en lugar del proxy por promedio histórico.
+            future_ventas_values: Valores predichos de ventas (para modelo de compras).
+                Si se proveen, se usan en lugar del proxy por promedio histórico.
         """
         if not self.is_fitted:
             raise ValueError("El modelo debe ser entrenado antes de generar predicciones")
@@ -453,6 +486,7 @@ class MultipleRegressionModel(BaseModel):
         include_calendar: bool = hp.get("include_calendar", True)
         poly_degree: int = int(hp.get("polynomial_degree", 1))
         use_compras: bool = bool(hp.get("use_compras", True))
+        use_ventas: bool = bool(hp.get("use_ventas", False))
         use_log: bool = self._log_transform
 
         start_date = last_date or self.last_date
@@ -473,6 +507,10 @@ class MultipleRegressionModel(BaseModel):
         raw_compras = (
             list(self.last_known_compras[-max_needed:])
             if self.last_known_compras else [0.0] * max_needed
+        )
+        raw_ventas_exog = (
+            list(self.last_known_ventas[-max_needed:])
+            if self.last_known_ventas else [0.0] * max_needed
         )
 
         # Helpers para obtener feature value (log o raw) del buffer
@@ -556,6 +594,15 @@ class MultipleRegressionModel(BaseModel):
                 vals_c = [self._log_val(v) for v in window_c] if use_log else window_c
                 row['compras_rolling7'] = float(np.mean(vals_c))
 
+            # ── Ventas exogenas (para modelo de compras) ───────────
+            if use_ventas and raw_ventas_exog:
+                row['ventas_exog_lag1'] = self._log_val(raw_ventas_exog[-1]) if use_log else float(raw_ventas_exog[-1])
+                vt7 = raw_ventas_exog[-7] if len(raw_ventas_exog) >= 7 else raw_ventas_exog[-1]
+                row['ventas_exog_lag7'] = self._log_val(vt7) if use_log else float(vt7)
+                window_v = raw_ventas_exog[-7:] if len(raw_ventas_exog) >= 7 else raw_ventas_exog
+                vals_v = [self._log_val(v) for v in window_v] if use_log else window_v
+                row['ventas_exog_rolling7'] = float(np.mean(vals_v))
+
             # ── Prediccion ─────────────────────────────────────────
             feature_values = [row.get(f, 0.0) for f in self.feature_names]
             X_row = np.array([feature_values], dtype=float)
@@ -582,11 +629,27 @@ class MultipleRegressionModel(BaseModel):
             ema7 = alpha7 * ema_input + (1.0 - alpha7) * ema7
             ema14 = alpha14 * ema_input + (1.0 - alpha14) * ema14
 
-            if raw_compras:
-                proxy = float(np.mean(raw_compras[-7:]) if len(raw_compras) >= 7 else np.mean(raw_compras))
-                raw_compras.append(proxy)
+            if use_compras and raw_compras:
+                # Usar valor provisto (pack forecast) o proxy por promedio histórico
+                step_idx = len(predictions) - 1
+                if future_compras_values and step_idx < len(future_compras_values):
+                    next_compra = float(future_compras_values[step_idx])
+                else:
+                    next_compra = float(np.mean(raw_compras[-7:]) if len(raw_compras) >= 7 else np.mean(raw_compras))
+                raw_compras.append(next_compra)
                 if len(raw_compras) > max_needed:
                     raw_compras.pop(0)
+
+            if use_ventas and raw_ventas_exog:
+                # Usar valor provisto (pack forecast) o proxy por promedio histórico
+                step_idx = len(predictions) - 1
+                if future_ventas_values and step_idx < len(future_ventas_values):
+                    next_venta = float(future_ventas_values[step_idx])
+                else:
+                    next_venta = float(np.mean(raw_ventas_exog[-7:]) if len(raw_ventas_exog) >= 7 else np.mean(raw_ventas_exog))
+                raw_ventas_exog.append(next_venta)
+                if len(raw_ventas_exog) > max_needed:
+                    raw_ventas_exog.pop(0)
 
         return PredictionResult(
             predictions=predictions,
@@ -617,6 +680,7 @@ class MultipleRegressionModel(BaseModel):
             "last_date": self.last_date,
             "last_known_values": self.last_known_values,
             "last_known_compras": self.last_known_compras,
+            "last_known_ventas": self.last_known_ventas,
             "_base_feature_names": self._base_feature_names,
             "scaler": self.scaler,
             "coefficients": self.coefficients,
@@ -648,6 +712,7 @@ class MultipleRegressionModel(BaseModel):
         self.last_date = model_data.get("last_date")
         self.last_known_values = model_data.get("last_known_values", [])
         self.last_known_compras = model_data.get("last_known_compras", [])
+        self.last_known_ventas = model_data.get("last_known_ventas", [])
         self._base_feature_names = model_data.get("_base_feature_names", self.feature_names)
         self.scaler = model_data.get("scaler")
         self.coefficients = model_data.get("coefficients", {})
@@ -655,5 +720,6 @@ class MultipleRegressionModel(BaseModel):
         self._last_ema7 = model_data.get("_last_ema7", 0.0)
         self._last_ema14 = model_data.get("_last_ema14", 0.0)
         self._compras_data = None
+        self._ventas_data = None
 
         logger.info(f"MultipleRegressionModel cargado desde {filepath}")

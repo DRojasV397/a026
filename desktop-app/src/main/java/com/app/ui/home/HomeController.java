@@ -3,8 +3,9 @@ package com.app.ui.home;
 import com.app.model.Alert;
 import com.app.model.ListItem;
 import com.app.model.StatsDTO;
+import com.app.model.alerts.AlertDTO;
 import com.app.model.dashboard.ExecutiveDashboardDTO;
-import com.app.service.alerts.AlertService;
+import com.app.service.alerts.AlertApiService;
 import com.app.service.dashboard.DashboardService;
 import com.app.ui.components.alerts.AlertCardController;
 import com.app.ui.components.charts.*;
@@ -19,11 +20,13 @@ import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.chart.PieChart;
 import javafx.scene.chart.XYChart;
+import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.ToggleButton;
 import javafx.scene.control.ToggleGroup;
 import javafx.scene.layout.HBox;
+import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
 
 import java.io.IOException;
@@ -50,9 +53,16 @@ public class HomeController {
     @FXML
     private VerticalListCardController topProductsListController;
 
-    // Contenedor de alertas
-    @FXML
-    private HBox alertsContainer;
+    // Contenedor de alertas y controles del carrusel
+    @FXML private HBox   alertsContainer;
+    @FXML private Button btnAlertPrev;
+    @FXML private Button btnAlertNext;
+    @FXML private Label  lblAlertPage;
+
+    // Estado del carrusel de alertas
+    private final List<Alert> allAlerts = new ArrayList<>();
+    private int alertPage = 0;
+    private static final int ALERTS_PER_PAGE = 3;
 
     @FXML
     private ScrollPane dashboardRoot;
@@ -87,7 +97,7 @@ public class HomeController {
     private ExecutiveDashboardDTO dashboardDto;
 
     // Servicios
-    private final AlertService alertService = new AlertService();
+    private final AlertApiService alertApiService = new AlertApiService();
     private final DashboardService dashboardService = new DashboardService();
 
     @FXML
@@ -126,18 +136,17 @@ public class HomeController {
                 this.dashboardDto = dto;
                 loadStatsFromDashboard(dto);
                 loadTopProductsFromDashboard(dto);
-                loadAlertsFromDashboard(dto);
                 loadChartsFromDashboard(dto);
                 if (additionalChartsLoaded) refreshLazyCharts();
                 if (moduleChartsLoaded)    populateModuleCharts();
             } else {
                 loadStatsCards();
-                loadAlerts();
                 loadInitialCharts();
             }
+            loadActiveAlertsFromApi();
         })).exceptionally(ex -> {
             System.err.println("[HOME] Error al cargar dashboard: " + ex.getMessage());
-            Platform.runLater(() -> { loadStatsCards(); loadAlerts(); loadInitialCharts(); });
+            Platform.runLater(() -> { loadStatsCards(); loadInitialCharts(); loadActiveAlertsFromApi(); });
             return null;
         });
     }
@@ -154,18 +163,27 @@ public class HomeController {
 
     /** Refresca los charts lazy (PieChart y AreaChart) cuando ya están visibles. */
     private void refreshLazyCharts() {
-        if (productDistributionChartController != null && dashboardDto != null
-                && !dashboardDto.getVentasPorCategoria().isEmpty()) {
-            ObservableList<PieChart.Data> pie = FXCollections.observableArrayList();
-            dashboardDto.getVentasPorCategoria().forEach(c ->
-                pie.add(new PieChart.Data(c.getCategoria(), c.getTotal())));
-            productDistributionChartController.loadCustomData(pie);
+        if (productDistributionChartController != null && dashboardDto != null) {
+            if (!dashboardDto.getVentasPorCategoria().isEmpty()) {
+                ObservableList<PieChart.Data> pie = FXCollections.observableArrayList();
+                dashboardDto.getVentasPorCategoria().forEach(c ->
+                    pie.add(new PieChart.Data(c.getCategoria(), c.getTotal())));
+                productDistributionChartController.loadCustomData(pie);
+            } else {
+                productDistributionChartController.setSubtitle("Sin datos para el período");
+                productDistributionChartController.clearData();
+            }
         }
         if (revenueExpenseChartController != null && dashboardDto != null) {
-            revenueExpenseChartController.loadCustomData(
-                buildTrendSeries("Ingresos", dashboardDto.getTendencias().getVentas()),
-                buildTrendSeries("Gastos",   dashboardDto.getTendencias().getCompras())
-            );
+            if (!dashboardDto.getTendencias().getVentas().isEmpty()) {
+                revenueExpenseChartController.loadCustomData(
+                    buildTrendSeries("Ingresos", dashboardDto.getTendencias().getVentas()),
+                    buildTrendSeries("Gastos",   dashboardDto.getTendencias().getCompras())
+                );
+            } else {
+                revenueExpenseChartController.setSubtitle("Sin datos para el período");
+                revenueExpenseChartController.clearData();
+            }
         }
     }
 
@@ -188,21 +206,13 @@ public class HomeController {
         Platform.runLater(() -> {
             if (salesTrendChartController != null) {
                 salesTrendChartController.setTitle("Tendencia de Ventas");
-                salesTrendChartController.setSubtitle("Últimos 4 meses");
-                salesTrendChartController.loadData();
+                salesTrendChartController.setSubtitle("Sin datos disponibles");
+                salesTrendChartController.clearData();
             }
 
-            if (regionSalesChartController != null) {
-                regionSalesChartController.setTitle("Ventas por Región");
-                regionSalesChartController.setSubtitle("Distribución actual");
-                regionSalesChartController.loadData();
-            }
-
-            // Cargar la lista de productos
             if (topProductsListController != null) {
                 topProductsListController.setTitle("Top Productos");
-                topProductsListController.setSubtitle("Más vendidos");
-                loadTopProductsList();
+                topProductsListController.setSubtitle("Sin datos disponibles");
             }
         });
     }
@@ -248,69 +258,114 @@ public class HomeController {
     }
 
     /**
-     * Carga la lista de productos (usado solo si el dashboard ejecutivo no devuelve datos).
+     * Carga alertas desde la API usando el mismo endpoint y filtro que el módulo de alertas:
+     * excluye RESUELTA e IGNORADA. Muestra máximo 5 alertas recientes.
+     * Fallback a datos mock si la API no está disponible.
      */
-    private void loadTopProductsList() {
-        if (topProductsListController != null) {
-            topProductsListController.setTitle("Top Productos");
-            topProductsListController.setSubtitle("M\u00E1s vendidos");
-        }
+    private void loadActiveAlertsFromApi() {
+        alertApiService.getActiveAlerts()
+                .thenAccept(alertas -> Platform.runLater(() -> {
+                    List<Alert> alerts = alertas.stream()
+                            .filter(a -> !"RESUELTA".equals(a.status()) && !"IGNORADA".equals(a.status()))
+                            .limit(5)
+                            .map(this::alertDtoToAlert)
+                            .toList();
+                    displayAlerts(alerts);
+                }))
+                .exceptionally(ex -> {
+                    Platform.runLater(() -> displayAlerts(List.of()));
+                    return null;
+                });
+    }
+
+    /** Convierte un AlertDTO (API) al modelo Alert usado por el dashboard. */
+    private Alert alertDtoToAlert(AlertDTO dto) {
+        Alert.AlertType tipo = switch (dto.type()) {
+            case "RIESGO"      -> Alert.AlertType.ERROR;
+            case "OPORTUNIDAD" -> Alert.AlertType.SUCCESS;
+            default            -> Alert.AlertType.WARNING;
+        };
+        return new Alert((int) dto.id(), tipo, dto.title(), dto.description(), null,
+                dto.createdAt() != null ? dto.createdAt().toLocalDate().toString() : "");
     }
 
     /**
-     * Carga alertas usando datos mock como fallback cuando la API no está disponible.
-     */
-    private void loadAlerts() {
-        List<Alert> alerts = alertService.getMockAlerts();
-        displayAlerts(alerts);
-    }
-
-    /**
-     * Muestra las alertas en el contenedor
+     * Recibe la lista completa de alertas, reinicia el carrusel a la página 0 y renderiza.
      */
     private void displayAlerts(List<Alert> alerts) {
+        allAlerts.clear();
+        if (alerts != null) allAlerts.addAll(alerts);
+        alertPage = 0;
+        renderAlertPage();
+    }
+
+    /**
+     * Renderiza la página actual del carrusel (ALERTS_PER_PAGE tarjetas).
+     */
+    private void renderAlertPage() {
         alertsContainer.getChildren().clear();
 
-        if (alerts == null || alerts.isEmpty()) {
+        if (allAlerts.isEmpty()) {
             showEmptyAlertsState();
+            updateCarouselNav(0, 0);
             return;
         }
 
-        for (Alert alert : alerts) {
+        int total      = allAlerts.size();
+        int totalPages = (int) Math.ceil((double) total / ALERTS_PER_PAGE);
+        int start      = alertPage * ALERTS_PER_PAGE;
+        int end        = Math.min(start + ALERTS_PER_PAGE, total);
+
+        for (int i = start; i < end; i++) {
+            Alert alert = allAlerts.get(i);
             try {
                 FXMLLoader loader = new FXMLLoader(
-                        getClass().getResource("/fxml/components/alerts/AlertCard.fxml")
-                );
+                        getClass().getResource("/fxml/components/alerts/AlertCard.fxml"));
                 HBox alertCard = loader.load();
                 AlertCardController controller = loader.getController();
 
-                // Configurar la alerta
                 controller.setAlert(alert);
-
-                // IMPORTANTE: Guardar el ID de la alerta en el UserData del nodo
                 alertCard.setUserData(alert.getId());
-
-                // Configurar callback para dismiss
                 controller.setOnDismissCallback(this::handleAlertDismiss);
+                // Cada tarjeta crece equitativamente para ocupar el ancho disponible
+                HBox.setHgrow(alertCard, Priority.ALWAYS);
 
-                // Agregar al contenedor
                 alertsContainer.getChildren().add(alertCard);
-
             } catch (IOException e) {
                 e.printStackTrace();
             }
         }
+
+        updateCarouselNav(alertPage + 1, totalPages);
     }
 
-    /**
-     * Muestra el estado vacío cuando no hay alertas
-     */
-    private void showEmptyAlertsState() {
-        alertsContainer.getChildren().clear();
+    /** Actualiza la visibilidad y estado de los controles de navegación del carrusel. */
+    private void updateCarouselNav(int currentPage, int totalPages) {
+        boolean multiPage = totalPages > 1;
 
+        if (lblAlertPage != null) {
+            lblAlertPage.setVisible(multiPage);
+            lblAlertPage.setManaged(multiPage);
+            if (multiPage) lblAlertPage.setText(currentPage + " / " + totalPages);
+        }
+        if (btnAlertPrev != null) {
+            btnAlertPrev.setVisible(multiPage);
+            btnAlertPrev.setManaged(multiPage);
+            btnAlertPrev.setDisable(currentPage <= 1);
+        }
+        if (btnAlertNext != null) {
+            btnAlertNext.setVisible(multiPage);
+            btnAlertNext.setManaged(multiPage);
+            btnAlertNext.setDisable(currentPage >= totalPages);
+        }
+    }
+
+    /** Muestra el estado vacío cuando no hay alertas. */
+    private void showEmptyAlertsState() {
         HBox emptyState = new HBox();
         emptyState.getStyleClass().add("alerts-empty-state");
         emptyState.setAlignment(javafx.geometry.Pos.CENTER);
+        HBox.setHgrow(emptyState, Priority.ALWAYS);
 
         Label emptyLabel = new Label("Sin alertas recientes");
         emptyLabel.getStyleClass().add("alerts-empty-text");
@@ -319,45 +374,43 @@ public class HomeController {
         alertsContainer.getChildren().add(emptyState);
     }
 
+    /** Navega a la página anterior del carrusel. */
+    @FXML
+    private void onAlertPrev() {
+        if (alertPage > 0) {
+            alertPage--;
+            renderAlertPage();
+        }
+    }
+
+    /** Navega a la página siguiente del carrusel. */
+    @FXML
+    private void onAlertNext() {
+        int totalPages = (int) Math.ceil((double) allAlerts.size() / ALERTS_PER_PAGE);
+        if (alertPage < totalPages - 1) {
+            alertPage++;
+            renderAlertPage();
+        }
+    }
+
     /**
-     * Maneja el evento de dismiss de una alerta
+     * Elimina la alerta descartada de la lista y re-renderiza la página actual.
+     * Si la página queda vacía por el dismiss, retrocede una página.
      */
     private void handleAlertDismiss(Alert alert) {
-        // Buscar y remover la card con animación
         Platform.runLater(() -> {
-            alertsContainer.getChildren().removeIf(node -> {
-                Object userData = node.getUserData();
-                if (userData != null && userData.equals(alert.getId())) {
-                    // Animación fade out
-                    javafx.animation.FadeTransition fadeOut =
-                            new javafx.animation.FadeTransition(javafx.util.Duration.millis(200), node);
-                    fadeOut.setFromValue(1.0);
-                    fadeOut.setToValue(0.0);
-                    fadeOut.setOnFinished(e -> {
-                        alertsContainer.getChildren().remove(node);
-
-                        // Si no quedan alertas, mostrar estado vacío
-                        if (alertsContainer.getChildren().isEmpty()) {
-                            showEmptyAlertsState();
-                        }
-                    });
-                    fadeOut.play();
-                    return false; // No remover todavía, lo hace la animación
-                }
-                return false;
-            });
+            allAlerts.removeIf(a -> a.getId() == alert.getId());
+            int totalPages = (int) Math.ceil((double) allAlerts.size() / ALERTS_PER_PAGE);
+            if (alertPage >= totalPages && alertPage > 0) alertPage--;
+            renderAlertPage();
         });
-
-        // TODO: Actualizar la BD para marcar la alerta como descartada
-        // Connection conn = DatabaseConnection.getConnection();
-        // alertService.dismissAlert(conn, alert.getId());
     }
 
     /**
      * Refresca las alertas (llamar después de acciones que generen alertas)
      */
     public void refreshAlerts() {
-        loadAlerts();
+        loadActiveAlertsFromApi();
     }
 
     /**
@@ -402,27 +455,29 @@ public class HomeController {
                 Platform.runLater(() -> {
                     if (productDistributionChartController != null) {
                         productDistributionChartController.setTitle("Distribución por Categoría");
-                        productDistributionChartController.setSubtitle("Participación en ventas");
                         if (dashboardDto != null && !dashboardDto.getVentasPorCategoria().isEmpty()) {
+                            productDistributionChartController.setSubtitle("Participación en ventas");
                             ObservableList<PieChart.Data> pie = FXCollections.observableArrayList();
                             dashboardDto.getVentasPorCategoria().forEach(c ->
                                 pie.add(new PieChart.Data(c.getCategoria(), c.getTotal())));
                             productDistributionChartController.loadCustomData(pie);
                         } else {
-                            productDistributionChartController.loadData();
+                            productDistributionChartController.setSubtitle("Sin datos para el período");
+                            productDistributionChartController.clearData();
                         }
                     }
 
                     if (revenueExpenseChartController != null) {
                         revenueExpenseChartController.setTitle("Ingresos vs Gastos");
-                        revenueExpenseChartController.setSubtitle("Comparativa semanal");
-                        if (dashboardDto != null) {
+                        if (dashboardDto != null && !dashboardDto.getTendencias().getVentas().isEmpty()) {
+                            revenueExpenseChartController.setSubtitle("Comparativa semanal");
                             revenueExpenseChartController.loadCustomData(
                                 buildTrendSeries("Ingresos", dashboardDto.getTendencias().getVentas()),
                                 buildTrendSeries("Gastos",   dashboardDto.getTendencias().getCompras())
                             );
                         } else {
-                            revenueExpenseChartController.loadData();
+                            revenueExpenseChartController.setSubtitle("Sin datos para el período");
+                            revenueExpenseChartController.clearData();
                         }
                     }
 
@@ -466,8 +521,8 @@ public class HomeController {
                     modelosChartController = barLoader2.getController();
 
                     HBox row2 = new HBox(20);
-                    HBox.setHgrow(pieNode,  javafx.scene.layout.Priority.ALWAYS);
-                    HBox.setHgrow(bar2Node, javafx.scene.layout.Priority.ALWAYS);
+                    HBox.setHgrow(pieNode,  Priority.ALWAYS);
+                    HBox.setHgrow(bar2Node, Priority.ALWAYS);
                     row2.getChildren().addAll(pieNode, bar2Node);
 
                     Platform.runLater(() -> modulesChartsContainer.getChildren().add(row2));
@@ -494,30 +549,35 @@ public class HomeController {
     private void populateModuleCharts() {
         if (dashboardDto == null) return;
 
-        // 1. BarChart — Rentabilidad por Categoría (ingresos vs utilidad)
+        // 1. BarChart — Rentabilidad por Categoría (ingresos vs utilidad bruta)
         if (rentabilidadChartController != null) {
             rentabilidadChartController.setTitle("Rentabilidad por Categoría");
-            rentabilidadChartController.setSubtitle("Ingresos vs Utilidad del período");
             List<ExecutiveDashboardDTO.RentabilidadCategoria> cats = dashboardDto.getRentabilidadCategorias();
             if (!cats.isEmpty()) {
+                // Calcular margen promedio ponderado para el subtítulo informativo
+                double totalIngresos = cats.stream().mapToDouble(ExecutiveDashboardDTO.RentabilidadCategoria::getIngresos).sum();
+                double totalUtilidad = cats.stream().mapToDouble(ExecutiveDashboardDTO.RentabilidadCategoria::getUtilidad).sum();
+                double margenProm = totalIngresos > 0 ? (totalUtilidad / totalIngresos * 100) : 0;
+                rentabilidadChartController.setSubtitle(
+                        String.format("Ingresos vs Utilidad Bruta  |  Margen promedio: %.1f%%", margenProm));
                 XYChart.Series<String, Number> serieIngresos = new XYChart.Series<>();
                 serieIngresos.setName("Ingresos");
                 XYChart.Series<String, Number> serieUtilidad = new XYChart.Series<>();
-                serieUtilidad.setName("Utilidad");
+                serieUtilidad.setName("Utilidad Bruta");
                 cats.forEach(c -> {
                     serieIngresos.getData().add(new XYChart.Data<>(c.getCategoria(), c.getIngresos()));
                     serieUtilidad.getData().add(new XYChart.Data<>(c.getCategoria(), c.getUtilidad()));
                 });
                 rentabilidadChartController.loadCustomData(serieIngresos, serieUtilidad);
             } else {
-                rentabilidadChartController.loadData();
+                rentabilidadChartController.setSubtitle("Sin datos para el período");
+                rentabilidadChartController.clearData();
             }
         }
 
         // 2. PieChart — Alertas por tipo
         if (alertasChartController != null) {
             alertasChartController.setTitle("Distribución de Alertas");
-            alertasChartController.setSubtitle("Por tipo de alerta activa");
             java.util.Map<String, Integer> porTipo = dashboardDto.getAlertasActivas().getPorTipo();
             if (porTipo != null && !porTipo.isEmpty()) {
                 ObservableList<PieChart.Data> pie = FXCollections.observableArrayList();
@@ -525,28 +585,39 @@ public class HomeController {
                     if (count > 0) pie.add(new PieChart.Data(tipo, count));
                 });
                 if (!pie.isEmpty()) {
+                    alertasChartController.setSubtitle("Por tipo de alerta activa");
                     alertasChartController.loadCustomData(pie);
                 } else {
-                    alertasChartController.loadData();
+                    alertasChartController.setSubtitle("Sin alertas activas");
+                    alertasChartController.clearData();
                 }
             } else {
-                alertasChartController.loadData();
+                alertasChartController.setSubtitle("Sin alertas activas");
+                alertasChartController.clearData();
             }
         }
 
-        // 3. BarChart — Precisión (R²) de modelos predictivos
+        // 3. BarChart — Precisión (R²) de packs de modelos
         if (modelosChartController != null) {
-            modelosChartController.setTitle("Precisión de Modelos Predictivos");
-            modelosChartController.setSubtitle("R² de modelos entrenados (0 = peor, 1 = mejor)");
+            modelosChartController.setTitle("Precisión de Packs Predictivos");
             List<ExecutiveDashboardDTO.ModeloResumen> modelos = dashboardDto.getPrecisionModelos();
             if (!modelos.isEmpty()) {
+                // Encontrar el mejor pack para resaltarlo en el subtítulo
+                ExecutiveDashboardDTO.ModeloResumen mejor = modelos.stream()
+                        .max(java.util.Comparator.comparingDouble(ExecutiveDashboardDTO.ModeloResumen::getPrecision))
+                        .orElse(null);
+                String subtitulo = mejor != null
+                        ? String.format("R² por pack activo  |  Mejor: %s (R²=%.3f)", mejor.getNombre(), mejor.getPrecision())
+                        : "R² promedio por pack activo (0 = peor, 1 = mejor)";
+                modelosChartController.setSubtitle(subtitulo);
                 XYChart.Series<String, Number> serie = new XYChart.Series<>();
                 serie.setName("R²");
                 modelos.forEach(m -> serie.getData().add(
                         new XYChart.Data<>(m.getNombre(), m.getPrecision())));
                 modelosChartController.loadCustomData(serie);
             } else {
-                modelosChartController.loadData();
+                modelosChartController.setSubtitle("Sin packs entrenados — entrena un pack en el módulo predictivo");
+                modelosChartController.clearData();
             }
         }
     }
@@ -573,36 +644,67 @@ public class HomeController {
 
     /** Popula las stats cards con datos reales del dashboard ejecutivo. */
     private void loadStatsFromDashboard(ExecutiveDashboardDTO dto) {
-        ExecutiveDashboardDTO.ResumenVentas ventas  = dto.getResumenVentas();
-        ExecutiveDashboardDTO.KpisFinancieros kpis  = dto.getKpisFinancieros();
+        ExecutiveDashboardDTO.ResumenVentas ventas   = dto.getResumenVentas();
+        ExecutiveDashboardDTO.ResumenCompras compras  = dto.getResumenCompras();
+        ExecutiveDashboardDTO.KpisFinancieros kpis    = dto.getKpisFinancieros();
 
         double variacionVentas = ventas.getVariacion();
         String signV   = variacionVentas >= 0 ? "↑" : "↓";
         String colorV  = variacionVentas >= 0 ? "blue" : "orange";
 
-        double margen = kpis.getMargenBrutoPct();
-        String signM  = margen >= 0 ? "↑" : "↓";
-        String colorM = margen >= 20 ? "green" : margen >= 10 ? "blue" : "orange";
+        // Margen bruto (tres razones — razón 1)
+        double margenBruto = kpis.getMargenBrutoPct();
+        String colorMB = margenBruto >= 20 ? "green" : margenBruto >= 10 ? "blue" : "orange";
+
+        // Margen operativo (tres razones — razón 2)
+        double margenOp = kpis.getMargenOperativoPct();
+        String colorMO = margenOp >= 15 ? "green" : margenOp >= 8 ? "blue" : "orange";
+
+        double variacionCompras = compras.getVariacion();
+        String signC  = variacionCompras >= 0 ? "↑" : "↓";
+        String colorC = variacionCompras >= 0 ? "orange" : "green";
+
+        // Estado financiero (de backend)
+        String estado = kpis.getEstadoFinanciero();
+        String estadoLabel = switch (estado) {
+            case "excelente" -> "Estado: Excelente";
+            case "bueno"     -> "Estado: Bueno";
+            case "aceptable" -> "Estado: Aceptable";
+            case "bajo"      -> "Estado: Bajo";
+            case "critico"   -> "Estado: Crítico";
+            default          -> "Sin datos";
+        };
 
         List<StatsDTO> stats = List.of(
+                // Card 1: Ventas Totales con variación vs período anterior
                 new StatsDTO("📊",
                         String.format("$%,.0f", ventas.getTotal()),
                         "Ventas Totales",
-                        String.format("%s %.1f%%", signV, Math.abs(variacionVentas)),
+                        String.format("%s %.1f%% vs período ant.", signV, Math.abs(variacionVentas)),
                         colorV,
                         variacionVentas >= 0),
+                // Card 2: Utilidad Bruta — razón 1 del módulo de rentabilidad
                 new StatsDTO("💰",
                         String.format("$%,.0f", kpis.getUtilidadBruta()),
                         "Utilidad Bruta",
-                        String.format("%s %.1f%%", signM, Math.abs(margen)),
-                        colorM,
+                        String.format("Margen bruto: %.1f%%", margenBruto),
+                        colorMB,
                         kpis.getUtilidadBruta() >= 0),
-                new StatsDTO("📦",
-                        String.valueOf(ventas.getCantidad()),
-                        "Ventas del Periodo",
-                        String.format("ROI: %.1f%%", kpis.getRoiPorcentaje()),
-                        "blue",
-                        kpis.getRoiPorcentaje() >= 0),
+                // Card 3: Compras Totales
+                new StatsDTO("🛒",
+                        String.format("$%,.0f", compras.getTotal()),
+                        "Compras Totales",
+                        String.format("%s %.1f%% vs período ant.", signC, Math.abs(variacionCompras)),
+                        colorC,
+                        variacionCompras <= 0),
+                // Card 4: Margen Operativo — razón 2 del módulo de rentabilidad
+                new StatsDTO("📈",
+                        String.format("%.1f%%", margenOp),
+                        "Margen Operativo",
+                        estadoLabel,
+                        colorMO,
+                        margenOp >= 0),
+                // Card 5: Ticket Promedio
                 new StatsDTO("🎯",
                         String.format("$%,.0f", ventas.getTicketPromedio()),
                         "Ticket Promedio",
@@ -642,51 +744,12 @@ public class HomeController {
         topProductsListController.loadItems(items);
     }
 
-    /** Convierte alertas del dashboard ejecutivo al modelo Alert del HomeController. */
-    private void loadAlertsFromDashboard(ExecutiveDashboardDTO dto) {
-        List<ExecutiveDashboardDTO.AlertaResumen> apiAlertas = dto.getAlertasActivas().getAlertas();
-        List<Alert> alerts = new ArrayList<>();
-
-        for (ExecutiveDashboardDTO.AlertaResumen a : apiAlertas) {
-            Alert.AlertType tipo = switch (a.getTipo()) {
-                case "Riesgo"  -> Alert.AlertType.ERROR;
-                case "Oportunidad" -> Alert.AlertType.SUCCESS;
-                default        -> Alert.AlertType.WARNING;
-            };
-
-            String titulo = switch (a.getTipo()) {
-                case "Riesgo"      -> "Riesgo en " + a.getMetrica();
-                case "Oportunidad" -> "Oportunidad en " + a.getMetrica();
-                case "Anomalia"    -> "Anomal\u00EDa en " + a.getMetrica();
-                case "Tendencia"   -> "Tendencia en " + a.getMetrica();
-                default            -> "Alerta en " + a.getMetrica();
-            };
-
-            String mensaje = String.format("Valor actual: %.2f / Esperado: %.2f",
-                    a.getValorActual(), a.getValorEsperado());
-
-            alerts.add(new Alert(a.getId(), tipo, titulo, mensaje, null,
-                    a.getCreadaEn() != null ? a.getCreadaEn().substring(0, 10) : ""));
-        }
-
-        displayAlerts(alerts);
-    }
-
-    /* CARGA STATS CARDS (fallback mock) */
+    /* CARGA STATS CARDS (fallback sin conexión) */
     private void loadStatsCards() {
-        List<StatsDTO> stats = List.of(
-                new StatsDTO("\uD83D\uDCCA", "$124,500", "Ventas Totales", "\u2191 12.5%", "blue", true),
-                new StatsDTO("\uD83D\uDCB0", "$38,200", "Utilidad Bruta", "\u2191 8.2%", "green", true),
-                new StatsDTO("\uD83D\uDCE6", "342", "Ventas del Periodo", "ROI: 30.7%", "blue", true)
-        );
-
         statsCardsContainer.getChildren().clear();
-        for (StatsDTO stat : stats) {
-            HBox card = StatsCard.createStatsCard(
-                    stat.emoji(), stat.value(), stat.label(),
-                    stat.change(), stat.colorClass(), stat.positive());
-            statsCardsContainer.getChildren().add(card);
-        }
+        Label msg = new Label("Sin conexión con el servidor — Datos no disponibles");
+        msg.setStyle("-fx-text-fill: #6B7280; -fx-font-size: 13px; -fx-padding: 20px 0;");
+        statsCardsContainer.getChildren().add(msg);
     }
 
 

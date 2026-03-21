@@ -38,6 +38,7 @@ class ReportType(str, Enum):
     COMPRAS = "compras"
     RENTABILIDAD = "rentabilidad"
     PRODUCTOS = "productos"
+    PREDICCIONES = "predicciones"
 
 
 # === Schemas ===
@@ -292,6 +293,12 @@ async def get_report_types(
                 "descripcion": "Reporte de productos mas vendidos",
                 "formatos": ["json", "csv", "excel"],
                 "parametros": {"top_n": "Numero de productos (1-100)"}
+            },
+            {
+                "tipo": "predicciones",
+                "descripcion": "Reporte de modelos predictivos y packs entrenados",
+                "formatos": ["json", "csv"],
+                "parametros": {}
             }
         ]
     }
@@ -311,6 +318,7 @@ async def generate_report(
     - compras: Reporte de compras agrupado por periodo
     - rentabilidad: Reporte de rentabilidad mensual
     - productos: Reporte de productos mas vendidos
+    - predicciones: Modelos predictivos y packs entrenados del usuario
 
     Formatos disponibles:
     - json: Datos estructurados
@@ -349,6 +357,14 @@ async def generate_report(
             formato=request.formato.value,
             generado_por=current_user.idUsuario,
             top_n=request.top_n
+        )
+    elif request.tipo == ReportType.PREDICCIONES:
+        result = service.generate_predictions_report(
+            fecha_inicio=request.fecha_inicio,
+            fecha_fin=request.fecha_fin,
+            formato=request.formato.value,
+            generado_por=current_user.idUsuario,
+            user_id=current_user.idUsuario
         )
     else:
         raise HTTPException(
