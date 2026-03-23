@@ -776,8 +776,8 @@ class AlertService:
         4. Si desviación > risk_threshold  → RIESGO "compras_predichas"
            Si desviación < -opportunity_threshold → OPORTUNIDAD (ahorro inesperado)
         """
-        from app.services.prediction_service import PredictionService, _global_trained_models
-        import os, pickle
+        from app.services.prediction_service import PredictionService, _global_trained_models, _global_model_last_access
+        import os, pickle, time
 
         # Resolver model_key del modelo de compras del pack
         try:
@@ -812,6 +812,7 @@ class AlertService:
                 compras_model = MultipleRegressionModel(target_column='total', date_column='fecha')
                 compras_model.load(model_path)
                 _global_trained_models[compras_key] = compras_model
+                _global_model_last_access[compras_key] = time.time()
             except Exception as e:
                 logger.warning(f"Error cargando modelo de compras: {e}")
                 return []
@@ -885,8 +886,8 @@ class AlertService:
         4. Si desviación <= -risk_threshold     → RIESGO "ventas_predichas" (ventas por debajo de lo predicho)
            Si desviación >= opportunity_threshold → OPORTUNIDAD (ventas superan predicciones)
         """
-        from app.services.prediction_service import PredictionService, _global_trained_models
-        import os, pickle
+        from app.services.prediction_service import PredictionService, _global_trained_models, _global_model_last_access
+        import os, pickle, time
 
         # Resolver model_key del modelo de ventas del pack
         try:
@@ -921,6 +922,7 @@ class AlertService:
                 ventas_model = MultipleRegressionModel(target_column='total', date_column='fecha')
                 ventas_model.load(model_path)
                 _global_trained_models[ventas_key] = ventas_model
+                _global_model_last_access[ventas_key] = time.time()
             except Exception as e:
                 logger.warning(f"Error cargando modelo de ventas: {e}")
                 return []

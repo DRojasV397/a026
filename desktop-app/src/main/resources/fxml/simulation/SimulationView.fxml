@@ -48,18 +48,18 @@
 
                     <VBox spacing="24" styleClass="edition-body">
 
-                        <!-- Bloque 1: Pack de modelos -->
+                        <!-- Bloque 1: Modelos -->
                         <VBox spacing="0" styleClass="form-section">
                             <HBox styleClass="form-section-header" alignment="CENTER_LEFT" spacing="10">
                                 <Label text="📦" styleClass="form-section-icon"/>
-                                <Label text="Pack de modelos" styleClass="form-section-title"/>
+                                <Label text="Modelos" styleClass="form-section-title"/>
                                 <Label text="Obligatorio" styleClass="required-badge"/>
                             </HBox>
                             <VBox spacing="12" styleClass="form-section-body">
-                                <Label text="Selecciona un pack de modelos (Ventas + Compras) entrenado como base para la simulación."
+                                <Label text="Selecciona un conjunto de modelos (Ventas + Compras) entrenado como base para la simulación."
                                        styleClass="form-block-hint"/>
                                 <ComboBox fx:id="cmbTrainedModel"
-                                          promptText="— Seleccionar pack —"
+                                          promptText="— Seleccionar modelos —"
                                           styleClass="form-combo-large" maxWidth="Infinity"/>
                                 <HBox fx:id="modelInfoBox" styleClass="model-info-box"
                                       spacing="12" alignment="CENTER_LEFT" visible="false" managed="false">

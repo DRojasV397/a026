@@ -5,11 +5,44 @@ RF-02: Modulo de Analisis Predictivo.
 
 import pytest
 import numpy as np
-from datetime import date, timedelta
+import pandas as pd
+from datetime import date, datetime, timedelta
 from decimal import Decimal
 from unittest.mock import Mock, patch
 
 from app.services.prediction_service import PredictionService
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Helpers para construir DataFrames de prueba
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _make_df(days: int, zeros_pct: float = 0.0, negatives: int = 0,
+             nulls: int = 0) -> pd.DataFrame:
+    """
+    Construye un DataFrame con columnas 'fecha' y 'total' que cubre `days` días.
+
+    Args:
+        days: Número de filas (días consecutivos hasta hoy)
+        zeros_pct: Fracción de filas con valor 0.0 (0.0–1.0)
+        negatives: Número de filas con valor negativo (-1.0)
+        nulls: Número de filas con NaN
+    """
+    base = datetime.now() - timedelta(days=days - 1)
+    dates = [base + timedelta(days=i) for i in range(days)]
+
+    n_zeros = int(days * zeros_pct)
+    values = [0.0] * n_zeros + [100.0] * (days - n_zeros)
+
+    for i in range(min(negatives, days)):
+        values[i] = -1.0
+
+    df = pd.DataFrame({"fecha": dates, "total": values})
+
+    if nulls:
+        df.loc[:nulls - 1, "total"] = np.nan
+
+    return df
 
 
 class TestPredictionService:
@@ -281,3 +314,119 @@ class TestClustering:
         # Deberia sugerir ~3 clusters
         assert data.shape[0] == 60
         assert data.shape[1] == 2
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# validate_data_requirements  (C3: validación por modelo)
+# ─────────────────────────────────────────────────────────────────────────────
+
+class TestValidateDataRequirements:
+    """
+    Tests para validate_data_requirements con mínimos específicos por modelo.
+    Mejora C3: SARIMA / Prophet / Ensemble requieren 365 días;
+                el resto requiere el mínimo global de 180.
+    """
+
+    @pytest.fixture
+    def service(self, db_session):
+        return PredictionService(db_session)
+
+    # ── DataFrame vacío ───────────────────────────────────────────────────────
+
+    def test_empty_df_fails(self, service):
+        """DataFrame vacío → False con 'No hay datos'."""
+        df = pd.DataFrame(columns=["fecha", "total"])
+        ok, issues = service.validate_data_requirements(df)
+        assert not ok
+        assert any("No hay datos" in i for i in issues)
+
+    # ── Mínimo global (180 días) ──────────────────────────────────────────────
+
+    def test_below_global_minimum_fails(self, service):
+        """90 días de span → falla mínimo global sin especificar modelo."""
+        df = _make_df(91)   # span = 90 días < 180
+        ok, issues = service.validate_data_requirements(df)
+        assert not ok
+        assert any("Rango de datos insuficiente" in i for i in issues)
+        assert any("180" in i for i in issues)
+
+    def test_exactly_global_minimum_passes(self, service):
+        """span == 180 días → pasa para modelos estándar."""
+        df = _make_df(181)  # span = 180 días
+        ok, issues = service.validate_data_requirements(df)
+        assert ok
+        assert issues == []
+
+    # ── Mínimos por modelo (estándar: 180 días) ───────────────────────────────
+
+    @pytest.mark.parametrize("model_type", ["linear", "arima", "random_forest", "xgboost", "multiple_regression"])
+    def test_standard_models_pass_with_181_days(self, service, model_type):
+        """Modelos estándar aceptan 180 días de span (181 filas)."""
+        df = _make_df(181)
+        ok, _ = service.validate_data_requirements(df, model_type=model_type)
+        assert ok
+
+    # ── Mínimos por modelo (estacional: 365 días) ─────────────────────────────
+
+    @pytest.mark.parametrize("model_type", ["sarima", "prophet", "ensemble"])
+    def test_seasonal_models_fail_with_181_days(self, service, model_type):
+        """SARIMA / Prophet / Ensemble necesitan 365 días; 181 días no alcanza."""
+        df = _make_df(181)  # span = 180 < 365
+        ok, issues = service.validate_data_requirements(df, model_type=model_type)
+        assert not ok
+        assert any("365" in i for i in issues)
+        assert any("temporada" in i for i in issues)
+
+    @pytest.mark.parametrize("model_type", ["sarima", "prophet", "ensemble"])
+    def test_seasonal_models_pass_with_366_days(self, service, model_type):
+        """SARIMA / Prophet / Ensemble pasan con 366 filas (span=365)."""
+        df = _make_df(366)  # span = 365 días
+        ok, _ = service.validate_data_requirements(df, model_type=model_type)
+        assert ok
+
+    def test_seasonal_error_mentions_model_name(self, service):
+        """El mensaje de error incluye el nombre del modelo para mejor diagnóstico."""
+        df = _make_df(181)
+        _, issues = service.validate_data_requirements(df, model_type="sarima")
+        assert any("sarima" in i for i in issues)
+
+    # ── Calidad de datos ──────────────────────────────────────────────────────
+
+    def test_null_values_fail(self, service):
+        """Valores nulos en 'total' → False con mensaje de nulos."""
+        df = _make_df(181, nulls=5)
+        ok, issues = service.validate_data_requirements(df)
+        assert not ok
+        assert any("nulos" in i for i in issues)
+        assert any("5" in i for i in issues)
+
+    def test_negative_values_fail(self, service):
+        """Valores negativos en 'total' → False con mensaje de negativos."""
+        df = _make_df(181, negatives=3)
+        ok, issues = service.validate_data_requirements(df)
+        assert not ok
+        assert any("negativos" in i for i in issues)
+        assert any("3" in i for i in issues)
+
+    def test_null_and_negative_both_reported(self, service):
+        """Nulos Y negativos en distintas filas → ambos aparecen en issues."""
+        # nulls=2 sobreescribe las filas 0-1; negatives=3 pone -1.0 en 0,1,2
+        # → fila 0,1 quedan NaN; fila 2 queda -1.0 → null_count=2, negative_count=1
+        df = _make_df(181, nulls=2, negatives=3)
+        ok, issues = service.validate_data_requirements(df)
+        assert not ok
+        assert any("nulos" in i for i in issues)
+        assert any("negativos" in i for i in issues)
+
+    def test_over_80pct_zeros_adds_warning(self, service):
+        """Más del 80% de ceros → warning con prefijo 'Advertencia' en issues."""
+        df = _make_df(181, zeros_pct=0.85)  # ≈84.5% de ceros
+        _, issues = service.validate_data_requirements(df)
+        assert any(i.startswith("Advertencia") for i in issues)
+
+    def test_under_80pct_zeros_no_warning(self, service):
+        """79% de ceros → sin advertencia de datos degenerados."""
+        df = _make_df(181, zeros_pct=0.79)
+        ok, issues = service.validate_data_requirements(df)
+        assert ok
+        assert not any("Advertencia" in i for i in issues)

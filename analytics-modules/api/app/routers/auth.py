@@ -3,10 +3,12 @@ Router de autenticacion.
 Endpoints para login, registro, verificacion y refresh de tokens.
 """
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from collections import defaultdict
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 import logging
+import time
 
 from app.database import get_db
 from app.services.auth_service import AuthService
@@ -30,6 +32,33 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/auth", tags=["Autenticacion"])
 
+# ─── Rate limiting para /auth/login ──────────────────────────────────────────
+# Máximo 5 intentos fallidos por IP en una ventana de 5 minutos.
+_login_attempts: dict[str, list[float]] = defaultdict(list)
+_MAX_LOGIN_ATTEMPTS = 5
+_LOGIN_WINDOW_SECONDS = 300  # 5 minutos
+
+
+def _check_rate_limit(ip: str) -> None:
+    """Lanza 429 si la IP superó el límite de intentos fallidos."""
+    now = time.time()
+    # Descartar intentos fuera de la ventana
+    _login_attempts[ip] = [t for t in _login_attempts[ip] if now - t < _LOGIN_WINDOW_SECONDS]
+    if len(_login_attempts[ip]) >= _MAX_LOGIN_ATTEMPTS:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=f"Demasiados intentos fallidos. Intenta de nuevo en {_LOGIN_WINDOW_SECONDS // 60} minutos.",
+            headers={"Retry-After": str(_LOGIN_WINDOW_SECONDS)},
+        )
+
+
+def _record_failed(ip: str) -> None:
+    _login_attempts[ip].append(time.time())
+
+
+def _clear_attempts(ip: str) -> None:
+    _login_attempts.pop(ip, None)
+
 
 @router.post(
     "/login",
@@ -38,6 +67,7 @@ router = APIRouter(prefix="/auth", tags=["Autenticacion"])
     description="Autentica un usuario y retorna tokens JWT"
 )
 async def login(
+    request: Request,
     form_data: OAuth2PasswordRequestForm = Depends(),
     db: Session = Depends(get_db)
 ):
@@ -49,16 +79,21 @@ async def login(
 
     Retorna access_token y refresh_token.
     """
+    ip = request.client.host if request.client else "unknown"
+    _check_rate_limit(ip)
+
     auth_service = AuthService(db)
     result = auth_service.login(form_data.username, form_data.password)
 
     if not result:
+        _record_failed(ip)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Usuario o contrasena incorrectos",
             headers={"WWW-Authenticate": "Bearer"},
         )
 
+    _clear_attempts(ip)
     return LoginResponse(
         access_token=result["access_token"],
         refresh_token=result["refresh_token"],
@@ -75,6 +110,7 @@ async def login(
     description="Autentica un usuario usando JSON body"
 )
 async def login_json(
+    request: Request,
     credentials: LoginRequest,
     db: Session = Depends(get_db)
 ):
@@ -83,16 +119,21 @@ async def login_json(
 
     Alternativa al OAuth2 form para clientes que prefieren JSON.
     """
+    ip = request.client.host if request.client else "unknown"
+    _check_rate_limit(ip)
+
     auth_service = AuthService(db)
     result = auth_service.login(credentials.username, credentials.password)
 
     if not result:
+        _record_failed(ip)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Usuario o contrasena incorrectos",
             headers={"WWW-Authenticate": "Bearer"},
         )
 
+    _clear_attempts(ip)
     return LoginResponse(
         access_token=result["access_token"],
         refresh_token=result["refresh_token"],

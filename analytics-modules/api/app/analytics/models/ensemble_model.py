@@ -573,6 +573,7 @@ class EnsembleModel(BaseModel):
     def save(self, filepath: str) -> None:
         """Guarda el ensemble completo (modelos base + meta-learner)."""
         model_data = {
+            "_model_type": self.model_type.value,
             "config": self.config,
             "metrics": self.metrics,
             "is_fitted": self.is_fitted,

@@ -1,6 +1,7 @@
 package com.app.service.alerts;
 
 import com.app.config.ApiConfig;
+import com.app.config.HttpClientProvider;
 import com.app.core.session.UserSession;
 import com.app.model.alerts.AlertDTO;
 import com.app.model.alerts.AlertsListResponseDTO;
@@ -41,10 +42,7 @@ public class AlertApiService {
     private final HttpClient httpClient;
 
     public AlertApiService() {
-        this.httpClient = HttpClient.newBuilder()
-                .version(HttpClient.Version.HTTP_1_1)
-                .connectTimeout(Duration.ofSeconds(15))
-                .build();
+        this.httpClient = HttpClientProvider.getClient();
     }
 
     private String authHeader() {

@@ -1,6 +1,7 @@
 package com.app.service.auth;
 
 import com.app.config.ApiConfig;
+import com.app.config.HttpClientProvider;
 import com.app.core.session.UserSession;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
@@ -26,10 +27,7 @@ public class TokenRefreshService {
     private final HttpClient httpClient;
 
     public TokenRefreshService() {
-        this.httpClient = HttpClient.newBuilder()
-                .version(HttpClient.Version.HTTP_1_1)
-                .connectTimeout(Duration.ofSeconds(10))
-                .build();
+        this.httpClient = HttpClientProvider.getClient();
     }
 
     /**

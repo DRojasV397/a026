@@ -8,6 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from contextlib import asynccontextmanager
 import logging
+import time
 
 from app.config import settings
 from app.database import db_manager
@@ -81,13 +82,23 @@ def read_root():
     }
 
 
+_health_cache: dict = {"db_status": "unknown", "checked_at": 0.0}
+_HEALTH_CACHE_TTL = 30  # segundos
+
+
 @app.get("/health")
 def health_check():
-    """Endpoint de health check."""
-    db_status = "connected" if db_manager.test_connection() else "disconnected"
+    """
+    Endpoint de health check con caché de 30 segundos.
+    Evita lanzar una query real a la BD en cada llamada.
+    """
+    now = time.time()
+    if now - _health_cache["checked_at"] >= _HEALTH_CACHE_TTL:
+        _health_cache["db_status"] = "connected" if db_manager.test_connection() else "disconnected"
+        _health_cache["checked_at"] = now
     return {
         "status": "healthy",
-        "database": db_status
+        "database": _health_cache["db_status"]
     }
 
 

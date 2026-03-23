@@ -1,6 +1,7 @@
 package com.app.service.dashboard;
 
 import com.app.config.ApiConfig;
+import com.app.config.HttpClientProvider;
 import com.app.core.session.UserSession;
 import com.app.model.dashboard.ExecutiveDashboardDTO;
 import com.app.model.dashboard.PreferencesResponseDTO;
@@ -29,10 +30,7 @@ public class DashboardService {
     private final HttpClient httpClient;
 
     public DashboardService() {
-        this.httpClient = HttpClient.newBuilder()
-                .version(HttpClient.Version.HTTP_1_1)
-                .connectTimeout(Duration.ofSeconds(15))
-                .build();
+        this.httpClient = HttpClientProvider.getClient();
     }
 
     private String authHeader() {

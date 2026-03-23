@@ -1,6 +1,7 @@
 package com.app.service.data;
 
 import com.app.config.ApiConfig;
+import com.app.config.HttpClientProvider;
 import com.app.core.session.UserSession;
 import com.app.model.data.api.*;
 import com.google.gson.Gson;
@@ -35,10 +36,7 @@ public class DataApiService {
     private final HttpClient httpClient;
 
     public DataApiService() {
-        this.httpClient = HttpClient.newBuilder()
-                .version(HttpClient.Version.HTTP_1_1)
-                .connectTimeout(Duration.ofSeconds(15))
-                .build();
+        this.httpClient = HttpClientProvider.getClient();
     }
 
     /**

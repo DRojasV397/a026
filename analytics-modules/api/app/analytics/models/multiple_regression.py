@@ -666,6 +666,7 @@ class MultipleRegressionModel(BaseModel):
     def save(self, filepath: str) -> None:
         """Guarda el modelo con todo el estado necesario para forecast."""
         model_data = {
+            "_model_type": self.model_type.value,
             "model": self.model,
             "config": self.config,
             "metrics": self.metrics,

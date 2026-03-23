@@ -65,8 +65,8 @@ class PredictionDTOsTest {
         assertEquals("linear_20250101_20250601", resp.getModelKey());
         assertEquals("linear", resp.getModelType());
         assertNotNull(resp.getMetrics());
-        assertEquals(0.85, resp.getMetrics().get("r2"), 0.001);
-        assertEquals(1234.56, resp.getMetrics().get("mae"), 0.01);
+        assertEquals(0.85, ((Number) resp.getMetrics().get("r2")).doubleValue(), 0.001);
+        assertEquals(1234.56, ((Number) resp.getMetrics().get("mae")).doubleValue(), 0.01);
         assertTrue(resp.getMeetsR2Threshold());
         assertEquals("Modelo aprobado", resp.getRecommendation());
         assertEquals(200, resp.getTrainingSamples());
@@ -109,7 +109,7 @@ class PredictionDTOsTest {
 
         assertTrue(resp.isSuccess());
         assertFalse(resp.getMeetsR2Threshold());
-        assertEquals(0.45, resp.getMetrics().get("r2"), 0.001);
+        assertEquals(0.45, ((Number) resp.getMetrics().get("r2")).doubleValue(), 0.001);
     }
 
     // ── ForecastRequestDTO ────────────────────────────────────────────────
@@ -194,7 +194,7 @@ class PredictionDTOsTest {
         assertEquals("sarima_20240101_20250101", info.getModelKey());
         assertEquals("sarima", info.getModelType());
         assertTrue(info.isFitted());
-        assertEquals(0.92, info.getMetrics().get("r2"), 0.001);
+        assertEquals(0.92, ((Number) info.getMetrics().get("r2")).doubleValue(), 0.001);
         assertEquals("2025-06-15T10:30:00", info.getTrainedAt());
     }
 

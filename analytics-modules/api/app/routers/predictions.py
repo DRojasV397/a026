@@ -10,8 +10,10 @@ from typing import Optional, List
 from datetime import datetime, date
 from pydantic import BaseModel, Field
 import pandas as pd
+import asyncio
+from concurrent.futures import ThreadPoolExecutor
 
-from app.database import get_db
+from app.database import get_db, db_manager
 from app.services.prediction_service import PredictionService
 from app.middleware.auth_middleware import get_current_user
 from app.schemas.auth import TokenData
@@ -22,6 +24,10 @@ from app.schemas.prediction import (
 )
 
 router = APIRouter(prefix="/predictions", tags=["Predicciones"])
+
+# Executor dedicado para entrenamientos ML (CPU-bound).
+# max_workers=2 evita saturar la CPU; los entrenamientos son infrecuentes y pesados.
+_train_executor = ThreadPoolExecutor(max_workers=2, thread_name_prefix="ml-train")
 
 
 # ==================== SCHEMAS ====================
@@ -207,25 +213,31 @@ class SalesDataRequest(BaseModel):
 )
 async def train_model(
     request: TrainModelRequest,
-    db: Session = Depends(get_db),
     current_user: TokenData = Depends(get_current_user)
 ):
     """Entrena un modelo predictivo."""
-    service = PredictionService(db)
-
-    # Convertir fechas
+    # Extraer valores del request antes de entrar al executor (thread safety)
     fecha_inicio = datetime.combine(request.fecha_inicio, datetime.min.time()) if request.fecha_inicio else None
     fecha_fin = datetime.combine(request.fecha_fin, datetime.min.time()) if request.fecha_fin else None
+    model_type = request.model_type
+    hyperparameters = request.hyperparameters
+    nombre = request.nombre
+    user_id = current_user.idUsuario
 
-    result = service.train_model(
-        model_type=request.model_type,
-        fecha_inicio=fecha_inicio,
-        fecha_fin=fecha_fin,
-        hyperparameters=request.hyperparameters,
-        user_id=current_user.idUsuario,
-        nombre=request.nombre
-    )
+    def _blocking():
+        with db_manager.get_session_context() as db:
+            service = PredictionService(db)
+            return service.train_model(
+                model_type=model_type,
+                fecha_inicio=fecha_inicio,
+                fecha_fin=fecha_fin,
+                hyperparameters=hyperparameters,
+                user_id=user_id,
+                nombre=nombre
+            )
 
+    loop = asyncio.get_running_loop()
+    result = await loop.run_in_executor(_train_executor, _blocking)
     return TrainModelResponse(**result)
 
 
@@ -271,21 +283,24 @@ async def forecast(
 )
 async def auto_select_model(
     request: AutoSelectRequest,
-    db: Session = Depends(get_db),
     current_user: TokenData = Depends(get_current_user)
 ):
     """Selecciona automaticamente el mejor modelo."""
-    service = PredictionService(db)
-
     fecha_inicio = datetime.combine(request.fecha_inicio, datetime.min.time()) if request.fecha_inicio else None
     fecha_fin = datetime.combine(request.fecha_fin, datetime.min.time()) if request.fecha_fin else None
+    user_id = current_user.idUsuario
 
-    result = service.auto_select_model(
-        fecha_inicio=fecha_inicio,
-        fecha_fin=fecha_fin,
-        user_id=current_user.idUsuario
-    )
+    def _blocking():
+        with db_manager.get_session_context() as db:
+            service = PredictionService(db)
+            return service.auto_select_model(
+                fecha_inicio=fecha_inicio,
+                fecha_fin=fecha_fin,
+                user_id=user_id
+            )
 
+    loop = asyncio.get_running_loop()
+    result = await loop.run_in_executor(_train_executor, _blocking)
     return AutoSelectResponse(**result)
 
 
@@ -690,23 +705,30 @@ async def delete_model(
 )
 async def train_pack(
     request: PackTrainRequest,
-    db: Session = Depends(get_db),
     current_user: TokenData = Depends(get_current_user)
 ):
     """Entrena pack de modelos ventas+compras."""
-    service = PredictionService(db)
-
     fecha_inicio = datetime.combine(request.fecha_inicio, datetime.min.time()) if request.fecha_inicio else None
     fecha_fin    = datetime.combine(request.fecha_fin,    datetime.min.time()) if request.fecha_fin    else None
+    nombre = request.nombre
+    hyperparameters = request.hyperparameters
+    user_id = current_user.idUsuario
+    ventas_model_type = request.ventas_model_type or "multiple_regression"
 
-    result = service.train_pack(
-        nombre=request.nombre,
-        fecha_inicio=fecha_inicio,
-        fecha_fin=fecha_fin,
-        hyperparameters=request.hyperparameters,
-        user_id=current_user.idUsuario,
-        ventas_model_type=request.ventas_model_type or "multiple_regression"
-    )
+    def _blocking():
+        with db_manager.get_session_context() as db:
+            service = PredictionService(db)
+            return service.train_pack(
+                nombre=nombre,
+                fecha_inicio=fecha_inicio,
+                fecha_fin=fecha_fin,
+                hyperparameters=hyperparameters,
+                user_id=user_id,
+                ventas_model_type=ventas_model_type
+            )
+
+    loop = asyncio.get_running_loop()
+    result = await loop.run_in_executor(_train_executor, _blocking)
 
     if not result.get("success"):
         return PackTrainResponse(**result)

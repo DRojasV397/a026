@@ -38,7 +38,7 @@ public class DashboardPreferencesController {
             new String[]{"chart_ingresos_gastos",        "Ingresos vs Gastos"},
             new String[]{"chart_rentabilidad",           "Rentabilidad por Categoría"},
             new String[]{"chart_alertas",                "Distribución de Alertas"},
-            new String[]{"chart_precision_packs",        "Precisión de Packs"}
+            new String[]{"chart_precision_packs",        "Precisión de Modelos"}
     );
 
     private final List<PrefRow> statRows  = new ArrayList<>();

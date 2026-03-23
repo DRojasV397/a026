@@ -729,17 +729,17 @@ public class HomeController {
             }
         }
 
-        // 3. BarChart — Precisión (R²) de packs de modelos
+        // 3. BarChart — Precisión (R²) de modelos
         if (modelosChartController != null) {
-            modelosChartController.setTitle("Precisión de Packs Predictivos");
+            modelosChartController.setTitle("Precisión de Modelos Predictivos");
             List<ExecutiveDashboardDTO.ModeloResumen> modelos = dashboardDto.getPrecisionModelos();
             if (!modelos.isEmpty()) {
                 ExecutiveDashboardDTO.ModeloResumen mejor = modelos.stream()
                         .max(Comparator.comparingDouble(ExecutiveDashboardDTO.ModeloResumen::getPrecision))
                         .orElse(null);
                 String subtitulo = mejor != null
-                        ? String.format("R² por pack activo  |  Mejor: %s (R²=%.3f)", mejor.getNombre(), mejor.getPrecision())
-                        : "R² promedio por pack activo (0 = peor, 1 = mejor)";
+                        ? String.format("R² por modelo activo  |  Mejor: %s (R²=%.3f)", mejor.getNombre(), mejor.getPrecision())
+                        : "R² promedio por modelo activo (0 = peor, 1 = mejor)";
                 modelosChartController.setSubtitle(subtitulo);
                 XYChart.Series<String, Number> serie = new XYChart.Series<>();
                 serie.setName("R²");
@@ -747,7 +747,7 @@ public class HomeController {
                         new XYChart.Data<>(m.getNombre(), m.getPrecision())));
                 modelosChartController.loadCustomData(serie);
             } else {
-                modelosChartController.setSubtitle("Sin packs entrenados — entrena un pack en el módulo predictivo");
+                modelosChartController.setSubtitle("Sin modelos entrenados — entrena un modelo en el módulo predictivo");
                 modelosChartController.clearData();
             }
         }

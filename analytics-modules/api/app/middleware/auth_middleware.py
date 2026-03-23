@@ -3,7 +3,7 @@ Middleware de autenticacion y autorizacion.
 Proporciona dependencias para proteger endpoints con JWT.
 """
 
-from typing import Optional, List
+from typing import Optional, List, Tuple
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
@@ -22,145 +22,114 @@ oauth2_scheme = OAuth2PasswordBearer(
     auto_error=False
 )
 
+# Excepcion reutilizable para credenciales invalidas
+_CREDENTIALS_EXCEPTION = HTTPException(
+    status_code=status.HTTP_401_UNAUTHORIZED,
+    detail="No se pudo validar las credenciales",
+    headers={"WWW-Authenticate": "Bearer"},
+)
 
-async def get_current_user(
-    token: Optional[str] = Depends(oauth2_scheme),
-    db: Session = Depends(get_db)
-) -> Optional[Usuario]:
+_INACTIVE_EXCEPTION = HTTPException(
+    status_code=status.HTTP_403_FORBIDDEN,
+    detail="Usuario inactivo",
+)
+
+
+async def _resolve_user(
+    token: Optional[str],
+    db: Session,
+) -> Tuple[Usuario, TokenData]:
     """
-    Obtiene el usuario actual a partir del token JWT.
-    No lanza excepcion si no hay token (para endpoints opcionales).
+    Helper interno: verifica el token JWT y carga el Usuario de la BD.
 
-    Args:
-        token: Token JWT del header Authorization
-        db: Sesion de base de datos
+    Centraliza la logica compartida por get_current_user,
+    get_current_active_user y require_roles, evitando duplicacion.
 
     Returns:
-        Optional[Usuario]: Usuario autenticado o None
+        (Usuario, TokenData)
+
+    Raises:
+        HTTPException 401: Si falta token, es invalido, o el usuario no existe.
     """
     if not token:
-        return None
+        raise _CREDENTIALS_EXCEPTION
 
     auth_service = AuthService(db)
     token_data = auth_service.verify_token(token)
-
     if not token_data:
-        return None
+        raise _CREDENTIALS_EXCEPTION
 
-    # Obtener usuario de la BD
     from app.repositories import UsuarioRepository
-    user_repo = UsuarioRepository(db)
-    user = user_repo.get_by_id(token_data.idUsuario)
+    user = UsuarioRepository(db).get_by_id(token_data.idUsuario)
+    if not user:
+        raise _CREDENTIALS_EXCEPTION
 
+    return user, token_data
+
+
+async def get_current_user(
+    token: Optional[str] = Depends(oauth2_scheme),
+    db: Session = Depends(get_db),
+) -> Usuario:
+    """
+    Obtiene el usuario autenticado a partir del token JWT.
+    Lanza 401 si el token falta o es invalido.
+
+    Returns:
+        Usuario autenticado (sin verificar estado activo).
+    """
+    user, _ = await _resolve_user(token, db)
     return user
 
 
 async def get_current_active_user(
     token: Optional[str] = Depends(oauth2_scheme),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ) -> Usuario:
     """
-    Obtiene el usuario actual autenticado y activo.
-    Lanza excepcion si no hay token o usuario invalido.
-
-    Args:
-        token: Token JWT del header Authorization
-        db: Sesion de base de datos
+    Obtiene el usuario autenticado y activo.
+    Lanza 401 si el token es invalido, 403 si el usuario esta inactivo.
 
     Returns:
-        Usuario: Usuario autenticado
-
-    Raises:
-        HTTPException: Si no hay token, es invalido o usuario inactivo
+        Usuario autenticado y activo.
     """
-    credentials_exception = HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="No se pudo validar las credenciales",
-        headers={"WWW-Authenticate": "Bearer"},
-    )
-
-    if not token:
-        raise credentials_exception
-
-    auth_service = AuthService(db)
-    token_data = auth_service.verify_token(token)
-
-    if not token_data:
-        raise credentials_exception
-
-    # Obtener usuario de la BD
-    from app.repositories import UsuarioRepository
-    user_repo = UsuarioRepository(db)
-    user = user_repo.get_by_id(token_data.idUsuario)
-
-    if not user:
-        raise credentials_exception
-
-    # Verificar que el usuario este activo
-    if user.estado and user.estado.lower() != 'activo':
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Usuario inactivo"
-        )
-
+    user, _ = await _resolve_user(token, db)
+    if user.estado and user.estado.lower() != "activo":
+        raise _INACTIVE_EXCEPTION
     return user
 
 
 def require_roles(allowed_roles: List[str]):
     """
-    Decorador/dependencia para requerir roles especificos.
+    Dependencia para requerir roles especificos.
+
+    Verifica (en orden):
+    1. Token valido y usuario existente (401 si falla)
+    2. Usuario activo (403 si inactivo)          ← fix B3
+    3. Al menos un rol permitido (403 si falta)
 
     Args:
-        allowed_roles: Lista de roles permitidos
+        allowed_roles: Lista de roles aceptados (OR logico).
 
     Returns:
-        Dependencia que verifica los roles
+        Dependencia de FastAPI que retorna el Usuario autenticado.
     """
     async def role_checker(
         token: Optional[str] = Depends(oauth2_scheme),
-        db: Session = Depends(get_db)
+        db: Session = Depends(get_db),
     ) -> Usuario:
-        """
-        Verifica que el usuario tenga uno de los roles permitidos.
+        user, token_data = await _resolve_user(token, db)
 
-        Returns:
-            Usuario: Usuario autenticado con rol valido
+        # B3: verificar que el usuario este activo antes de comprobar roles
+        if user.estado and user.estado.lower() != "activo":
+            raise _INACTIVE_EXCEPTION
 
-        Raises:
-            HTTPException: Si no tiene permisos
-        """
-        credentials_exception = HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="No se pudo validar las credenciales",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-
-        if not token:
-            raise credentials_exception
-
-        auth_service = AuthService(db)
-        token_data = auth_service.verify_token(token)
-
-        if not token_data:
-            raise credentials_exception
-
-        # Verificar roles
         user_roles = token_data.roles or []
-        has_permission = any(role in allowed_roles for role in user_roles)
-
-        if not has_permission:
+        if not any(role in allowed_roles for role in user_roles):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"Se requiere uno de los siguientes roles: {', '.join(allowed_roles)}"
+                detail=f"Se requiere uno de los siguientes roles: {', '.join(allowed_roles)}",
             )
-
-        # Obtener usuario de la BD
-        from app.repositories import UsuarioRepository
-        user_repo = UsuarioRepository(db)
-        user = user_repo.get_by_id(token_data.idUsuario)
-
-        if not user:
-            raise credentials_exception
 
         return user
 
