@@ -38,7 +38,7 @@ public class LoginController {
     @FXML
     private void initialize() {
         Platform.runLater(() -> {
-            userField.getParent().requestFocus();
+            userField.requestFocus();
         });
 
         userField.textProperty().addListener((obs, oldVal, newVal) -> {
@@ -50,6 +50,29 @@ public class LoginController {
             passTouched = true;
             validateForm();
         });
+
+        // ── Tab desde usuario → salta a contraseña ──────────────────────
+        userField.setOnKeyPressed(event -> {
+            if (event.getCode() == javafx.scene.input.KeyCode.TAB) {
+                event.consume(); // evita comportamiento doble
+                passwordField.requestFocus();
+            }
+            // ── Enter desde usuario → dispara login si el botón está activo ─
+            if (event.getCode() == javafx.scene.input.KeyCode.ENTER) {
+                if (!loginButton.isDisabled()) onLogin();
+            }
+        });
+
+        // ── Enter desde contraseña → dispara login ───────────────────────
+        passwordField.setOnKeyPressed(event -> {
+            if (event.getCode() == javafx.scene.input.KeyCode.ENTER) {
+                if (!loginButton.isDisabled()) onLogin();
+            }
+        });
+
+        // ── Los wrappers HBox no deben participar en el tab-order ────────
+        userWrapper.setFocusTraversable(false);
+        passwordWrapper.setFocusTraversable(false);
     }
 
     private void validateForm() {
