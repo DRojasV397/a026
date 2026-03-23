@@ -79,7 +79,7 @@ public class NavbarController {
     private void registerAvatarClickHandler() {
         // Solo clic DERECHO sobre el avatar o su contenedor abre el menú
         avatarPane.setOnMouseClicked(event -> {
-            if (event.getButton() == MouseButton.SECONDARY) {
+            if (event.getButton() == MouseButton.PRIMARY) {
                 profileMenu.show(avatarPane, event.getScreenX(), event.getScreenY());
                 event.consume();
             } else {
