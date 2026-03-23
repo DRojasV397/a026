@@ -254,7 +254,7 @@ class ExtendedPredictionDTOsTest {
         assertEquals("linear", resp.getModelType());
         assertTrue(resp.getIsFitted());
         assertNotNull(resp.getMetrics());
-        assertEquals(0.87, resp.getMetrics().get("r2"), 0.001);
+        assertEquals(0.87, ((Number) resp.getMetrics().get("r2")).doubleValue(), 0.001);
         assertNotNull(resp.getPath());
         assertNull(resp.getError());
     }

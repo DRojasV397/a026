@@ -380,7 +380,7 @@ public class PredictiveController {
         card.getStyleClass().add("model-card");
         card.setMaxWidth(280);
 
-        Label badgePack = new Label("📦 Pack");
+        Label badgePack = new Label("📦 Modelo");
         badgePack.setStyle("-fx-background-color: #fef9e7; -fx-text-fill: #e67e22; "
                 + "-fx-padding: 2 8; -fx-background-radius: 10; -fx-font-size: 10px; -fx-font-weight: bold;");
 
@@ -401,7 +401,7 @@ public class PredictiveController {
         Label fechaLabel = new Label("Creado: " + fecha);
         fechaLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: #95a5a6;");
 
-        Button useBtn = new Button("Usar este pack");
+        Button useBtn = new Button("Usar este modelo");
         useBtn.setMaxWidth(Double.MAX_VALUE);
         useBtn.getStyleClass().add("select-button");
         useBtn.setOnAction(e -> {
@@ -446,7 +446,7 @@ public class PredictiveController {
         savedPackCards.forEach(c -> {
             c.getStyleClass().remove("selected");
             Button b = (Button) c.lookup(".select-button");
-            if (b != null) b.setText("Usar este pack");
+            if (b != null) b.setText("Usar este modelo");
         });
         card.getStyleClass().add("selected");
         btn.setText("Seleccionado");
@@ -1364,10 +1364,10 @@ public class PredictiveController {
         VBox card = new VBox(14);
         card.getStyleClass().add("param-card");
 
-        Label title = new Label("⚙️ Parámetros del Pack Ventas + Compras");
+        Label title = new Label("⚙️ Parámetros del Modelo Ventas + Compras");
         title.getStyleClass().add("param-card-title");
 
-        Label note = new Label("Configura la regularización para cada submodelo del pack");
+        Label note = new Label("Configura la regularización para cada submodelo");
         note.setStyle("-fx-font-size: 11px; -fx-text-fill: #95a5a6; -fx-font-style: italic;");
         note.setWrapText(true);
 
@@ -2403,7 +2403,7 @@ public class PredictiveController {
         boolean comprasOk = response.getCompras() != null
                 && Boolean.TRUE.equals(response.getCompras().getMeets_r2_threshold());
 
-        lblTrainingTime.setText("Pack: 2 modelos");
+        lblTrainingTime.setText("Ventas + Compras: 2 modelos");
         lblMetric.setText("Ventas R²=" + ventasR2 + " | Compras R²=" + comprasR2);
         lblResult.setText(ventasOk && comprasOk ? "Aprobado" : ventasOk || comprasOk ? "Parcial" : "Bajo umbral");
 
@@ -2411,7 +2411,7 @@ public class PredictiveController {
         trainingMetrics.setVisible(true);
         trainingMetrics.setManaged(true);
 
-        trainingTitleTxt.setText("Pack entrenado correctamente. Clave: " + response.getPack_key());
+        trainingTitleTxt.setText("Modelos entrenados correctamente. Clave: " + response.getPack_key());
         validPhase3 = true;
         updateFooterState();
 
@@ -2508,7 +2508,7 @@ public class PredictiveController {
             loadPackResultsKpisFromApi();
             loadPackTrainingSummaryFromApi();
             loadPackModelInfoFromApi();
-            Label loadingLabel = new Label("Generando gráficas del pack...");
+            Label loadingLabel = new Label("Generando gráficas...");
             loadingLabel.setStyle("-fx-text-fill: #7f8c8d; -fx-font-style: italic; -fx-padding: 20;");
             resultsChartsContainer.getChildren().setAll(loadingLabel);
             requestPackForecastForCharts();
@@ -2569,7 +2569,7 @@ public class PredictiveController {
     private void loadPackTrainingSummaryFromApi() {
         trainingSummaryContainer.getChildren().clear();
         Map<String, String> summary = new LinkedHashMap<>();
-        summary.put("Pack Key", lastPackTrainResponse.getPack_key() != null
+        summary.put("Clave", lastPackTrainResponse.getPack_key() != null
                 ? lastPackTrainResponse.getPack_key() : "N/A");
         PackTrainResponseDTO.SubModelResult ventas = lastPackTrainResponse.getVentas();
         PackTrainResponseDTO.SubModelResult compras = lastPackTrainResponse.getCompras();
@@ -2592,8 +2592,8 @@ public class PredictiveController {
     private void loadPackModelInfoFromApi() {
         modelInfoContainer.getChildren().clear();
         Map<String, String> info = new LinkedHashMap<>();
-        info.put("Tipo", "Pack Ventas + Compras");
-        info.put("Pack Key", lastPackTrainResponse.getPack_key() != null
+        info.put("Tipo", "Modelo Ventas + Compras");
+        info.put("Clave", lastPackTrainResponse.getPack_key() != null
                 ? lastPackTrainResponse.getPack_key() : "N/A");
         info.put("Entrenado", java.time.LocalDateTime.now()
                 .format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")));
@@ -2643,7 +2643,7 @@ public class PredictiveController {
                         getClass().getResource("/fxml/components/charts/LineChartCard.fxml"));
                 VBox chartNode = loader.load();
                 LineChartCardController controller = loader.getController();
-                controller.setTitle("Predicción de Ventas (Pack)");
+                controller.setTitle("Predicción de Ventas (Modelo)");
                 controller.setSubtitle("Forecast ventas — " + lastPackForecastResponse.getPeriods() + " períodos");
 
                 XYChart.Series<String, Number> series = new XYChart.Series<>();
@@ -2670,7 +2670,7 @@ public class PredictiveController {
                         getClass().getResource("/fxml/components/charts/LineChartCard.fxml"));
                 VBox chartNode = loader.load();
                 LineChartCardController controller = loader.getController();
-                controller.setTitle("Predicción de Compras (Pack)");
+                controller.setTitle("Predicción de Compras (Modelo)");
                 controller.setSubtitle("Forecast compras — " + lastPackForecastResponse.getPeriods() + " períodos");
 
                 XYChart.Series<String, Number> series = new XYChart.Series<>();

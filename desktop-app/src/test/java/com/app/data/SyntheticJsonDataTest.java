@@ -46,7 +46,7 @@ class SyntheticJsonDataTest {
         assertEquals("random_forest", resp.getModelType());
         assertTrue(resp.getMeetsR2Threshold());
         assertNotNull(resp.getMetrics());
-        assertTrue(resp.getMetrics().get("r2") >= 0.7,
+        assertTrue(((Number) resp.getMetrics().get("r2")).doubleValue() >= 0.7,
                 "R2 debe cumplir umbral de aceptacion (>= 0.7)");
         assertEquals(550, resp.getTrainingSamples());
         assertEquals(180, resp.getTestSamples());
@@ -63,7 +63,7 @@ class SyntheticJsonDataTest {
 
         assertTrue(resp.isSuccess()); // El entrenamiento ocurrio, pero R2 es bajo
         assertFalse(resp.getMeetsR2Threshold());
-        assertTrue(resp.getMetrics().get("r2") < 0.7,
+        assertTrue(((Number) resp.getMetrics().get("r2")).doubleValue() < 0.7,
                 "R2 debe estar bajo el umbral");
         assertNotNull(resp.getIssues());
         assertFalse(resp.getIssues().isEmpty());

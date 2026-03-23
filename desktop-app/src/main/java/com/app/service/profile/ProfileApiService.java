@@ -1,6 +1,7 @@
 package com.app.service.profile;
 
 import com.app.config.ApiConfig;
+import com.app.config.HttpClientProvider;
 import com.app.core.session.UserSession;
 import com.google.gson.Gson;
 import com.google.gson.annotations.SerializedName;
@@ -28,10 +29,7 @@ public class ProfileApiService {
     private final HttpClient httpClient;
 
     public ProfileApiService() {
-        this.httpClient = HttpClient.newBuilder()
-                .version(HttpClient.Version.HTTP_1_1)
-                .connectTimeout(Duration.ofSeconds(15))
-                .build();
+        this.httpClient = HttpClientProvider.getClient();
     }
 
     /**

@@ -512,6 +512,7 @@ class TimeSeriesRandomForest(RandomForestModel):
         import pickle
 
         model_data = {
+            "_model_type": self.model_type.value,
             "model": self.model,
             "config": self.config,
             "metrics": self.metrics,

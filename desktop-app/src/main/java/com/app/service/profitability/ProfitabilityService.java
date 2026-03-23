@@ -1,6 +1,7 @@
 package com.app.service.profitability;
 
 import com.app.config.ApiConfig;
+import com.app.config.HttpClientProvider;
 import com.app.core.session.UserSession;
 import com.app.model.profitability.*;
 import com.google.gson.Gson;
@@ -35,10 +36,7 @@ public class ProfitabilityService {
     private final HttpClient httpClient;
 
     public ProfitabilityService() {
-        this.httpClient = HttpClient.newBuilder()
-                .version(HttpClient.Version.HTTP_1_1)
-                .connectTimeout(Duration.ofSeconds(15))
-                .build();
+        this.httpClient = HttpClientProvider.getClient();
     }
 
     private String authHeader() {

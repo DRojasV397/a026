@@ -861,8 +861,8 @@ public class SimulationController {
 
     private boolean validateForm(boolean requireModel) {
         if (requireModel && cmbTrainedModel.getSelectionModel().isEmpty()) {
-            showAlert(Alert.AlertType.WARNING, "Pack requerido",
-                    "Selecciona un pack de modelos entrenado."); return false;
+            showAlert(Alert.AlertType.WARNING, "Modelos requeridos",
+                    "Selecciona un conjunto de modelos entrenado."); return false;
         }
         if (txtScenarioName.getText().isBlank()) {
             showAlert(Alert.AlertType.WARNING, "Nombre requerido",

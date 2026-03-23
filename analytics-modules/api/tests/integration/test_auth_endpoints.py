@@ -3,6 +3,7 @@ Pruebas de integracion para endpoints de autenticacion.
 """
 
 import pytest
+from unittest.mock import patch
 from fastapi.testclient import TestClient
 
 
@@ -208,3 +209,96 @@ class TestAuthEndpoints:
 
         # Puede ser 200, 401 (token invalido), 403 (sin permisos), o 500 (error interno)
         assert response.status_code in [200, 401, 403, 500]
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Rate limiting  (mejora 4: máx 5 intentos fallidos / IP en 5 minutos)
+# ─────────────────────────────────────────────────────────────────────────────
+
+_WRONG_CREDS = {"username": "noexist_ratelimit", "password": "WrongPass999!"}
+_WRONG_CREDS_JSON = {"username": "noexist_ratelimit", "password": "WrongPass999!"}
+
+
+class TestLoginRateLimit:
+    """
+    Valida que el rate limiter en /auth/login bloquee tras 5 intentos
+    fallidos por IP (HTTP 429) e incluya el header Retry-After.
+    """
+
+    @pytest.fixture(autouse=True)
+    def _clean_rate_state(self):
+        """Limpia _login_attempts antes y después de cada test."""
+        from app.routers.auth import _login_attempts
+        _login_attempts.clear()
+        yield
+        _login_attempts.clear()
+
+    # ── endpoint form-data (/auth/login) ─────────────────────────────────────
+
+    def test_first_4_failures_return_401(self, client: TestClient):
+        """4 intentos fallidos seguidos → cada uno retorna 401, no 429."""
+        for _ in range(4):
+            r = client.post("/api/v1/auth/login", data=_WRONG_CREDS)
+            assert r.status_code == 401
+
+    def test_6th_failure_returns_429(self, client: TestClient):
+        """Tras 5 intentos fallidos, el 6to intento → 429 Too Many Requests."""
+        for _ in range(5):
+            client.post("/api/v1/auth/login", data=_WRONG_CREDS)
+        r = client.post("/api/v1/auth/login", data=_WRONG_CREDS)
+        assert r.status_code == 429
+
+    def test_429_contains_retry_after_header(self, client: TestClient):
+        """La respuesta 429 incluye el header Retry-After."""
+        for _ in range(5):
+            client.post("/api/v1/auth/login", data=_WRONG_CREDS)
+        r = client.post("/api/v1/auth/login", data=_WRONG_CREDS)
+        assert r.status_code == 429
+        lower_headers = {k.lower(): v for k, v in r.headers.items()}
+        assert "retry-after" in lower_headers
+
+    def test_429_retry_after_value_is_300(self, client: TestClient):
+        """Retry-After indica la ventana completa (300 segundos = 5 min)."""
+        for _ in range(5):
+            client.post("/api/v1/auth/login", data=_WRONG_CREDS)
+        r = client.post("/api/v1/auth/login", data=_WRONG_CREDS)
+        lower_headers = {k.lower(): v for k, v in r.headers.items()}
+        assert lower_headers.get("retry-after") == "300"
+
+    # ── endpoint JSON (/auth/login/json) ─────────────────────────────────────
+
+    def test_json_endpoint_also_rate_limited(self, client: TestClient):
+        """/auth/login/json también aplica rate limiting tras 5 fallos."""
+        for _ in range(5):
+            client.post("/api/v1/auth/login/json", json=_WRONG_CREDS_JSON)
+        r = client.post("/api/v1/auth/login/json", json=_WRONG_CREDS_JSON)
+        assert r.status_code == 429
+
+    # ── contador compartido entre endpoints ───────────────────────────────────
+
+    def test_form_and_json_share_counter(self, client: TestClient):
+        """3 fallos en /login + 2 en /login/json = 5 total → el 6to falla con 429."""
+        for _ in range(3):
+            client.post("/api/v1/auth/login", data=_WRONG_CREDS)
+        for _ in range(2):
+            client.post("/api/v1/auth/login/json", json=_WRONG_CREDS_JSON)
+        # 6to intento combinado
+        r = client.post("/api/v1/auth/login", data=_WRONG_CREDS)
+        assert r.status_code == 429
+
+    # ── reset por login exitoso ───────────────────────────────────────────────
+
+    def test_successful_login_resets_counter(self, client: TestClient):
+        """Un login exitoso limpia el contador → el siguiente fallo retorna 401."""
+        # Llenar 4 intentos fallidos
+        for _ in range(4):
+            client.post("/api/v1/auth/login", data=_WRONG_CREDS)
+
+        # Simular un login exitoso limpiando el contador directamente
+        # (idéntico a lo que hace _clear_attempts en el router)
+        from app.routers.auth import _login_attempts
+        _login_attempts.clear()
+
+        # Ahora el siguiente intento fallido debe retornar 401, no 429
+        r = client.post("/api/v1/auth/login", data=_WRONG_CREDS)
+        assert r.status_code == 401

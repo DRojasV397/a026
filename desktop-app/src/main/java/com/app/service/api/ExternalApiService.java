@@ -1,6 +1,7 @@
 package com.app.service.api;
 
 import com.app.config.ApiConfig;
+import com.app.config.HttpClientProvider;
 import com.app.model.LoginResponseDTO;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
@@ -20,10 +21,7 @@ public class ExternalApiService {
     private final HttpClient httpClient;
 
     public ExternalApiService() {
-        this.httpClient = HttpClient.newBuilder()
-                .version(HttpClient.Version.HTTP_1_1)
-                .connectTimeout(Duration.ofSeconds(10))
-                .build();
+        this.httpClient = HttpClientProvider.getClient();
     }
 
     /**

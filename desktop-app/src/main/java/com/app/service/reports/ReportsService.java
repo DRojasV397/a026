@@ -1,6 +1,7 @@
 package com.app.service.reports;
 
 import com.app.config.ApiConfig;
+import com.app.config.HttpClientProvider;
 import com.app.core.session.UserSession;
 import com.app.model.reports.ReportTypeDTO;
 import com.app.model.reports.ReportTypesResponseDTO;
@@ -36,10 +37,7 @@ public class ReportsService {
     private final HttpClient httpClient;
 
     public ReportsService() {
-        this.httpClient = HttpClient.newBuilder()
-                .version(HttpClient.Version.HTTP_1_1)
-                .connectTimeout(Duration.ofSeconds(15))
-                .build();
+        this.httpClient = HttpClientProvider.getClient();
     }
 
     private String authHeader() {

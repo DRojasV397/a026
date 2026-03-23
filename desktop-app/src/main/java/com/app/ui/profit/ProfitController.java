@@ -1587,7 +1587,7 @@ public class ProfitController {
 
     private void loadProjection(VBox container, int periods) {
         container.getChildren().clear();
-        Label loading = new Label("Generando proyección con el mejor pack disponible...");
+        Label loading = new Label("Generando proyección con los mejores modelos disponibles...");
         loading.getStyleClass().add("main-subtitle");
         container.getChildren().add(loading);
 
@@ -1604,7 +1604,7 @@ public class ProfitController {
                     Label errMsg = new Label(
                             resp == null
                             ? "No se pudo conectar con el servidor."
-                            : "No hay packs de modelos activos. Entrena un pack en el módulo de Predicciones.");
+                            : "No hay modelos activos. Entrena un modelo en el módulo de Predicciones.");
                     errMsg.getStyleClass().add("coming-soon-text");
                     errMsg.setWrapText(true);
                     errMsg.setMaxWidth(480);

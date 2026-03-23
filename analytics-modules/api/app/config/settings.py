@@ -44,6 +44,22 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
 
+    @field_validator('SECRET_KEY')
+    @classmethod
+    def validate_secret_key(cls, v: str) -> str:
+        """Rechaza la clave por defecto o claves demasiado cortas al iniciar la API."""
+        _default = "your-secret-key-here-change-in-production"
+        if v == _default:
+            raise ValueError(
+                "SECRET_KEY no puede ser el valor por defecto. "
+                "Define una clave segura en el archivo .env (mínimo 32 caracteres)."
+            )
+        if len(v) < 32:
+            raise ValueError(
+                f"SECRET_KEY debe tener al menos 32 caracteres (tiene {len(v)})."
+            )
+        return v
+
     # Configuración CORS
     ALLOWED_ORIGINS: Union[list, str] = [
         "http://localhost:3000",

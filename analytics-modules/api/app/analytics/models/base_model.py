@@ -410,6 +410,7 @@ class BaseModel(ABC):
     def save(self, filepath: str) -> None:
         """Guarda el modelo en disco."""
         model_data = {
+            "_model_type": self.model_type.value,
             "model": self.model,
             "config": self.config,
             "metrics": self.metrics,

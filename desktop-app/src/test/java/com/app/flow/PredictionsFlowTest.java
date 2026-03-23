@@ -62,11 +62,12 @@ class PredictionsFlowTest {
     @Order(1)
     @DisplayName("Obtener tipos de modelo disponibles")
     void getModelTypes() throws Exception {
-        CompletableFuture<Map<String, Object>> future = predictionService.getModelTypes();
-        Map<String, Object> types = future.get(15, TimeUnit.SECONDS);
+        CompletableFuture<ModelTypesResponseDTO> future = predictionService.getModelTypes();
+        ModelTypesResponseDTO types = future.get(15, TimeUnit.SECONDS);
 
         assertNotNull(types, "Debe retornar tipos de modelo");
-        assertFalse(types.isEmpty(), "Debe haber al menos un tipo de modelo disponible");
+        assertNotNull(types.getModelTypes(), "Debe haber tipos de modelo");
+        assertFalse(types.getModelTypes().isEmpty(), "Debe haber al menos un tipo de modelo disponible");
     }
 
     // ── Validación de datos (casos positivos) ───────────────────────────
@@ -236,8 +237,8 @@ class PredictionsFlowTest {
     @Order(35)
     @DisplayName("Obtener historial de predicciones")
     void getHistory() throws Exception {
-        CompletableFuture<List<Map<String, Object>>> future = predictionService.getHistory(10);
-        List<Map<String, Object>> history = future.get(15, TimeUnit.SECONDS);
+        CompletableFuture<List<PredictionHistoryItemDTO>> future = predictionService.getHistory(10);
+        List<PredictionHistoryItemDTO> history = future.get(15, TimeUnit.SECONDS);
 
         assertNotNull(history, "El historial no debe ser null");
         // Puede estar vacío si no hay predicciones previas

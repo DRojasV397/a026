@@ -1,6 +1,7 @@
 package com.app.service.simulation;
 
 import com.app.config.ApiConfig;
+import com.app.config.HttpClientProvider;
 import com.app.core.session.UserSession;
 import com.app.model.simulation.*;
 import com.google.gson.Gson;
@@ -36,10 +37,7 @@ public class SimulationApiService {
     private final HttpClient httpClient;
 
     public SimulationApiService() {
-        this.httpClient = HttpClient.newBuilder()
-                .version(HttpClient.Version.HTTP_1_1)
-                .connectTimeout(Duration.ofSeconds(15))
-                .build();
+        this.httpClient = HttpClientProvider.getClient();
     }
 
     // ── List Scenarios ───────────────────────────────────────────────────────

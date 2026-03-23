@@ -320,7 +320,7 @@ class PredictionModuleTest {
 
         assertTrue(resp.isSuccess());
         assertTrue(resp.getMeetsR2Threshold());
-        assertTrue(resp.getMetrics().get("r2") >= 0.7,
+        assertTrue(((Number) resp.getMetrics().get("r2")).doubleValue() >= 0.7,
                 "R² debe ser >= 0.7 para ser aceptado");
         assertEquals(255, resp.getTrainingSamples());
         assertEquals(110, resp.getTestSamples());
@@ -346,7 +346,7 @@ class PredictionModuleTest {
         TrainModelResponseDTO resp = gson.fromJson(json, TrainModelResponseDTO.class);
 
         assertEquals("sarima", resp.getModelType());
-        assertEquals(0.95, resp.getMetrics().get("r2"), 0.001);
+        assertEquals(0.95, ((Number) resp.getMetrics().get("r2")).doubleValue(), 0.001);
         assertTrue(resp.getMeetsR2Threshold());
     }
 
@@ -371,7 +371,7 @@ class PredictionModuleTest {
         assertFalse(resp.getMeetsR2Threshold());
         assertNotNull(resp.getIssues());
         assertFalse(resp.getIssues().isEmpty());
-        assertTrue(resp.getMetrics().get("r2") < 0.7);
+        assertTrue(((Number) resp.getMetrics().get("r2")).doubleValue() < 0.7);
     }
 
     // ══════════════════════════════════════════════════════════════════════

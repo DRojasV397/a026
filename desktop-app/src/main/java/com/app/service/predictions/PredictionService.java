@@ -1,6 +1,7 @@
 package com.app.service.predictions;
 
 import com.app.config.ApiConfig;
+import com.app.config.HttpClientProvider;
 import com.app.core.session.UserSession;
 import com.app.model.predictions.*;
 import com.google.gson.Gson;
@@ -8,6 +9,8 @@ import com.google.gson.reflect.TypeToken;
 import java.lang.reflect.Type;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import com.app.util.RetryUtil;
 
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -50,15 +53,13 @@ public class PredictionService {
     private final HttpClient httpClient;
 
     public PredictionService() {
-        this.httpClient = HttpClient.newBuilder()
-                .version(HttpClient.Version.HTTP_1_1)
-                .connectTimeout(Duration.ofSeconds(15))
-                .build();
+        this.httpClient = HttpClientProvider.getClient();
     }
 
     /**
      * Entrena un modelo predictivo.
      * Timeout largo (120s) porque el training puede tardar.
+     * Reintenta hasta 2 veces ante errores de conexión o timeout (3 intentos total).
      */
     public CompletableFuture<TrainModelResponseDTO> trainModel(TrainModelRequestDTO request) {
         String jsonBody = gson.toJson(request);
@@ -71,20 +72,22 @@ public class PredictionService {
                 .POST(HttpRequest.BodyPublishers.ofString(jsonBody))
                 .build();
 
-        return httpClient.sendAsync(httpRequest, HttpResponse.BodyHandlers.ofString())
-                .thenApply(response -> {
-                    logger.info("Train response HTTP {}: {}", response.statusCode(), response.body());
-                    if (response.statusCode() == 200 || response.statusCode() == 201) {
-                        return gson.fromJson(response.body(), TrainModelResponseDTO.class);
-                    }
-                    TrainModelResponseDTO errorResponse = new TrainModelResponseDTO();
-                    logger.warn("Train failed - HTTP {}: {}", response.statusCode(), response.body());
-                    return errorResponse;
-                })
-                .exceptionally(ex -> {
-                    logger.error("Error al entrenar modelo: {}", ex.getMessage());
-                    return null;
-                });
+        return RetryUtil.withRetry(
+                () -> httpClient.sendAsync(httpRequest, HttpResponse.BodyHandlers.ofString())
+                        .thenApply(response -> {
+                            logger.info("Train response HTTP {}: {}", response.statusCode(), response.body());
+                            if (response.statusCode() == 200 || response.statusCode() == 201) {
+                                return gson.fromJson(response.body(), TrainModelResponseDTO.class);
+                            }
+                            TrainModelResponseDTO errorResponse = new TrainModelResponseDTO();
+                            logger.warn("Train failed - HTTP {}: {}", response.statusCode(), response.body());
+                            return errorResponse;
+                        }),
+                3, 2000
+        ).exceptionally(ex -> {
+            logger.error("Error al entrenar modelo tras reintentos: {}", ex.getMessage());
+            return null;
+        });
     }
 
     /**
@@ -118,6 +121,7 @@ public class PredictionService {
 
     /**
      * Auto-selección del mejor modelo. Timeout largo (180s).
+     * Reintenta hasta 2 veces ante errores transitorios (3 intentos total).
      */
     public CompletableFuture<AutoSelectResponseDTO> autoSelectModel(String fechaInicio, String fechaFin) {
         Map<String, String> body = new HashMap<>();
@@ -133,19 +137,21 @@ public class PredictionService {
                 .POST(HttpRequest.BodyPublishers.ofString(jsonBody))
                 .build();
 
-        return httpClient.sendAsync(httpRequest, HttpResponse.BodyHandlers.ofString())
-                .thenApply(response -> {
-                    logger.info("AutoSelect response HTTP {}", response.statusCode());
-                    if (response.statusCode() == 200 || response.statusCode() == 201) {
-                        return gson.fromJson(response.body(), AutoSelectResponseDTO.class);
-                    }
-                    logger.warn("AutoSelect failed - HTTP {}: {}", response.statusCode(), response.body());
-                    return null;
-                })
-                .exceptionally(ex -> {
-                    logger.error("Error en auto-select: {}", ex.getMessage());
-                    return null;
-                });
+        return RetryUtil.withRetry(
+                () -> httpClient.sendAsync(httpRequest, HttpResponse.BodyHandlers.ofString())
+                        .thenApply(response -> {
+                            logger.info("AutoSelect response HTTP {}", response.statusCode());
+                            if (response.statusCode() == 200 || response.statusCode() == 201) {
+                                return gson.fromJson(response.body(), AutoSelectResponseDTO.class);
+                            }
+                            logger.warn("AutoSelect failed - HTTP {}: {}", response.statusCode(), response.body());
+                            return null;
+                        }),
+                3, 2000
+        ).exceptionally(ex -> {
+            logger.error("Error en auto-select tras reintentos: {}", ex.getMessage());
+            return null;
+        });
     }
 
     /**

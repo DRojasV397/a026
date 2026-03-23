@@ -4,6 +4,7 @@ Orquesta el entrenamiento, evaluacion y uso de modelos predictivos.
 """
 
 import json
+import time
 import pandas as pd
 import numpy as np
 from typing import Optional, Dict, Any, List, Tuple
@@ -35,6 +36,26 @@ logger = logging.getLogger(__name__)
 # Esto permite que los modelos cargados esten disponibles para todas las instancias del servicio
 _global_trained_models: Dict[str, BaseModel] = {}
 _global_model_ids: Dict[str, Optional[int]] = {}
+_global_model_last_access: Dict[str, float] = {}  # timestamp Unix del último acceso
+
+# Modelos no usados por más de este tiempo son eliminados de RAM
+_MODEL_TTL_SECONDS = 2 * 3600  # 2 horas
+
+
+def _evict_expired_models() -> None:
+    """Elimina de RAM los modelos que superaron el TTL de inactividad."""
+    global _global_trained_models, _global_model_ids, _global_model_last_access
+    now = time.time()
+    expired = [
+        k for k, t in list(_global_model_last_access.items())
+        if now - t > _MODEL_TTL_SECONDS
+    ]
+    for k in expired:
+        _global_trained_models.pop(k, None)
+        _global_model_ids.pop(k, None)
+        _global_model_last_access.pop(k, None)
+    if expired:
+        logger.info(f"TTL: {len(expired)} modelo(s) eliminado(s) de RAM por inactividad.")
 
 
 class PredictionService:
@@ -59,7 +80,10 @@ class PredictionService:
     MIN_HISTORICAL_DAYS = 180
 
     def __init__(self, db: Session, auto_load: bool = False):
-        global _global_trained_models, _global_model_ids
+        global _global_trained_models, _global_model_ids, _global_model_last_access
+
+        # Liberar modelos expirados antes de operar con el dict global
+        _evict_expired_models()
 
         self.db = db
         self.venta_repo = VentaRepository(db)
@@ -206,13 +230,40 @@ class PredictionService:
         )
         return df_agg.sort_values('fecha')
 
+    # Requisitos mínimos de días por tipo de modelo.
+    # SARIMA y Prophet necesitan al menos una temporada completa (365 días) para
+    # aprender patrones estacionales. Ensemble se guía por el modelo más exigente
+    # que lo componga; por defecto se exige 365.
+    _MODEL_MIN_DAYS: Dict[str, int] = {
+        "linear":              180,
+        "multiple_regression": 180,
+        "arima":               180,
+        "sarima":              365,
+        "random_forest":       180,
+        "ensemble":            365,
+        "xgboost":             180,
+        "prophet":             365,
+    }
+
     def validate_data_requirements(
         self,
-        df: pd.DataFrame
+        df: pd.DataFrame,
+        model_type: Optional[str] = None,
     ) -> Tuple[bool, List[str]]:
         """
-        Valida que los datos cumplan los requisitos minimos.
-        RN-01.01: Minimo 6 meses de datos historicos.
+        Valida que los datos cumplan los requisitos minimos de cantidad y calidad.
+
+        Comprobaciones:
+        - DataFrame no vacio
+        - Rango de fechas suficiente (global: 180 días; por modelo si es mayor)
+        - Sin valores nulos en la columna 'total'
+        - Sin valores negativos
+        - Advertencia si >80% de registros son cero (datos degenerados)
+
+        Args:
+            df: DataFrame con columnas 'fecha' y 'total'
+            model_type: Tipo de modelo a entrenar. Si se provee, aplica el
+                        mínimo específico del modelo (puede ser mayor que 180 días).
 
         Returns:
             Tuple[bool, List[str]]: (cumple_requisitos, lista_de_problemas)
@@ -223,24 +274,49 @@ class PredictionService:
             issues.append("No hay datos disponibles")
             return False, issues
 
-        # Verificar rango minimo de fechas (no cantidad de filas, ya que
-        # la agregacion semanal/mensual reduce el numero de registros)
+        # ── Rango de fechas ──────────────────────────────────────────────────
         date_span = (df['fecha'].max() - df['fecha'].min()).days
-        if date_span < self.MIN_HISTORICAL_DAYS:
+
+        # Mínimo global (6 meses) o mínimo específico del modelo si es mayor
+        min_days = self.MIN_HISTORICAL_DAYS
+        if model_type:
+            model_min = self._MODEL_MIN_DAYS.get(model_type, self.MIN_HISTORICAL_DAYS)
+            if model_min > min_days:
+                min_days = model_min
+
+        if date_span < min_days:
+            model_label = f" para {model_type}" if model_type else ""
             issues.append(
-                f"Rango de datos insuficiente: {date_span} días. "
-                f"Mínimo requerido: {self.MIN_HISTORICAL_DAYS} días (6 meses)"
+                f"Rango de datos insuficiente{model_label}: {date_span} días. "
+                f"Mínimo requerido: {min_days} días"
+                + (" (se necesita al menos una temporada completa para detectar "
+                   "estacionalidad)" if min_days >= 365 else " (6 meses)")
             )
 
-        # Verificar valores nulos
-        null_count = df['total'].isna().sum()
+        # ── Valores nulos ────────────────────────────────────────────────────
+        null_count = int(df['total'].isna().sum())
         if null_count > 0:
-            issues.append(f"Hay {null_count} valores nulos en los datos")
+            issues.append(f"Hay {null_count} valores nulos en la columna 'total'")
 
-        # Verificar valores negativos
-        negative_count = (df['total'] < 0).sum()
+        # ── Valores negativos ────────────────────────────────────────────────
+        negative_count = int((df['total'] < 0).sum())
         if negative_count > 0:
-            issues.append(f"Hay {negative_count} valores negativos")
+            issues.append(
+                f"Hay {negative_count} valores negativos en 'total'. "
+                "Los datos de ventas deben ser >= 0"
+            )
+
+        # ── Datos degenerados (>80% ceros) ───────────────────────────────────
+        # No bloquea el entrenamiento pero se incluye como advertencia en issues
+        # para que el router pueda incluirlo en la respuesta.
+        total_rows = len(df)
+        zero_count = int((df['total'] == 0).sum())
+        zero_pct = zero_count / total_rows * 100 if total_rows > 0 else 0
+        if zero_pct > 80:
+            issues.append(
+                f"Advertencia: el {zero_pct:.0f}% de los registros tienen valor 0. "
+                "El modelo puede producir predicciones poco fiables con datos tan dispersos"
+            )
 
         return len(issues) == 0, issues
 
@@ -271,8 +347,8 @@ class PredictionService:
         # La agregación semanal para ARIMA daba solo ~37 muestras: insuficiente.
         df = self.get_sales_data(fecha_inicio, fecha_fin, aggregation='D', user_id=user_id)
 
-        # Validar requisitos
-        valid, issues = self.validate_data_requirements(df)
+        # Validar requisitos con chequeos específicos del modelo
+        valid, issues = self.validate_data_requirements(df, model_type=model_type)
         if not valid:
             return {
                 "success": False,
@@ -305,6 +381,7 @@ class PredictionService:
             # Guardar modelo en memoria
             model_key = f"{model_type}_{datetime.now().strftime('%Y%m%d%H%M%S')}"
             self._trained_models[model_key] = model
+            _global_model_last_access[model_key] = time.time()
 
             # Guardar en BD y registrar idVersion para asociar predicciones
             version_db = self._save_model_to_db(model, model_key, metrics, user_id=user_id, nombre=nombre)
@@ -602,6 +679,7 @@ class PredictionService:
     ) -> Optional[BaseModel]:
         """Obtiene un modelo entrenado. Auto-carga desde disco si no está en RAM."""
         if model_key and model_key in self._trained_models:
+            _global_model_last_access[model_key] = time.time()
             return self._trained_models[model_key]
 
         # Auto-cargar desde disco si no está en memoria
@@ -678,6 +756,7 @@ class PredictionService:
         model_types = ['linear', 'arima', 'sarima', 'random_forest', 'multiple_regression', 'xgboost', 'ensemble']
         results = {}
         predictions = {}
+        errors: Dict[str, str] = {}
 
         for model_type in model_types:
             try:
@@ -691,15 +770,20 @@ class PredictionService:
                         # Obtener predicciones para comparacion
                         y_pred = model.predict(df[['fecha', 'total']])
                         predictions[model_type] = y_pred
+                else:
+                    errors[model_type] = result.get("error") or "Entrenamiento fallido sin detalle"
 
             except Exception as e:
                 logger.warning(f"Error con modelo {model_type}: {str(e)}")
+                errors[model_type] = str(e)
                 continue
 
         if not results:
+            issues = [f"{t}: {msg}" for t, msg in errors.items()]
             return {
                 "success": False,
-                "error": "No se pudo entrenar ningun modelo"
+                "error": "Ningún modelo pudo entrenarse con los datos disponibles.",
+                "issues": issues
             }
 
         # Comparar modelos
@@ -711,6 +795,17 @@ class PredictionService:
         best_type, best_result = best_model
         meets_threshold = best_result.get("metrics", {}).get("r2_score", 0) >= self.R2_THRESHOLD
 
+        all_models_summary = {
+            k: {
+                "metrics": v.get("metrics"),
+                "meets_threshold": v.get("meets_r2_threshold")
+            }
+            for k, v in results.items()
+        }
+        # Incluir modelos que fallaron con su motivo
+        for t, msg in errors.items():
+            all_models_summary[t] = {"error": msg, "meets_threshold": False}
+
         return {
             "success": True,
             "best_model": {
@@ -719,18 +814,13 @@ class PredictionService:
                 "metrics": best_result.get("metrics")
             },
             "meets_r2_threshold": meets_threshold,
-            "all_models": {
-                k: {
-                    "metrics": v.get("metrics"),
-                    "meets_threshold": v.get("meets_r2_threshold")
-                }
-                for k, v in results.items()
-            },
+            "all_models": all_models_summary,
             "recommendation": (
                 f"Usar modelo {best_type} con R2={best_result.get('metrics', {}).get('r2_score', 0):.4f}"
                 if meets_threshold else
-                "Ningun modelo cumple el umbral minimo. Considerar mas datos."
-            )
+                f"Ningún modelo supera R2={self.R2_THRESHOLD}. Considerar más datos históricos."
+            ),
+            "issues": [f"{t}: {msg}" for t, msg in errors.items()] if errors else None
         }
 
     def get_trained_models(self) -> List[Dict[str, Any]]:
@@ -782,19 +872,28 @@ class PredictionService:
             }
 
         try:
-            # Determinar tipo de modelo desde el nombre
-            # Los nombres tienen formato: {model_type}_{timestamp}
-            # Ej: linear_20260202, random_forest_20260202, arima_20260202
-            model_type = self._extract_model_type_from_key(model_key)
+            # Leer el pkl para determinar el tipo real guardado
+            with open(model_path, 'rb') as f:
+                peek_data = pickle.load(f)
 
-            # Crear instancia vacia del modelo correcto
-            model = self._create_model(model_type)
+            # Prioridad 1: campo auto-descriptivo (añadido en versiones recientes)
+            if "_model_type" in peek_data:
+                actual_type = peek_data["_model_type"]
+            # Prioridad 2: detectar EnsembleModel por claves únicas (pkls sin _model_type)
+            elif "_meta_model" in peek_data or "_fitted_bases" in peek_data:
+                actual_type = "ensemble"
+                logger.info(f"Detectado EnsembleModel por claves para {model_key}")
+            else:
+                # Fallback: extraer desde el nombre de la clave
+                actual_type = self._extract_model_type_from_key(model_key)
 
-            # Cargar estado desde disco
+            # Crear instancia vacía del tipo correcto y cargar estado
+            model = self._create_model(actual_type)
             model.load(model_path)
 
             # Guardar en memoria
             self._trained_models[model_key] = model
+            _global_model_last_access[model_key] = time.time()
 
             logger.info(f"Modelo cargado desde disco: {model_key}")
 
@@ -964,6 +1063,7 @@ class PredictionService:
         # Eliminar de memoria
         if model_key in self._trained_models:
             del self._trained_models[model_key]
+            _global_model_last_access.pop(model_key, None)
             deleted_from_memory = True
 
         # Eliminar de disco
@@ -1039,6 +1139,7 @@ class PredictionService:
             )
             self._trained_models[ventas_key] = ventas_model
             self._trained_model_ids[ventas_key] = ventas_version.idVersion if ventas_version else None
+            _global_model_last_access[ventas_key] = time.time()
             ventas_model.save(os.path.join(self.MODELS_DIR, f"{ventas_key}.pkl"))
 
             # ── 2. Modelo de COMPRAS (con ventas como exógena) ─────────────
@@ -1054,6 +1155,7 @@ class PredictionService:
             )
             self._trained_models[compras_key] = compras_model
             self._trained_model_ids[compras_key] = compras_version.idVersion if compras_version else None
+            _global_model_last_access[compras_key] = time.time()
             compras_model.save(os.path.join(self.MODELS_DIR, f"{compras_key}.pkl"))
 
             # ── 3. Guardar ModeloPack en BD ────────────────────────────────
