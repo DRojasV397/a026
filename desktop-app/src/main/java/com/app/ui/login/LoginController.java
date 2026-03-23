@@ -124,7 +124,7 @@ public class LoginController {
             LoginResponseDTO response = authService.login(user, pass);
 
             Platform.runLater(() -> {
-                 if(response != null) {
+                 if(response != null) { //
                     UserSession.setFromLoginResponse(response);
                     SceneManager.showHome();
                 } else {

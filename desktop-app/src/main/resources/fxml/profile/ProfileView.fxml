@@ -255,19 +255,6 @@
                                 </HBox>
                             </VBox>
                         </VBox>
-
-                        <VBox styleClass="settings-group" spacing="0">
-                            <Label text="Autenticación" styleClass="settings-group-title"/>
-                            <Separator styleClass="settings-separator"/>
-
-                            <HBox fx:id="row2FA" alignment="CENTER_LEFT" spacing="15"
-                                  styleClass="settings-row, settings-row-last">
-                                <VBox HBox.hgrow="ALWAYS" spacing="3">
-                                    <Label text="Autenticación de dos factores (2FA)" styleClass="settings-item-title"/>
-                                    <Label text="Añade una capa extra de seguridad a tu cuenta" styleClass="settings-item-sub"/>
-                                </VBox>
-                            </HBox>
-                        </VBox>
                     </VBox>
 
                     <!-- ─────────────────────────────────────────── -->
@@ -311,14 +298,6 @@
                                 <VBox HBox.hgrow="ALWAYS" spacing="3">
                                     <Label text="Reportes generados" styleClass="settings-item-title"/>
                                     <Label text="Al completarse la exportación de un reporte" styleClass="settings-item-sub"/>
-                                </VBox>
-                            </HBox>
-
-                            <HBox fx:id="rowNotifSecurity" alignment="CENTER_LEFT" spacing="15"
-                                  styleClass="settings-row, settings-row-last">
-                                <VBox HBox.hgrow="ALWAYS" spacing="3">
-                                    <Label text="Alertas de seguridad" styleClass="settings-item-title"/>
-                                    <Label text="Inicios de sesión sospechosos o cambios críticos" styleClass="settings-item-sub"/>
                                 </VBox>
                             </HBox>
                         </VBox>

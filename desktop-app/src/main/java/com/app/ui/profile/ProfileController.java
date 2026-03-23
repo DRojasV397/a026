@@ -82,20 +82,16 @@ public class ProfileController {
 
     // ── Toggle buttons  ─────────────────────────────────────────────────
     private AnimatedToggleSwitch tglPredictionsPanel;
-    private AnimatedToggleSwitch tgl2FA;
     private AnimatedToggleSwitch tglEmailNotif;
     private AnimatedToggleSwitch tglSystemNotif;
     private AnimatedToggleSwitch tglNotifPredictions;
     private AnimatedToggleSwitch tglNotifReports;
-    private AnimatedToggleSwitch tglNotifSecurity;
 
     @FXML private HBox rowPredictionsPanel;
-    @FXML private HBox row2FA;
     @FXML private HBox rowEmailNotif;
     @FXML private HBox rowSystemNotif;
     @FXML private HBox rowNotifPredictions;
     @FXML private HBox rowNotifReports;
-    @FXML private HBox rowNotifSecurity;
 
     // ── Estado interno ────────────────────────────────────────────────────────
     private List<Button> allTabs;
@@ -139,20 +135,16 @@ public class ProfileController {
 
     private void createToggles() {
         tglPredictionsPanel  = injectToggle(rowPredictionsPanel);
-        tgl2FA               = injectToggle(row2FA);
         tglEmailNotif        = injectToggle(rowEmailNotif);
         tglSystemNotif       = injectToggle(rowSystemNotif);
         tglNotifPredictions  = injectToggle(rowNotifPredictions);
         tglNotifReports      = injectToggle(rowNotifReports);
-        tglNotifSecurity     = injectToggle(rowNotifSecurity);
 
         tglPredictionsPanel.selectedProperty().addListener((obs, o, v) -> onConfigChanged(ConfigKey.PREDICTIONS_PANEL, v));
-        tgl2FA.selectedProperty()             .addListener((obs, o, v) -> onConfigChanged(ConfigKey.TWO_FACTOR, v));
         tglEmailNotif.selectedProperty()      .addListener((obs, o, v) -> onConfigChanged(ConfigKey.EMAIL_NOTIF, v));
         tglSystemNotif.selectedProperty()     .addListener((obs, o, v) -> onConfigChanged(ConfigKey.SYSTEM_NOTIF, v));
         tglNotifPredictions.selectedProperty().addListener((obs, o, v) -> onConfigChanged(ConfigKey.NOTIF_PREDICTIONS, v));
         tglNotifReports.selectedProperty()    .addListener((obs, o, v) -> onConfigChanged(ConfigKey.NOTIF_REPORTS, v));
-        tglNotifSecurity.selectedProperty()   .addListener((obs, o, v) -> onConfigChanged(ConfigKey.NOTIF_SECURITY, v));
     }
 
     /**
@@ -373,13 +365,10 @@ public class ProfileController {
         cmbDateRange.getSelectionModel().select(config.dateRange());
         tglPredictionsPanel.setSelected(config.showPredictionsOnStart());
 
-        tgl2FA.setSelected(config.twoFactorEnabled());
-
         tglEmailNotif.setSelected(config.emailNotifications());
         tglSystemNotif.setSelected(config.systemNotifications());
         tglNotifPredictions.setSelected(config.notifyPredictions());
         tglNotifReports.setSelected(config.notifyReports());
-        tglNotifSecurity.setSelected(config.notifySecurityAlerts());
     }
 
     // ═════════════════════════════════════════════════════════════════════════

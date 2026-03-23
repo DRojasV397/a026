@@ -19,7 +19,7 @@
     <Label text="Términos y Condiciones"
            styleClass="login-h1"/>
 
-    <Label text="Sistema BI TT - Sistema de análisis predictivo para PyMES"
+    <Label text="SANI - Sistema de análisis predictivo para PyMES"
            styleClass="login-h4"/>
 
     <!-- Contenedor del texto -->
