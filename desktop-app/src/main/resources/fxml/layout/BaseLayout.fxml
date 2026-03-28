@@ -2,6 +2,7 @@
 
 <?import javafx.scene.layout.BorderPane?>
 <?import javafx.scene.layout.StackPane?>
+<?import javafx.scene.layout.VBox?>
 <?import javafx.geometry.Insets?>
 <BorderPane xmlns="http://javafx.com/javafx/21"
             xmlns:fx="http://javafx.com/fxml/1"
@@ -21,14 +22,9 @@
     <!-- Contenido con Navbar integrado -->
     <center>
         <BorderPane fx:id="centerContainer">
-            <!-- Navbar en el top del contenido -->
+            <!-- Banner offline + Navbar apilados en un VBox -->
             <top>
-                <StackPane>
-
-                    <BorderPane.margin>
-                        <Insets top="10" right="20" bottom="20" left="20"/>
-                    </BorderPane.margin>
-                </StackPane>
+                <VBox fx:id="topContainer"/>
             </top>
 
             <!-- Contenido dinámico -->

@@ -6,6 +6,7 @@ import com.app.core.session.UserSession;
 import com.app.core.threading.AppExecutor;
 import com.app.model.LoginResponseDTO;
 import com.app.service.auth.AuthService;
+import com.app.service.offline.OfflineModeManager;
 import com.app.util.ValidationUtil;
 import javafx.application.Platform;
 import javafx.fxml.FXML;
@@ -26,10 +27,11 @@ public class LoginController {
     @FXML private PasswordField passwordField;
     @FXML private Label errorLabel;
     @FXML private Button loginButton;
+    @FXML private Button btnOfflineLogin;
 
     @FXML private HBox userWrapper;
     @FXML private HBox passwordWrapper;
-    
+
     private final AuthService authService = new AuthService();
 
     private boolean userTouched = false;
@@ -40,6 +42,12 @@ public class LoginController {
         Platform.runLater(() -> {
             userField.requestFocus();
         });
+
+        // Mostrar botón offline si hay identidad guardada en disco
+        if (OfflineModeManager.hasOfflineIdentity()) {
+            btnOfflineLogin.setVisible(true);
+            btnOfflineLogin.setManaged(true);
+        }
 
         userField.textProperty().addListener((obs, oldVal, newVal) -> {
             userTouched = true;
@@ -149,6 +157,7 @@ public class LoginController {
             Platform.runLater(() -> {
                  if(response != null) { //
                     UserSession.setFromLoginResponse(response);
+                    OfflineModeManager.saveIdentity();
                     SceneManager.showHome();
                 } else {
                     showError("Usuario o contraseña incorrectos");
@@ -157,6 +166,16 @@ public class LoginController {
                 }
             });
         });
+    }
+
+    @FXML
+    private void onOfflineLogin() {
+        if (OfflineModeManager.loadAndApplyIdentity()) {
+            OfflineModeManager.enterOfflineMode();
+            SceneManager.showHome();
+        } else {
+            showError("No hay datos guardados para continuar sin conexión");
+        }
     }
 
     @FXML

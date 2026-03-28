@@ -4,6 +4,8 @@ import com.app.config.ApiConfig;
 import com.app.config.HttpClientProvider;
 import com.app.core.session.UserSession;
 import com.app.model.data.api.*;
+import com.app.service.offline.CacheService;
+import com.app.service.offline.CacheService.CacheEntry;
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
 import java.lang.reflect.Type;
@@ -291,6 +293,14 @@ public class DataApiService {
      * @param tipo Filtro opcional: "ventas", "compras", "productos" o null/vacío para todos.
      */
     public CompletableFuture<HistorialCargaListDTO> getHistorial(String tipo) {
+        String userId   = String.valueOf(UserSession.getUserId());
+        String cacheKey = "data_historial";
+
+        if (UserSession.isOfflineMode()) {
+            return CompletableFuture.completedFuture(
+                    loadFromCache(userId, cacheKey, HistorialCargaListDTO.class));
+        }
+
         StringBuilder url = new StringBuilder(ApiConfig.getDataHistorialUrl());
         if (tipo != null && !tipo.isBlank() && !tipo.equalsIgnoreCase("todos")) {
             url.append("?tipo=").append(tipo.toLowerCase());
@@ -307,6 +317,7 @@ public class DataApiService {
                 .thenApply(response -> {
                     logger.info("Historial response HTTP {}", response.statusCode());
                     if (response.statusCode() == 200) {
+                        CacheService.put(userId, cacheKey, response.body());
                         return gson.fromJson(response.body(), HistorialCargaListDTO.class);
                     }
                     logger.warn("Historial failed - HTTP {}: {}", response.statusCode(), response.body());
@@ -314,7 +325,7 @@ public class DataApiService {
                 })
                 .exceptionally(ex -> {
                     logger.error("Error al obtener historial de cargas: {}", ex.getMessage());
-                    return null;
+                    return loadFromCache(userId, cacheKey, HistorialCargaListDTO.class);
                 });
     }
 
@@ -323,6 +334,14 @@ public class DataApiService {
      * GET /productos/?limit=1000
      */
     public CompletableFuture<List<ProductoCatalogDTO>> getProductos() {
+        String userId   = String.valueOf(UserSession.getUserId());
+        String cacheKey = "data_productos";
+        Type   listType = new TypeToken<List<ProductoCatalogDTO>>() {}.getType();
+
+        if (UserSession.isOfflineMode()) {
+            return CompletableFuture.completedFuture(loadListFromCache(userId, cacheKey, listType));
+        }
+
         String url = ApiConfig.getProductosUrl() + "?limit=1000";
 
         HttpRequest httpRequest = HttpRequest.newBuilder()
@@ -332,12 +351,11 @@ public class DataApiService {
                 .GET()
                 .build();
 
-        Type listType = new TypeToken<List<ProductoCatalogDTO>>() {}.getType();
-
         return httpClient.sendAsync(httpRequest, HttpResponse.BodyHandlers.ofString())
                 .thenApply(response -> {
                     logger.info("Productos response HTTP {}", response.statusCode());
                     if (response.statusCode() == 200) {
+                        CacheService.put(userId, cacheKey, response.body());
                         return (List<ProductoCatalogDTO>) gson.fromJson(response.body(), listType);
                     }
                     logger.warn("Productos failed - HTTP {}: {}", response.statusCode(), response.body());
@@ -345,7 +363,7 @@ public class DataApiService {
                 })
                 .exceptionally(ex -> {
                     logger.error("Error al obtener catálogo de productos: {}", ex.getMessage());
-                    return null;
+                    return loadListFromCache(userId, cacheKey, listType);
                 });
     }
 
@@ -393,6 +411,31 @@ public class DataApiService {
                     logger.error("Error al obtener históricos: {}", ex.getMessage());
                     return null;
                 });
+    }
+
+    // ── Cache helpers ─────────────────────────────────────────────────────────
+
+    private <T> T loadFromCache(String userId, String key, Class<T> type) {
+        CacheEntry entry = CacheService.get(userId, key);
+        if (entry == null) return null;
+        try {
+            return gson.fromJson(entry.payload, type);
+        } catch (Exception e) {
+            logger.warn("[CACHE] Error al parsear caché key={}: {}", key, e.getMessage());
+            return null;
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private <T> List<T> loadListFromCache(String userId, String key, java.lang.reflect.Type type) {
+        CacheEntry entry = CacheService.get(userId, key);
+        if (entry == null) return null;
+        try {
+            return (List<T>) gson.fromJson(entry.payload, type);
+        } catch (Exception e) {
+            logger.warn("[CACHE] Error al parsear caché key={}: {}", key, e.getMessage());
+            return null;
+        }
     }
 
     /**

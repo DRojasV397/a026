@@ -1,5 +1,6 @@
 package com.app.core.navigation;
 
+import com.app.core.theme.ThemeManager;
 import com.app.model.AppRoute;
 import com.app.ui.layout.BaseLayoutController;
 import javafx.fxml.FXMLLoader;
@@ -84,6 +85,7 @@ public class SceneManager {
 
             Scene scene = new Scene(root);
             scene.getStylesheets().add("/styles/main.css");
+            ThemeManager.register(scene);
 
             stage.setScene(scene);
 
@@ -154,6 +156,7 @@ public class SceneManager {
 
             Scene scene = new Scene(root);
             scene.getStylesheets().add("/styles/main.css");
+            ThemeManager.register(scene);
 
             stage.setScene(scene);
 
@@ -171,6 +174,7 @@ public class SceneManager {
             Scene scene = new Scene(root);
             scene.getStylesheets().add("/styles/main.css");
             scene.getStylesheets().add("/styles/modal.css");
+            ThemeManager.register(scene);
 
             Stage modalStage = new Stage();
             modalStage.setTitle(title);
@@ -206,6 +210,7 @@ public class SceneManager {
         navigationGuard = null;
         onRouteChanged = null;
         viewCache.clear();  // Liberar todos los controllers cacheados
+        ThemeManager.clearScenes();
 
         // Cargar la escena de login desde cero
         showLogin();

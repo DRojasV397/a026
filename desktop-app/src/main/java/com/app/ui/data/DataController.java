@@ -1,5 +1,6 @@
 package com.app.ui.data;
 
+import com.app.core.session.UserSession;
 import com.app.model.data.CleaningReport;
 import com.app.model.data.UploadedFileDTO;
 import com.app.model.data.ValidationReport;
@@ -180,6 +181,16 @@ public class DataController {
             buildFormatFields();
             loadRecentUploads(getMockRecentUploads());
         });
+
+        if (UserSession.isOfflineMode()) applyOfflineRestrictions();
+    }
+
+    private void applyOfflineRestrictions() {
+        tabUpload.setDisable(true);
+        btnProcess.setDisable(true);
+        btnSelectFile.setDisable(true);
+        dropZoneCard.setDisable(true);
+        dropZoneCard.setOpacity(0.5);
     }
 
     // ─────────────────────────────────────────────────────────────────────────

@@ -2,6 +2,7 @@ package com.app.ui.profile;
 
 import com.app.core.navigation.SceneManager;
 import com.app.core.session.UserSession;
+import com.app.core.theme.ThemeManager;
 import com.app.model.UserDTO;
 import com.app.service.profile.ProfileApiService;
 import com.app.service.storage.AvatarStorageService;
@@ -131,6 +132,13 @@ public class ProfileController {
         configLoaded = false;
         applyMockConfig(getMockConfig());
         configLoaded = true;
+
+        if (UserSession.isOfflineMode()) applyOfflineRestrictions();
+    }
+
+    private void applyOfflineRestrictions() {
+        btnEditProfile.setDisable(true);
+        tabSecurity.setDisable(true);
     }
 
     private void createToggles() {
@@ -353,6 +361,9 @@ public class ProfileController {
     private void onConfigChangedString(ConfigKey key, String value) {
         if (!configLoaded) return;
         System.out.printf("[CONFIG] %-22s → \"%s\"%n", key.name(), value);
+        if (key == ConfigKey.THEME) {
+            ThemeManager.apply(value);
+        }
         // TODO: configService.updateSetting(UserSession.getUserId(), key.name(), value);
     }
 
@@ -869,7 +880,7 @@ public class ProfileController {
      */
     private UserConfig getMockConfig() {
         return new UserConfig(
-                "Azul corporativo",   // theme
+                ThemeManager.getCurrent(),    // theme
                 "Últimos 30 días",    // dateRange
                 true,                 // showPredictionsOnStart
                 false,                // twoFactorEnabled

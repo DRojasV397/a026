@@ -5,6 +5,8 @@ import com.app.config.HttpClientProvider;
 import com.app.core.session.UserSession;
 import com.app.model.alerts.AlertDTO;
 import com.app.model.alerts.AlertsListResponseDTO;
+import com.app.service.offline.CacheService;
+import com.app.service.offline.CacheService.CacheEntry;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 
@@ -56,6 +58,13 @@ public class AlertApiService {
      * Retorna lista de AlertDTO ya mapeados (listos para la UI).
      */
     public CompletableFuture<List<AlertDTO>> getActiveAlerts() {
+        String userId   = String.valueOf(UserSession.getUserId());
+        String cacheKey = "alerts_active";
+
+        if (UserSession.isOfflineMode()) {
+            return CompletableFuture.completedFuture(loadAlertsFromCache(userId, cacheKey));
+        }
+
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create(ApiConfig.getAlertsUrl()))
                 .header("Authorization", authHeader())
@@ -69,6 +78,7 @@ public class AlertApiService {
                     if (response.statusCode() == 200) {
                         AlertsListResponseDTO dto = gson.fromJson(response.body(), AlertsListResponseDTO.class);
                         if (dto != null && dto.isSuccess()) {
+                            CacheService.put(userId, cacheKey, response.body());
                             return dto.getAlertas().stream()
                                     .map(a -> a.toAlertDTO())
                                     .toList();
@@ -79,7 +89,7 @@ public class AlertApiService {
                 })
                 .exceptionally(ex -> {
                     logger.error("Error en getActiveAlerts: {}", ex.getMessage());
-                    return List.of();
+                    return loadAlertsFromCache(userId, cacheKey);
                 });
     }
 
@@ -90,6 +100,13 @@ public class AlertApiService {
      * Retorna historial de alertas (todas, no solo activas).
      */
     public CompletableFuture<List<AlertDTO>> getAlertHistory() {
+        String userId   = String.valueOf(UserSession.getUserId());
+        String cacheKey = "alerts_history";
+
+        if (UserSession.isOfflineMode()) {
+            return CompletableFuture.completedFuture(loadAlertsFromCache(userId, cacheKey));
+        }
+
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create(ApiConfig.getAlertHistoryUrl()))
                 .header("Authorization", authHeader())
@@ -103,6 +120,7 @@ public class AlertApiService {
                     if (response.statusCode() == 200) {
                         AlertsListResponseDTO dto = gson.fromJson(response.body(), AlertsListResponseDTO.class);
                         if (dto != null && dto.isSuccess()) {
+                            CacheService.put(userId, cacheKey, response.body());
                             return dto.getAlertas().stream()
                                     .map(a -> a.toAlertDTO())
                                     .toList();
@@ -113,7 +131,7 @@ public class AlertApiService {
                 })
                 .exceptionally(ex -> {
                     logger.error("Error en getAlertHistory: {}", ex.getMessage());
-                    return List.of();
+                    return loadAlertsFromCache(userId, cacheKey);
                 });
     }
 
@@ -254,5 +272,21 @@ public class AlertApiService {
                     logger.error("Error en saveConfig: {}", ex.getMessage());
                     return false;
                 });
+    }
+
+    // ── Cache helper ──────────────────────────────────────────────────────────
+
+    private List<AlertDTO> loadAlertsFromCache(String userId, String key) {
+        CacheEntry entry = CacheService.get(userId, key);
+        if (entry == null) return List.of();
+        try {
+            AlertsListResponseDTO dto = gson.fromJson(entry.payload, AlertsListResponseDTO.class);
+            if (dto != null && dto.isSuccess() && dto.getAlertas() != null) {
+                return dto.getAlertas().stream().map(a -> a.toAlertDTO()).toList();
+            }
+        } catch (Exception e) {
+            logger.warn("[CACHE] Error al parsear caché key={}: {}", key, e.getMessage());
+        }
+        return List.of();
     }
 }

@@ -1,5 +1,6 @@
 package com.app.ui.admin;
 
+import com.app.core.session.UserSession;
 import com.app.model.UserDTO;
 import com.app.model.admin.AdminUserDTO;
 import com.app.service.admin.AdminApiService;
@@ -80,6 +81,11 @@ public class AdminController {
     // ── Init ──────────────────────────────────────────────────────────────────
     @FXML
     public void initialize() {
+        if (UserSession.isOfflineMode()) {
+            applyOfflineRestrictions();
+            return;
+        }
+
         usersContainer.getChildren().addFirst(buildTableHeader());
 
         // Mostrar estado de carga
@@ -92,6 +98,13 @@ public class AdminController {
         searchField.textProperty().addListener((obs, o, v) -> {
             applyFilter(v);
         });
+    }
+
+    private void applyOfflineRestrictions() {
+        javafx.scene.control.Label msg = new javafx.scene.control.Label("No disponible sin conexión");
+        msg.getStyleClass().add("offline-section-message");
+        usersContainer.getChildren().setAll(msg);
+        if (searchField != null) searchField.setDisable(true);
     }
 
     private void showLoadingState() {

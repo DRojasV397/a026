@@ -144,6 +144,14 @@
                         styleClass="button-login"
                         maxWidth="Infinity"/>
 
+                <Button fx:id="btnOfflineLogin"
+                        text="Continuar sin conexión"
+                        onAction="#onOfflineLogin"
+                        styleClass="button-offline"
+                        maxWidth="Infinity"
+                        visible="false"
+                        managed="false"/>
+
                 <Label text="Términos y condiciones"
                        styleClass="link-label"
                        onMouseClicked="#onShowTerms"/>

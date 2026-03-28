@@ -1,5 +1,6 @@
 package com.app.ui.alerts;
 
+import com.app.core.session.UserSession;
 import com.app.model.alerts.AlertDTO;
 import com.app.service.alerts.AlertApiService;
 import com.app.ui.components.AnimatedToggleSwitch;
@@ -143,6 +144,14 @@ public class AlertsController {
 
         // Carga diferida — primer frame visible antes de procesar datos
         Platform.runLater(this::loadActiveSectionData);
+
+        if (UserSession.isOfflineMode()) applyOfflineRestrictions();
+    }
+
+    private void applyOfflineRestrictions() {
+        tabConfiguration.setDisable(true);
+        btnMarkAllRead.setDisable(true);
+        btnRefreshAlerts.setDisable(true);
     }
 
     /**

@@ -3,6 +3,7 @@ package com.app.ui.components.sidebar;
 import com.app.core.navigation.SceneManager;
 import com.app.core.session.UserSession;
 import com.app.model.AppRoute;
+import com.app.service.offline.OfflineModeManager;
 import com.app.service.storage.AvatarStorageService;
 import javafx.fxml.FXML;
 import javafx.scene.control.Button;
@@ -96,6 +97,8 @@ public class SidebarController {
             adminItem.setVisible(false);
         }
 
+        if (OfflineModeManager.isOffline()) applyOfflineRestrictions();
+
         // Module-based visibility for secondary users
         if (!UserSession.isPrincipal()) {
             setModuleVisibility(predictiveBtn, "predicciones");
@@ -126,6 +129,14 @@ public class SidebarController {
             if (newName != null && !newName.isBlank()) userNameLabel.setText(newName);
         });
 
+    }
+
+    private void applyOfflineRestrictions() {
+        if (adminItem != null && adminItem.isVisible()) {
+            adminItem.setDisable(true);
+            adminItem.setOpacity(0.4);
+            adminItem.setTooltip(new Tooltip("No disponible sin conexión"));
+        }
     }
 
     public void goDashboard() {

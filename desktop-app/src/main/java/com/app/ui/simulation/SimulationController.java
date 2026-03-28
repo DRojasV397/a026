@@ -1,5 +1,6 @@
 package com.app.ui.simulation;
 
+import com.app.core.session.UserSession;
 import com.app.model.data.api.ProductoCatalogDTO;
 import com.app.model.predictions.PackInfoDTO;
 import com.app.model.simulation.*;
@@ -161,6 +162,14 @@ public class SimulationController {
         loadUserModels();
         loadAllProductos();
         Platform.runLater(this::loadScenarios);
+
+        if (UserSession.isOfflineMode()) applyOfflineRestrictions();
+    }
+
+    private void applyOfflineRestrictions() {
+        btnSaveScenario.setDisable(true);
+        btnExecute.setDisable(true);
+        btnCompare.setDisable(true);
     }
 
     private void setupAggToggle() {

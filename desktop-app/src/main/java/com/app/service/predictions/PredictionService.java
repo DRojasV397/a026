@@ -4,6 +4,8 @@ import com.app.config.ApiConfig;
 import com.app.config.HttpClientProvider;
 import com.app.core.session.UserSession;
 import com.app.model.predictions.*;
+import com.app.service.offline.CacheService;
+import com.app.service.offline.CacheService.CacheEntry;
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
 import java.lang.reflect.Type;
@@ -282,6 +284,15 @@ public class PredictionService {
      * GET /predictions/history
      */
     public CompletableFuture<List<PredictionHistoryItemDTO>> getHistory(int limit) {
+        String userId   = String.valueOf(UserSession.getUserId());
+        String cacheKey = "predictions_history";
+        Type   listType = new TypeToken<List<PredictionHistoryItemDTO>>(){}.getType();
+
+        if (UserSession.isOfflineMode()) {
+            return CompletableFuture.completedFuture(
+                    loadListFromCache(userId, cacheKey, listType, List.of()));
+        }
+
         String url = ApiConfig.getPredictionsHistoryUrl() + "?limit=" + limit;
 
         HttpRequest httpRequest = HttpRequest.newBuilder()
@@ -294,14 +305,14 @@ public class PredictionService {
         return httpClient.sendAsync(httpRequest, HttpResponse.BodyHandlers.ofString())
                 .thenApply(response -> {
                     if (response.statusCode() == 200) {
-                        return gson.fromJson(response.body(),
-                                new TypeToken<List<PredictionHistoryItemDTO>>(){}.getType());
+                        CacheService.put(userId, cacheKey, response.body());
+                        return (List<PredictionHistoryItemDTO>) gson.fromJson(response.body(), listType);
                     }
                     return List.<PredictionHistoryItemDTO>of();
                 })
                 .exceptionally(ex -> {
                     logger.error("Error al obtener historial tipado: {}", ex.getMessage());
-                    return List.of();
+                    return loadListFromCache(userId, cacheKey, listType, List.of());
                 });
     }
 
@@ -310,6 +321,14 @@ public class PredictionService {
      * GET /predictions/model-types
      */
     public CompletableFuture<ModelTypesResponseDTO> getModelTypes() {
+        String userId   = String.valueOf(UserSession.getUserId());
+        String cacheKey = "predictions_model_types";
+
+        if (UserSession.isOfflineMode()) {
+            return CompletableFuture.completedFuture(
+                    loadFromCache(userId, cacheKey, ModelTypesResponseDTO.class));
+        }
+
         HttpRequest httpRequest = HttpRequest.newBuilder()
                 .uri(URI.create(ApiConfig.getPredictionsModelTypesUrl()))
                 .header("Authorization", "Bearer " + UserSession.getAccessToken())
@@ -320,6 +339,7 @@ public class PredictionService {
         return httpClient.sendAsync(httpRequest, HttpResponse.BodyHandlers.ofString())
                 .thenApply(response -> {
                     if (response.statusCode() == 200) {
+                        CacheService.put(userId, cacheKey, response.body());
                         return gson.fromJson(response.body(), ModelTypesResponseDTO.class);
                     }
                     logger.warn("GetModelTypes failed - HTTP {}", response.statusCode());
@@ -327,7 +347,7 @@ public class PredictionService {
                 })
                 .exceptionally(ex -> {
                     logger.error("Error al obtener tipos de modelo: {}", ex.getMessage());
-                    return null;
+                    return loadFromCache(userId, cacheKey, ModelTypesResponseDTO.class);
                 });
     }
 
@@ -373,6 +393,15 @@ public class PredictionService {
      * GET /predictions/models/user
      */
     public CompletableFuture<List<UserModelDTO>> getUserModels() {
+        String userId   = String.valueOf(UserSession.getUserId());
+        String cacheKey = "predictions_user_models";
+        Type   listType = new TypeToken<List<UserModelDTO>>(){}.getType();
+
+        if (UserSession.isOfflineMode()) {
+            return CompletableFuture.completedFuture(
+                    loadListFromCache(userId, cacheKey, listType, List.of()));
+        }
+
         HttpRequest httpRequest = HttpRequest.newBuilder()
                 .uri(URI.create(ApiConfig.getPredictionsUserModelsUrl()))
                 .header("Authorization", "Bearer " + UserSession.getAccessToken())
@@ -383,15 +412,15 @@ public class PredictionService {
         return httpClient.sendAsync(httpRequest, HttpResponse.BodyHandlers.ofString())
                 .thenApply(response -> {
                     if (response.statusCode() == 200) {
-                        return gson.fromJson(response.body(),
-                                new TypeToken<List<UserModelDTO>>(){}.getType());
+                        CacheService.put(userId, cacheKey, response.body());
+                        return gson.fromJson(response.body(), listType);
                     }
                     logger.warn("GetUserModels failed - HTTP {}", response.statusCode());
                     return List.<UserModelDTO>of();
                 })
                 .exceptionally(ex -> {
                     logger.error("Error al obtener modelos del usuario: {}", ex.getMessage());
-                    return List.of();
+                    return loadListFromCache(userId, cacheKey, listType, List.of());
                 });
     }
 
@@ -568,6 +597,32 @@ public class PredictionService {
                     logger.error("Error al obtener datos de ventas: {}", ex.getMessage());
                     return Map.of();
                 });
+    }
+
+    // ── Cache helpers ─────────────────────────────────────────────────────────
+
+    private <T> T loadFromCache(String userId, String key, Class<T> type) {
+        CacheEntry entry = CacheService.get(userId, key);
+        if (entry == null) return null;
+        try {
+            return gson.fromJson(entry.payload, type);
+        } catch (Exception e) {
+            logger.warn("[CACHE] Error al parsear caché key={}: {}", key, e.getMessage());
+            return null;
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private <T> List<T> loadListFromCache(String userId, String key, Type type, List<T> fallback) {
+        CacheEntry entry = CacheService.get(userId, key);
+        if (entry == null) return fallback;
+        try {
+            List<T> result = gson.fromJson(entry.payload, type);
+            return result != null ? result : fallback;
+        } catch (Exception e) {
+            logger.warn("[CACHE] Error al parsear caché key={}: {}", key, e.getMessage());
+            return fallback;
+        }
     }
 
 }

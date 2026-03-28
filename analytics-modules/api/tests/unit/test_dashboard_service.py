@@ -371,7 +371,11 @@ class TestActiveAlerts:
             return DashboardService(mock_db)
 
     def test_active_alerts_with_alerts(self, dashboard_service):
-        """Test alertas activas con datos."""
+        """Test alertas activas con datos.
+        _get_active_alerts hace 3 queries: lista principal, conteo por tipo, conteo por importancia.
+        """
+        from unittest.mock import MagicMock, call
+
         mock_alerta = Mock()
         mock_alerta.idAlerta = 1
         mock_alerta.tipo = "stock_bajo"
@@ -381,7 +385,25 @@ class TestActiveAlerts:
         mock_alerta.valorEsperado = Decimal('20.0')
         mock_alerta.creadaEn = datetime(2024, 1, 15, 10, 30)
 
-        dashboard_service.db.query.return_value.filter.return_value.order_by.return_value.limit.return_value.all.return_value = [mock_alerta]
+        # Query 1: lista de alertas (filter → order_by → limit → all)
+        q1 = MagicMock()
+        q1.filter.return_value.order_by.return_value.limit.return_value.all.return_value = [mock_alerta]
+
+        # Query 2: conteo por tipo (group_by → all)
+        tipo_row = Mock()
+        tipo_row.tipo = "stock_bajo"
+        tipo_row.cnt = 1
+        q2 = MagicMock()
+        q2.group_by.return_value.all.return_value = [tipo_row]
+
+        # Query 3: conteo por importancia (group_by → all)
+        imp_row = Mock()
+        imp_row.importancia = "alta"
+        imp_row.cnt = 1
+        q3 = MagicMock()
+        q3.group_by.return_value.all.return_value = [imp_row]
+
+        dashboard_service.db.query.side_effect = [q1, q2, q3]
 
         result = dashboard_service._get_active_alerts()
 

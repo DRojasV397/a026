@@ -122,3 +122,8 @@ claude-agents/
 /claude-agents/
 
 *.ps1
+*.md
+*.xlsx
+*.sql
+
+*/test/*

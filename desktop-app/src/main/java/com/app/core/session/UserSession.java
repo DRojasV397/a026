@@ -24,7 +24,7 @@ public class UserSession {
     private static String tipo;
     private static List<String> modulos;
 
-
+    private static boolean offlineMode = false;
 
     private UserSession() {}
 
@@ -99,6 +99,29 @@ public class UserSession {
         return refreshToken;
     }
 
+    /**
+     * Popula la sesión con identidad offline (sin tokens).
+     * Usado al iniciar sesión desde el caché local.
+     */
+    public static void setOfflineIdentity(String userId, String nombreCompleto,
+            String nombreUsuario, String email, List<String> roles, String tipo, List<String> modulos) {
+        UserSession.userId         = userId != null ? Integer.parseInt(userId) : 0;
+        UserSession.nombreCompleto = nombreCompleto;
+        UserSession.nombreUsuario  = nombreUsuario;
+        UserSession.email          = email;
+        UserSession.roles          = roles;
+        UserSession.tipo           = tipo;
+        UserSession.modulos        = modulos;
+        accessToken    = null;
+        refreshToken   = null;
+        offlineMode    = true;
+    }
+
+    /** Retorna true si la sesión está en modo sin conexión. */
+    public static boolean isOfflineMode() {
+        return offlineMode;
+    }
+
     public static void clear() {
         accessToken = null;
         refreshToken = null;
@@ -110,10 +133,12 @@ public class UserSession {
         roles = null;
         tipo = null;
         modulos = null;
+        offlineMode = false;
     }
 
     public static boolean isLoggedIn() {
-        return accessToken != null && nombreUsuario != null;
+        return (accessToken != null && nombreUsuario != null)
+                || (offlineMode && nombreUsuario != null);
     }
 
     public static boolean isAdmin() {

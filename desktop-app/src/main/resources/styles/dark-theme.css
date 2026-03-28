@@ -1,0 +1,274 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   dark-theme.css  —  Override stylesheet (cargado DESPUÉS de main.css)
+   Paleta: Tailwind Slate + acento teal #3B8EA5
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── ROOT ── */
+.root { -fx-background-color: #0F172A; }
+.base-layout { -fx-background-color: #0F172A; }
+
+/* ── MÓDULOS (fondos de root) ── */
+.dashboard-root,
+.dashboard-container,
+.profile-root,
+.admin-root,
+.alerts-empty-state,
+.data-root,
+.predictions-root,
+.predictive-root,
+.profit-root,
+.sim-root,
+.alrt-root,
+.reports-root { -fx-background-color: #1E293B; }
+
+/* ── SIDEBAR ── */
+.sidebar-root { -fx-background-color: #0F172A; }
+.sidebar-item { -fx-text-fill: #CBD5E1; }
+.sidebar-item:hover { -fx-background-color: #1E293B; }
+.sidebar-item.active { -fx-background-color: #1E3A4D; }
+.sidebar-footer:hover,
+.sidebar-footer.active,
+.sidebar-profile-link:hover,
+.sidebar-profile-link.active { -fx-background-color: #1E293B; }
+.sidebar-collapse-btn:hover { -fx-background-color: #1E293B; }
+
+/* ── CARDS y SUPERFICIES BLANCAS ── */
+.stats-card,
+.chart-card,
+.profile-card,
+.kpi-card,
+.settings-row,
+.settings-row-last,
+.modal-root { -fx-background-color: #263244; }
+
+/* ── TEXTO ── */
+.label { -fx-text-fill: #E2E8F0; }
+.stats-card-value,
+.dashboard-section-title,
+.alerts-section-title,
+.chart-title,
+.profile-name-title,
+.settings-item-title,
+.inner-card-title { -fx-text-fill: #E2E8F0; }
+.stats-card-label,
+.dashboard-section-subtitle,
+.chart-subtitle,
+.settings-item-sub,
+.profile-email-sub,
+.form-label,
+.stat-label,
+.settings-group-title { -fx-text-fill: #94A3B8; }
+
+/* ── INPUTS / FORMS ── */
+.form-input,
+.text-field,
+.password-field {
+    -fx-background-color: #2D3E54;
+    -fx-text-fill: #E2E8F0;
+    -fx-border-color: #334155;
+}
+.input-editing {
+    -fx-background-color: #2D3E54;
+    -fx-border-color: #3B8EA5;
+}
+.input-editing:focused { -fx-background-color: #1E293B; }
+.input-readonly {
+    -fx-background-color: #1E293B;
+    -fx-text-fill: #64748B;
+}
+.input-wrapper {
+    -fx-background-color: #2D3E54;
+    -fx-border-color: #334155;
+}
+.input-wrapper:focus-within { -fx-border-color: #3B8EA5; }
+.input-field { -fx-text-fill: #E2E8F0; }
+
+/* ── SETTINGS GROUP ── */
+.settings-group {
+    -fx-background-color: #1E293B;
+    -fx-border-color: #334155;
+}
+.stats-inner-card {
+    -fx-background-color: #1E293B;
+    -fx-border-color: #334155;
+}
+
+/* ── SEPARADORES ── */
+.separator > .line {
+    -fx-border-color: transparent transparent #334155 transparent;
+}
+.tab-container {
+    -fx-border-color: transparent transparent #334155 transparent;
+}
+
+/* ── PERIODO SELECTOR / BOTONES SECONDARY ── */
+.period-btn {
+    -fx-background-color: #263244;
+    -fx-border-color: #334155;
+    -fx-text-fill: #94A3B8;
+}
+.period-btn:hover {
+    -fx-background-color: #2D3E54;
+    -fx-text-fill: #E2E8F0;
+}
+
+/* ── NAVBAR ── */
+.profile-context-menu .menu-item:focused { -fx-background-color: #1E293B; }
+
+/* ── LOGIN ── */
+.login-root,
+.login-left { -fx-background-color: #0F172A; }
+.login-card { -fx-background-color: #1E293B; }
+.login-h1 { -fx-text-fill: #E2E8F0; }
+.login-h4,
+.login-footer-text,
+.login-small { -fx-text-fill: #94A3B8; }
+
+/* ── CHARTS ── */
+.chart-plot-background { -fx-background-color: #1E293B; }
+.chart-horizontal-grid-lines,
+.chart-vertical-grid-lines { -fx-stroke: #334155; }
+.chart-legend-item,
+.chart-pie-label { -fx-text-fill: #94A3B8; }
+
+/* ── ADMIN (tabla) ── */
+.user-row { -fx-background-color: #263244; }
+.table-header { -fx-background-color: #1E293B; }
+.users-card,
+.kpi-card-warn,
+.admin-scroll { -fx-background-color: #263244; }
+.search-wrapper { -fx-background-color: #2D3E54; -fx-border-color: #334155; }
+.search-input { -fx-text-fill: #E2E8F0; }
+
+/* ── PREDICTIVO / SIMULATION / REPORTS ── */
+.model-card,
+.model-detail,
+.training-card,
+.predictive-footer,
+.param-card,
+.preview-card,
+.summary-card,
+.validation-card,
+.result-kpi-card,
+.results-sidebar,
+.processing-card,
+.scenario-card,
+.edition-card,
+.chart-card-sim,
+.changes-summary-card,
+.comparison-card,
+.main-card,
+.report-card,
+.schedule-card,
+.alrt-toolbar,
+.alrt-sidebar-card,
+.alrt-config-card { -fx-background-color: #263244; -fx-border-color: #334155; }
+
+.form-section { -fx-background-color: #1E293B; -fx-border-color: #334155; }
+.form-section-header { -fx-background-color: #1E293B; -fx-border-color: #334155; }
+.sidebar-section-title,
+.panel-title,
+.results-section-title,
+.section-title,
+.model-title,
+.detail-title,
+.scenario-card-name,
+.edition-title,
+.summary-card-title,
+.chart-title-sim,
+.results-title { -fx-text-fill: #E2E8F0; }
+
+.model-description,
+.detail-extra,
+.info-label,
+.chart-subtitle-sim,
+.results-meta,
+.empty-text,
+.alrt-kpi-label { -fx-text-fill: #94A3B8; }
+
+/* ── ALERTS ── */
+.alert-row-card { -fx-background-color: #263244; -fx-border-color: #334155; }
+.alert-row-unread { -fx-background-color: #1E3A4D; -fx-border-color: #3B8EA5; }
+.alert-row-title { -fx-text-fill: #E2E8F0; }
+.alert-row-desc,
+.alert-meta { -fx-text-fill: #94A3B8; }
+
+/* ── PROFIT (KPI cards) ── */
+.indicator-card { -fx-background-color: #263244; -fx-border-color: #334155; }
+.indicator-title { -fx-text-fill: #E2E8F0; }
+.indicator-formula,
+.kpi-label,
+.page-info-label { -fx-text-fill: #94A3B8; }
+.kpi-value { -fx-text-fill: #E2E8F0; }
+.indicator-input {
+    -fx-background-color: #2D3E54;
+    -fx-border-color: #334155;
+    -fx-text-fill: #E2E8F0;
+}
+.profit-table,
+.summary-table { -fx-background-color: #1E293B; -fx-border-color: #334155; }
+.profit-table .column-header,
+.summary-table .column-header { -fx-background-color: #1E293B; }
+
+/* ── REPORTS ── */
+.saved-report-row,
+.history-row,
+.report-type-card { -fx-background-color: #263244; -fx-border-color: #334155; }
+.saved-report-name,
+.history-name { -fx-text-fill: #E2E8F0; }
+.saved-report-meta,
+.saved-report-user,
+.history-meta { -fx-text-fill: #94A3B8; }
+.log-text-area { -fx-background-color: #0F172A; -fx-text-fill: #E2E8F0; }
+
+/* ── DATA MODULE ── */
+.data-card,
+.upload-card,
+.sidebar-card,
+.metric-card,
+.result-card { -fx-background-color: #263244; -fx-border-color: #334155; }
+.recent-row { -fx-background-color: #263244; -fx-border-color: #334155; }
+.recent-row:hover { -fx-background-color: #2D3E54; }
+.data-card-title,
+.sidebar-card-title,
+.recent-file-name { -fx-text-fill: #E2E8F0; }
+.sidebar-card-hint,
+.recent-meta { -fx-text-fill: #94A3B8; }
+.data-search-input {
+    -fx-background-color: #2D3E54;
+    -fx-border-color: #334155;
+    -fx-text-fill: #E2E8F0;
+}
+.data-combo { -fx-background-color: #2D3E54; -fx-border-color: #334155; }
+
+/* ── TABLE VIEW ── */
+.table-view { -fx-background-color: #1E293B; -fx-border-color: #334155; }
+.table-view .column-header-background { -fx-background-color: #1E293B; }
+.table-view .column-header,
+.table-view .filler { -fx-background-color: #1E293B; -fx-border-color: #334155; }
+.table-row-cell { -fx-background-color: #1E293B; -fx-border-color: #334155; }
+.table-row-cell:odd { -fx-background-color: #263244; }
+.table-row-cell:selected { -fx-background-color: #1E3A4D; }
+.table-row-cell .text { -fx-fill: #E2E8F0; }
+
+/* ── SCROLL BAR ── */
+.scroll-bar { -fx-background-color: #1E293B; }
+.scroll-bar .thumb { -fx-background-color: #334155; }
+.scroll-bar .thumb:hover { -fx-background-color: #3B8EA5; }
+.scroll-bar .track { -fx-background-color: #1E293B; }
+.scroll-bar .increment-button,
+.scroll-bar .decrement-button { -fx-background-color: #1E293B; }
+
+/* ── COMBO BOX ── */
+.combo-box {
+    -fx-background-color: #2D3E54;
+    -fx-border-color: #334155;
+    -fx-text-fill: #E2E8F0;
+}
+.combo-box .list-cell { -fx-text-fill: #E2E8F0; -fx-background-color: #2D3E54; }
+.combo-box-popup .list-view { -fx-background-color: #2D3E54; -fx-border-color: #334155; }
+.combo-box-popup .list-cell { -fx-text-fill: #E2E8F0; -fx-background-color: #2D3E54; }
+.combo-box-popup .list-cell:filled:hover { -fx-background-color: #334155; }
+.combo-box-popup .list-cell:filled:selected { -fx-background-color: #1E3A4D; }
+.combo-box .arrow-button { -fx-background-color: #2D3E54; }
+.combo-box .arrow { -fx-background-color: #94A3B8; }

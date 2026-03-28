@@ -8,6 +8,7 @@ import com.app.model.profitability.ProductsResponseDTO;
 import com.app.model.profitability.ProjectionResponseDTO;
 import com.app.model.profitability.ProjectionGeneralDTO;
 import com.app.model.profitability.ProjectionItemDTO;
+import com.app.core.session.UserSession;
 import com.app.service.profitability.ProfitabilityService;
 import javafx.application.Platform;
 import javafx.collections.FXCollections;
@@ -153,8 +154,8 @@ public class ProfitController {
                 kpiContainer.getChildren().clear();
 
                 if (indResp == null || !indResp.isSuccess()) {
-                    Label err = new Label("⚠ Error de conexión con el servidor.");
-                    err.getStyleClass().add("main-subtitle");
+                    Label err = new Label(noDataMessage());
+                    err.getStyleClass().add("offline-section-message");
                     kpiContainer.getChildren().add(err);
                     return;
                 }
@@ -538,6 +539,12 @@ public class ProfitController {
         };
     }
 
+    private String noDataMessage() {
+        return UserSession.isOfflineMode()
+                ? "Sin datos en caché para este período. Conéctate para cargar este período."
+                : "⚠ No se pudieron cargar los datos. Verifique la conexión.";
+    }
+
     private String fmtMoney(double v) {
         return (v < 0 ? "-$" : "$") + df.format(Math.abs(v));
     }
@@ -603,8 +610,8 @@ public class ProfitController {
                 container.getChildren().clear();
 
                 if (indResp == null || !indResp.isSuccess()) {
-                    Label err = new Label("⚠ No se pudieron cargar los datos. Verifique la conexión.");
-                    err.getStyleClass().add("main-subtitle");
+                    Label err = new Label(noDataMessage());
+                    err.getStyleClass().add("offline-section-message");
                     container.getChildren().add(err);
                     return;
                 }
@@ -857,8 +864,8 @@ public class ProfitController {
                 container.getChildren().clear();
 
                 if (indResp == null || !indResp.isSuccess()) {
-                    Label err = new Label("⚠ No se pudieron cargar los datos. Verifique la conexión.");
-                    err.getStyleClass().add("main-subtitle");
+                    Label err = new Label(noDataMessage());
+                    err.getStyleClass().add("offline-section-message");
                     container.getChildren().add(err);
                     return;
                 }
@@ -1603,7 +1610,7 @@ public class ProfitController {
                     errIcon.setStyle("-fx-font-size: 48px; -fx-text-fill: #F59E0B;");
                     Label errMsg = new Label(
                             resp == null
-                            ? "No se pudo conectar con el servidor."
+                            ? noDataMessage()
                             : "No hay modelos activos. Entrena un modelo en el módulo de Predicciones.");
                     errMsg.getStyleClass().add("coming-soon-text");
                     errMsg.setWrapText(true);

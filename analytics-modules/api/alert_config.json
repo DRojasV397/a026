@@ -4,5 +4,6 @@
   "anomaly_rate_threshold": 5.0,
   "max_active_alerts": 5,
   "margen_minimo": 20.0,
-  "precio_cambio_threshold": 10.0
+  "precio_cambio_threshold": 10.0,
+  "min_confidence": 70.0
 }

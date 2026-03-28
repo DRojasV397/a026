@@ -163,6 +163,44 @@
     -fx-cursor: default;
 }
 
+/* Botón modo offline */
+.button-offline {
+    -fx-background-color: #6B7280;
+    -fx-text-fill: white;
+    -fx-background-radius: 8px;
+    -fx-font-size: 13px;
+    -fx-cursor: hand;
+    -fx-padding: 10px 20px;
+}
+
+.button-offline:hover {
+    -fx-background-color: #4B5563;
+}
+
+/* Banner modo offline */
+.offline-banner {
+    -fx-background-color: #F59E0B;
+    -fx-padding: 6px 20px;
+    -fx-min-height: 32px;
+}
+
+.offline-banner-text {
+    -fx-font-size: 12px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #1F2937;
+}
+
+.offline-banner-timestamp {
+    -fx-font-size: 11px;
+    -fx-text-fill: #374151;
+}
+
+.offline-section-message {
+    -fx-font-size: 13px;
+    -fx-text-fill: #6B7280;
+    -fx-padding: 16px 0;
+}
+
 /* Links */
 
 .login-link {

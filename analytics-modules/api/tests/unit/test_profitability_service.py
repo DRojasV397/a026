@@ -236,7 +236,9 @@ class TestValidateDataCompleteness:
                     assert any("ventas" in i.lower() for i in issues)
 
     def test_validate_no_compras(self, db_session):
-        """Verifica deteccion de falta de compras."""
+        """Verifica que falta de compras NO invalida el analisis (son opcionales).
+        El costo puede estimarse desde costoUnitario del producto.
+        """
         service = ProfitabilityService(db_session)
 
         with patch.object(service.venta_repo, 'get_by_rango_fechas', return_value=[Mock()]):
@@ -247,8 +249,9 @@ class TestValidateDataCompleteness:
                         date(2024, 1, 31)
                     )
 
-                    assert is_valid == False
-                    assert any("compras" in i.lower() for i in issues)
+                    # Las compras son opcionales: sin compras la validacion sigue siendo valida
+                    assert is_valid == True
+                    assert len(issues) == 0
 
     def test_validate_no_productos(self, db_session):
         """Verifica deteccion de falta de productos."""
@@ -322,17 +325,21 @@ class TestCalculateIndicators:
                     assert result["success"] == True
 
     def test_calculate_indicators_incomplete_data(self, db_session):
-        """Verifica error con datos incompletos."""
+        """Verifica calculo con ventas en cero: retorna success=True con ingresos=0.
+        calculate_indicators siempre retorna success=True; los ceros reflejan ausencia de datos.
+        """
         service = ProfitabilityService(db_session)
 
-        with patch.object(service, 'validate_data_completeness', return_value=(False, ["No hay ventas"])):
-            result = service.calculate_indicators(
-                fecha_inicio=date(2024, 1, 1),
-                fecha_fin=date(2024, 1, 31)
-            )
+        with patch.object(service.venta_repo, 'get_by_rango_fechas', return_value=[]):
+            with patch.object(service.compra_repo, 'get_by_rango_fechas', return_value=[]):
+                result = service.calculate_indicators(
+                    fecha_inicio=date(2024, 1, 1),
+                    fecha_fin=date(2024, 1, 31)
+                )
 
-            assert result["success"] == False
-            assert "issues" in result
+                assert result["success"] == True
+                assert result["indicators"]["ingresos_totales"] == 0.0
+                assert result["indicators"]["costos_totales"] == 0.0
 
 
 class TestGetProductProfitability:

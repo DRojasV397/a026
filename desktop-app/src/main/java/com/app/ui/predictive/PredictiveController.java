@@ -1,5 +1,6 @@
 package com.app.ui.predictive;
 
+import com.app.core.session.UserSession;
 import com.app.model.Phase2ConfigDTO;
 import com.app.model.PredictiveModelDTO;
 import com.app.model.ResultKpiDTO;
@@ -155,6 +156,13 @@ public class PredictiveController {
         loadUserModels();
         clearDetailPanel();
         updateFooterState();
+
+        if (UserSession.isOfflineMode()) applyOfflineRestrictions();
+    }
+
+    private void applyOfflineRestrictions() {
+        btnTrain.setDisable(true);
+        btnNext.setDisable(true);
     }
 
     /* =========================

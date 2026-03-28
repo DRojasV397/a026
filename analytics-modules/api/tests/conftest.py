@@ -446,3 +446,136 @@ def create_test_sale(db: Session, user_id: int = None, **kwargs) -> Any:
     db.commit()
     db.refresh(sale)
     return sale
+
+
+# ============================================================
+# Fixtures adicionales para tests de admin/permisos/e2e
+# ============================================================
+
+# Credenciales de usuario administrador (Principal) para tests de admin
+# Debe ser un usuario tipo "Principal" (Administrador) en la BD de prueba.
+# Por defecto usa las mismas credenciales que TEST_USER_CREDENTIALS.
+ADMIN_USER_CREDENTIALS = {
+    "username": os.environ.get("TEST_ADMIN_USERNAME", TEST_USER_CREDENTIALS["username"]),
+    "password": os.environ.get("TEST_ADMIN_PASSWORD", TEST_USER_CREDENTIALS["password"]),
+}
+
+
+@pytest.fixture
+def admin_token(client: TestClient) -> str:
+    """
+    Retorna el access_token de un usuario Administrador (Principal).
+    Útil cuando se necesita el token crudo en lugar de los headers completos.
+
+    Prerequisito: TEST_ADMIN_USERNAME debe ser un usuario tipo Principal en la BD.
+    """
+    response = client.post(
+        "/api/v1/auth/login/json",
+        json={
+            "username": ADMIN_USER_CREDENTIALS["username"],
+            "password": ADMIN_USER_CREDENTIALS["password"],
+        },
+    )
+    if response.status_code == 200:
+        return response.json().get("access_token", "")
+    return ""
+
+
+@pytest.fixture
+def secondary_user_factory(client: TestClient, admin_headers: Dict):
+    """
+    Factory fixture para crear usuarios Secundarios con módulos específicos.
+
+    Uso:
+        def test_algo(secondary_user_factory):
+            headers = secondary_user_factory(["datos", "alertas"])
+            # headers = {"Authorization": "Bearer <token>"}
+
+    Retorna None si no se puede crear el usuario (sin admin_headers funcionales).
+    """
+    import uuid
+
+    created_ids = []
+
+    def _create(modulos: list) -> Dict[str, str]:
+        if not admin_headers:
+            return None
+        s = str(uuid.uuid4())[:8]
+        username = f"factory_{s}"
+        password = "Factory123!"
+        payload = {
+            "nombreCompleto": f"Factory User {s}",
+            "nombreUsuario": username,
+            "email": f"factory_{s}@test.com",
+            "password": password,
+            "tipo": "Secundario",
+            "modulos": modulos,
+        }
+        create_r = client.post(
+            "/api/v1/admin/usuarios", headers=admin_headers, json=payload
+        )
+        if create_r.status_code not in [200, 201]:
+            return None
+
+        user_id = create_r.json().get("idUsuario")
+        if user_id:
+            created_ids.append(user_id)
+
+        login_r = client.post(
+            "/api/v1/auth/login/json",
+            json={"username": username, "password": password},
+        )
+        if login_r.status_code != 200:
+            return None
+
+        token = login_r.json().get("access_token")
+        return {"Authorization": f"Bearer {token}"}
+
+    yield _create
+
+    # Cleanup: eliminar usuarios creados
+    if admin_headers:
+        for uid in created_ids:
+            try:
+                client.delete(
+                    f"/api/v1/admin/usuarios/{uid}", headers=admin_headers
+                )
+            except Exception:
+                pass  # Ignorar errores de cleanup
+
+
+@pytest.fixture
+def ventas_csv_content() -> bytes:
+    """
+    Genera contenido CSV de ventas con 420 días (~14 meses) de datos.
+    Cumple el requisito mínimo de 6 meses (RN-01.01) para predicciones.
+    """
+    from datetime import date, timedelta
+
+    lines = ["fecha,producto,cantidad,precioUnitario,total"]
+    base = date.today() - timedelta(days=420)
+    for i in range(420):
+        d = (base + timedelta(days=i)).isoformat()
+        base_amount = 1000 + (i * 2)
+        variacion = (i % 7) * 150
+        total = base_amount + variacion
+        cantidad = 5 + (i % 8)
+        precio = round(total / cantidad, 2)
+        lines.append(f"{d},Producto General,{cantidad},{precio},{total}")
+    return "\n".join(lines).encode()
+
+
+@pytest.fixture
+def ventas_csv_insuficiente() -> bytes:
+    """
+    CSV con solo 30 días de ventas (< 6 meses).
+    Útil para testear validación RN-01.01.
+    """
+    from datetime import date, timedelta
+
+    lines = ["fecha,producto,cantidad,precioUnitario,total"]
+    base = date.today() - timedelta(days=30)
+    for i in range(30):
+        d = (base + timedelta(days=i)).isoformat()
+        lines.append(f"{d},Producto Test,5,100.0,500.0")
+    return "\n".join(lines).encode()

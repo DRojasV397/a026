@@ -4,6 +4,8 @@ import com.app.config.ApiConfig;
 import com.app.config.HttpClientProvider;
 import com.app.core.session.UserSession;
 import com.app.model.simulation.*;
+import com.app.service.offline.CacheService;
+import com.app.service.offline.CacheService.CacheEntry;
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
 import org.slf4j.Logger;
@@ -47,6 +49,13 @@ public class SimulationApiService {
      * GET /simulation/scenarios
      */
     public CompletableFuture<List<SimulationScenarioSummaryDTO>> listScenarios() {
+        String userId   = String.valueOf(UserSession.getUserId());
+        String cacheKey = "simulation_scenarios";
+
+        if (UserSession.isOfflineMode()) {
+            return CompletableFuture.completedFuture(loadScenariosFromCache(userId));
+        }
+
         HttpRequest req = HttpRequest.newBuilder()
                 .uri(URI.create(ApiConfig.getSimulationScenariosUrl()))
                 .header("Authorization", "Bearer " + UserSession.getAccessToken())
@@ -58,6 +67,7 @@ public class SimulationApiService {
                 .thenApply(response -> {
                     if (response.statusCode() == 200) {
                         SimulationScenarioListDTO result = gson.fromJson(response.body(), SimulationScenarioListDTO.class);
+                        CacheService.put(userId, cacheKey, response.body());
                         return result.getEscenarios() != null
                                 ? result.getEscenarios()
                                 : List.<SimulationScenarioSummaryDTO>of();
@@ -67,7 +77,7 @@ public class SimulationApiService {
                 })
                 .exceptionally(ex -> {
                     logger.error("Error al listar escenarios: {}", ex.getMessage());
-                    return List.<SimulationScenarioSummaryDTO>of();
+                    return loadScenariosFromCache(userId);
                 });
     }
 
@@ -245,5 +255,19 @@ public class SimulationApiService {
                     logger.error("Error al comparar escenarios: {}", ex.getMessage());
                     return Map.of("success", false);
                 });
+    }
+
+    // ── Cache helper ──────────────────────────────────────────────────────────
+
+    private List<SimulationScenarioSummaryDTO> loadScenariosFromCache(String userId) {
+        CacheEntry entry = CacheService.get(userId, "simulation_scenarios");
+        if (entry == null) return List.of();
+        try {
+            SimulationScenarioListDTO dto = gson.fromJson(entry.payload, SimulationScenarioListDTO.class);
+            if (dto != null && dto.getEscenarios() != null) return dto.getEscenarios();
+        } catch (Exception e) {
+            logger.warn("[CACHE] Error al parsear caché simulation_scenarios: {}", e.getMessage());
+        }
+        return List.of();
     }
 }

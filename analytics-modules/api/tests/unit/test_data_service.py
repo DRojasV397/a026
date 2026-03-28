@@ -49,7 +49,7 @@ class TestUploadFile:
 
         csv_content = b"fecha,total,moneda\n2024-01-01,1000.00,MXN\n2024-01-02,1500.00,MXN"
 
-        response = service.upload_file(csv_content, "ventas.csv")
+        response = service.upload_file(csv_content, "ventas.csv", user_id=1)
 
         assert response.upload_id is not None
         assert response.filename == "ventas.csv"
@@ -64,7 +64,7 @@ class TestUploadFile:
 
         invalid_content = b"not a valid csv or excel file content \x00\x01\x02"
 
-        response = service.upload_file(invalid_content, "invalid.xyz")
+        response = service.upload_file(invalid_content, "invalid.xyz", user_id=1)
 
         assert response.upload_id is not None
         assert response.status == UploadStatus.ERROR or response.total_rows == 0
@@ -75,7 +75,7 @@ class TestUploadFile:
 
         empty_content = b""
 
-        response = service.upload_file(empty_content, "empty.csv")
+        response = service.upload_file(empty_content, "empty.csv", user_id=1)
 
         assert response.upload_id is not None
         # Archivo vacio deberia dar error o 0 filas
@@ -87,7 +87,7 @@ class TestUploadFile:
 
         csv_content = b"fecha,total,moneda"
 
-        response = service.upload_file(csv_content, "headers_only.csv")
+        response = service.upload_file(csv_content, "headers_only.csv", user_id=1)
 
         assert response.upload_id is not None
         assert response.total_rows == 0
@@ -101,7 +101,7 @@ class TestGetUpload:
         service = DataService(db_session)
 
         csv_content = b"col1,col2\nval1,val2"
-        response = service.upload_file(csv_content, "test.csv")
+        response = service.upload_file(csv_content, "test.csv", user_id=1)
 
         upload = service.get_upload(response.upload_id)
 
@@ -127,7 +127,7 @@ class TestValidateStructure:
         service = DataService(db_session)
 
         csv_content = b"fecha,total,moneda\n2024-01-01,1000.00,MXN"
-        upload_response = service.upload_file(csv_content, "ventas.csv")
+        upload_response = service.upload_file(csv_content, "ventas.csv", user_id=1)
 
         result = service.validate_structure(
             upload_response.upload_id,
@@ -144,7 +144,7 @@ class TestValidateStructure:
 
         # CSV sin columna 'fecha' requerida
         csv_content = b"total,moneda\n1000.00,MXN"
-        upload_response = service.upload_file(csv_content, "ventas.csv")
+        upload_response = service.upload_file(csv_content, "ventas.csv", user_id=1)
 
         result = service.validate_structure(
             upload_response.upload_id,
@@ -170,7 +170,7 @@ class TestValidateStructure:
         service = DataService(db_session)
 
         csv_content = b"date,amount\n2024-01-01,1000.00"
-        upload_response = service.upload_file(csv_content, "ventas.csv")
+        upload_response = service.upload_file(csv_content, "ventas.csv", user_id=1)
 
         result = service.validate_structure(
             upload_response.upload_id,
@@ -189,7 +189,7 @@ class TestGetPreview:
         service = DataService(db_session)
 
         csv_content = b"col1,col2\nval1,val2\nval3,val4\nval5,val6"
-        upload_response = service.upload_file(csv_content, "test.csv")
+        upload_response = service.upload_file(csv_content, "test.csv", user_id=1)
 
         preview = service.get_preview(upload_response.upload_id, rows=2)
 
@@ -214,7 +214,7 @@ class TestGetPreview:
         service = DataService(db_session)
 
         csv_content = b"col1\nval1\nval2"
-        upload_response = service.upload_file(csv_content, "test.csv")
+        upload_response = service.upload_file(csv_content, "test.csv", user_id=1)
 
         preview = service.get_preview(upload_response.upload_id, rows=100)
 
@@ -229,7 +229,7 @@ class TestCleanData:
         service = DataService(db_session)
 
         csv_content = b"col1,col2\nval1,val2\nval1,val2\nval3,val4"
-        upload_response = service.upload_file(csv_content, "test.csv")
+        upload_response = service.upload_file(csv_content, "test.csv", user_id=1)
 
         options = CleaningOptions(
             remove_duplicates=True,
@@ -248,7 +248,7 @@ class TestCleanData:
         service = DataService(db_session)
 
         csv_content = b"col1,col2\nval1,val2\n,val3\nval4,val5"
-        upload_response = service.upload_file(csv_content, "test.csv")
+        upload_response = service.upload_file(csv_content, "test.csv", user_id=1)
 
         options = CleaningOptions(
             remove_duplicates=False,
@@ -267,7 +267,7 @@ class TestCleanData:
         service = DataService(db_session)
 
         csv_content = b"col1,col2\n1,2\n,3\n4,5"
-        upload_response = service.upload_file(csv_content, "test.csv")
+        upload_response = service.upload_file(csv_content, "test.csv", user_id=1)
 
         options = CleaningOptions(
             remove_duplicates=False,
@@ -285,7 +285,7 @@ class TestCleanData:
         service = DataService(db_session)
 
         csv_content = b"col1,col2\n1,2\n,3\n4,5"
-        upload_response = service.upload_file(csv_content, "test.csv")
+        upload_response = service.upload_file(csv_content, "test.csv", user_id=1)
 
         options = CleaningOptions(
             remove_duplicates=False,
@@ -303,7 +303,7 @@ class TestCleanData:
         service = DataService(db_session)
 
         csv_content = b"col1,col2\n1,2\n,3\n4,5"
-        upload_response = service.upload_file(csv_content, "test.csv")
+        upload_response = service.upload_file(csv_content, "test.csv", user_id=1)
 
         options = CleaningOptions(
             remove_duplicates=False,
@@ -322,7 +322,7 @@ class TestCleanData:
 
         # Crear datos con outlier evidente
         csv_content = b"valor\n10\n11\n12\n10\n11\n1000"  # 1000 es outlier
-        upload_response = service.upload_file(csv_content, "test.csv")
+        upload_response = service.upload_file(csv_content, "test.csv", user_id=1)
 
         options = CleaningOptions(
             remove_duplicates=False,
@@ -341,7 +341,7 @@ class TestCleanData:
         service = DataService(db_session)
 
         csv_content = b"texto\n  espacios  \n normal \n  mas  "
-        upload_response = service.upload_file(csv_content, "test.csv")
+        upload_response = service.upload_file(csv_content, "test.csv", user_id=1)
 
         options = CleaningOptions(
             remove_duplicates=False,
@@ -360,7 +360,7 @@ class TestCleanData:
 
         # Crear datos donde la mayoria son duplicados
         csv_content = b"col1\nval\nval\nval\nval\nval\nval\nval\nval\nval\nunique"
-        upload_response = service.upload_file(csv_content, "test.csv")
+        upload_response = service.upload_file(csv_content, "test.csv", user_id=1)
 
         options = CleaningOptions(
             remove_duplicates=True,
@@ -390,7 +390,7 @@ class TestCleanData:
         service = DataService(db_session)
 
         csv_content = b"texto,valor\n  dup  ,10\n  dup  ,10\nnormal,11\n,12\noutlier,1000"
-        upload_response = service.upload_file(csv_content, "test.csv")
+        upload_response = service.upload_file(csv_content, "test.csv", user_id=1)
 
         options = CleaningOptions(
             remove_duplicates=True,
@@ -469,7 +469,7 @@ class TestGetQualityReport:
         service = DataService(db_session)
 
         csv_content = b"col1,col2\n1,a\n2,b\n3,c"
-        upload_response = service.upload_file(csv_content, "test.csv")
+        upload_response = service.upload_file(csv_content, "test.csv", user_id=1)
 
         report = service.get_quality_report(upload_response.upload_id)
 
@@ -484,7 +484,7 @@ class TestGetQualityReport:
 
         # Datos con muchos nulos
         csv_content = b"col1,col2\n1,\n,b\n,\n4,d\n,"
-        upload_response = service.upload_file(csv_content, "test.csv")
+        upload_response = service.upload_file(csv_content, "test.csv", user_id=1)
 
         report = service.get_quality_report(upload_response.upload_id)
 
@@ -497,7 +497,7 @@ class TestGetQualityReport:
         service = DataService(db_session)
 
         csv_content = b"valor\n10\n11\n12\n10\n11\n10000"
-        upload_response = service.upload_file(csv_content, "test.csv")
+        upload_response = service.upload_file(csv_content, "test.csv", user_id=1)
 
         report = service.get_quality_report(upload_response.upload_id)
 
@@ -520,7 +520,7 @@ class TestGetQualityReport:
 
         # Datos de baja calidad
         csv_content = b"col1\n\n\n\n\nval"
-        upload_response = service.upload_file(csv_content, "test.csv")
+        upload_response = service.upload_file(csv_content, "test.csv", user_id=1)
 
         report = service.get_quality_report(upload_response.upload_id)
 
@@ -549,7 +549,7 @@ class TestConfirmUpload:
         service = DataService(db_session)
 
         csv_content = b"fecha,total\n2024-01-01,1000\n2024-01-02,1500"
-        upload_response = service.upload_file(csv_content, "ventas.csv")
+        upload_response = service.upload_file(csv_content, "ventas.csv", user_id=1)
 
         # Mock del repositorio para evitar acceso real a BD
         with patch.object(service, '_insert_ventas', return_value=2):
@@ -567,7 +567,7 @@ class TestConfirmUpload:
         service = DataService(db_session)
 
         csv_content = b"fecha,proveedor,total\n2024-01-01,Prov1,1000"
-        upload_response = service.upload_file(csv_content, "compras.csv")
+        upload_response = service.upload_file(csv_content, "compras.csv", user_id=1)
 
         with patch.object(service, '_insert_compras', return_value=1):
             result = service.confirm_upload(
@@ -583,9 +583,10 @@ class TestConfirmUpload:
         service = DataService(db_session)
 
         csv_content = b"sku,nombre,precio\nSKU001,Producto1,100"
-        upload_response = service.upload_file(csv_content, "productos.csv")
+        upload_response = service.upload_file(csv_content, "productos.csv", user_id=1)
 
-        with patch.object(service, '_insert_productos', return_value=1):
+        # _insert_productos retorna tupla (insertados, actualizados)
+        with patch.object(service, '_insert_productos', return_value=(1, 0)):
             result = service.confirm_upload(
                 upload_response.upload_id,
                 DataType.PRODUCTOS,
@@ -599,7 +600,7 @@ class TestConfirmUpload:
         service = DataService(db_session)
 
         csv_content = b"col1\nval1"
-        upload_response = service.upload_file(csv_content, "test.csv")
+        upload_response = service.upload_file(csv_content, "test.csv", user_id=1)
 
         # Usar un tipo que no sea ventas, compras o productos
         # Nota: DataType puede no tener otros valores, este test es para cobertura
@@ -651,7 +652,7 @@ class TestInsertMethods:
             assert inserted == 1
 
     def test_insert_productos_mock(self, db_session):
-        """Verifica insercion de productos con mock."""
+        """Verifica insercion de productos con mock. Retorna tupla (insertados, actualizados)."""
         service = DataService(db_session)
 
         df = pd.DataFrame({
@@ -661,12 +662,20 @@ class TestInsertMethods:
         })
 
         with patch('app.services.data_service.ProductoRepository') as MockRepo:
-            mock_instance = MockRepo.return_value
-            mock_instance.create.return_value = Mock()
+            with patch('app.services.data_service.CategoriaRepository') as MockCatRepo:
+                mock_prod = MockRepo.return_value
+                mock_cat = MockCatRepo.return_value
+                # Forzar ruta de insercion: producto no existe
+                # El método usa get_by_sku_y_usuario (no get_by_sku) cuando user_id está presente
+                mock_prod.get_by_sku_y_usuario.return_value = None
+                mock_prod.get_by_nombre_y_usuario.return_value = None
+                mock_prod.create.return_value = Mock()
+                mock_cat.get_by_nombre.return_value = Mock(idCategoria=1)
 
-            inserted = service._insert_productos(df)
+                inserted_count, updated_count = service._insert_productos(df, user_id=1)
 
-            assert inserted == 1
+                assert inserted_count == 1
+                assert updated_count == 0
 
     def test_insert_with_error_handling(self, db_session):
         """Verifica manejo de errores en insercion."""
@@ -697,7 +706,7 @@ class TestDeleteUpload:
         service = DataService(db_session)
 
         csv_content = b"col1\nval1"
-        upload_response = service.upload_file(csv_content, "test.csv")
+        upload_response = service.upload_file(csv_content, "test.csv", user_id=1)
 
         result = service.delete_upload(upload_response.upload_id)
 

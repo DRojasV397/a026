@@ -2,6 +2,7 @@ package com.app.ui.components.navbar;
 
 import com.app.core.navigation.SceneManager;
 import com.app.core.session.UserSession;
+import com.app.service.offline.OfflineModeManager;
 import com.app.service.storage.AvatarStorageService;
 import javafx.fxml.FXML;
 import javafx.scene.control.*;
@@ -104,7 +105,10 @@ public class NavbarController {
         Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
         alert.setTitle("Cerrar sesión");
         alert.setHeaderText("¿Estás seguro que deseas cerrar sesión?");
-        alert.setContentText("Se perderán los cambios que no hayan sido guardados.");
+        String contentText = OfflineModeManager.isOffline()
+                ? "Saldrás del modo sin conexión y regresarás a la pantalla de inicio."
+                : "Se perderán los cambios que no hayan sido guardados.";
+        alert.setContentText(contentText);
 
         // Personalizar los botones
         ButtonType btnConfirmar = new ButtonType("Cerrar sesión", ButtonBar.ButtonData.OK_DONE);

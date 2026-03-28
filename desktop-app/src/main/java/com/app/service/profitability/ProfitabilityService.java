@@ -4,6 +4,8 @@ import com.app.config.ApiConfig;
 import com.app.config.HttpClientProvider;
 import com.app.core.session.UserSession;
 import com.app.model.profitability.*;
+import com.app.service.offline.CacheService;
+import com.app.service.offline.CacheService.CacheEntry;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import org.slf4j.Logger;
@@ -15,6 +17,7 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.time.LocalDate;
+import java.time.temporal.ChronoUnit;
 import java.util.concurrent.CompletableFuture;
 
 /**
@@ -50,6 +53,16 @@ public class ProfitabilityService {
      * Obtiene rentabilidad de todos los productos para el rango dado.
      */
     public CompletableFuture<ProductsResponseDTO> getProductProfitability(LocalDate from, LocalDate to) {
+        String userId   = String.valueOf(UserSession.getUserId());
+        String cacheKey = (from != null && to != null)
+                ? "profit_products_" + ChronoUnit.DAYS.between(from, to) + "d"
+                : "profit_products_default";
+
+        if (UserSession.isOfflineMode()) {
+            return CompletableFuture.completedFuture(
+                    loadFromCache(userId, cacheKey, ProductsResponseDTO.class));
+        }
+
         StringBuilder url = new StringBuilder(ApiConfig.getProfitabilityProductsUrl());
         boolean first = true;
         if (from != null) { url.append("?fecha_inicio=").append(from); first = false; }
@@ -66,6 +79,7 @@ public class ProfitabilityService {
                 .thenApply(response -> {
                     logger.debug("GET /profitability/products → HTTP {}", response.statusCode());
                     if (response.statusCode() == 200) {
+                        CacheService.put(userId, cacheKey, response.body());
                         return gson.fromJson(response.body(), ProductsResponseDTO.class);
                     }
                     logger.warn("getProductProfitability falló - HTTP {}: {}", response.statusCode(), response.body());
@@ -73,7 +87,7 @@ public class ProfitabilityService {
                 })
                 .exceptionally(ex -> {
                     logger.error("Error en getProductProfitability: {}", ex.getMessage());
-                    return null;
+                    return loadFromCache(userId, cacheKey, ProductsResponseDTO.class);
                 });
     }
 
@@ -116,6 +130,16 @@ public class ProfitabilityService {
      * Obtiene rentabilidad por categoría para el rango dado.
      */
     public CompletableFuture<CategoriesResponseDTO> getCategoryProfitability(LocalDate from, LocalDate to) {
+        String userId   = String.valueOf(UserSession.getUserId());
+        String cacheKey = (from != null && to != null)
+                ? "profit_categories_" + ChronoUnit.DAYS.between(from, to) + "d"
+                : "profit_categories_default";
+
+        if (UserSession.isOfflineMode()) {
+            return CompletableFuture.completedFuture(
+                    loadFromCache(userId, cacheKey, CategoriesResponseDTO.class));
+        }
+
         StringBuilder url = new StringBuilder(ApiConfig.getProfitabilityCategoriesUrl());
         boolean first = true;
         if (from != null) { url.append("?fecha_inicio=").append(from); first = false; }
@@ -132,6 +156,7 @@ public class ProfitabilityService {
                 .thenApply(response -> {
                     logger.debug("GET /profitability/categories → HTTP {}", response.statusCode());
                     if (response.statusCode() == 200) {
+                        CacheService.put(userId, cacheKey, response.body());
                         return gson.fromJson(response.body(), CategoriesResponseDTO.class);
                     }
                     logger.warn("getCategoryProfitability falló - HTTP {}: {}", response.statusCode(), response.body());
@@ -139,7 +164,7 @@ public class ProfitabilityService {
                 })
                 .exceptionally(ex -> {
                     logger.error("Error en getCategoryProfitability: {}", ex.getMessage());
-                    return null;
+                    return loadFromCache(userId, cacheKey, CategoriesResponseDTO.class);
                 });
     }
 
@@ -193,6 +218,16 @@ public class ProfitabilityService {
             LocalDate fechaInicio, LocalDate fechaFin,
             Double activosTotales, Double patrimonio) {
 
+        String userId   = String.valueOf(UserSession.getUserId());
+        String cacheKey = (fechaInicio != null && fechaFin != null)
+                ? "profit_indicators_" + ChronoUnit.DAYS.between(fechaInicio, fechaFin) + "d"
+                : "profit_indicators_default";
+
+        if (UserSession.isOfflineMode()) {
+            return CompletableFuture.completedFuture(
+                    loadFromCache(userId, cacheKey, IndicatorsResponseDTO.class));
+        }
+
         JsonObject body = new JsonObject();
         if (fechaInicio != null)    body.addProperty("fecha_inicio", fechaInicio.toString());
         if (fechaFin != null)       body.addProperty("fecha_fin", fechaFin.toString());
@@ -211,6 +246,7 @@ public class ProfitabilityService {
                 .thenApply(response -> {
                     logger.debug("POST /profitability/indicators → HTTP {}", response.statusCode());
                     if (response.statusCode() == 200) {
+                        CacheService.put(userId, cacheKey, response.body());
                         return gson.fromJson(response.body(), IndicatorsResponseDTO.class);
                     }
                     logger.warn("calculateIndicators falló - HTTP {}: {}", response.statusCode(), response.body());
@@ -218,7 +254,7 @@ public class ProfitabilityService {
                 })
                 .exceptionally(ex -> {
                     logger.error("Error en calculateIndicators: {}", ex.getMessage());
-                    return null;
+                    return loadFromCache(userId, cacheKey, IndicatorsResponseDTO.class);
                 });
     }
 
@@ -234,6 +270,14 @@ public class ProfitabilityService {
      * Genera proyección de rentabilidad usando el mejor pack activo.
      */
     public CompletableFuture<ProjectionResponseDTO> getProjection(int periods) {
+        String userId   = String.valueOf(UserSession.getUserId());
+        String cacheKey = "profit_projection_" + periods + "p";
+
+        if (UserSession.isOfflineMode()) {
+            return CompletableFuture.completedFuture(
+                    loadFromCache(userId, cacheKey, ProjectionResponseDTO.class));
+        }
+
         String url = ApiConfig.getProfitabilityProjectionUrl() + "?periods=" + periods;
 
         HttpRequest request = HttpRequest.newBuilder()
@@ -247,6 +291,7 @@ public class ProfitabilityService {
                 .thenApply(response -> {
                     logger.debug("GET /profitability/projection → HTTP {}", response.statusCode());
                     if (response.statusCode() == 200) {
+                        CacheService.put(userId, cacheKey, response.body());
                         return gson.fromJson(response.body(), ProjectionResponseDTO.class);
                     }
                     logger.warn("getProjection falló - HTTP {}: {}", response.statusCode(), response.body());
@@ -254,7 +299,20 @@ public class ProfitabilityService {
                 })
                 .exceptionally(ex -> {
                     logger.error("Error en getProjection: {}", ex.getMessage());
-                    return null;
+                    return loadFromCache(userId, cacheKey, ProjectionResponseDTO.class);
                 });
+    }
+
+    // ── Cache helper ──────────────────────────────────────────────────────────
+
+    private <T> T loadFromCache(String userId, String key, Class<T> type) {
+        CacheEntry entry = CacheService.get(userId, key);
+        if (entry == null) return null;
+        try {
+            return gson.fromJson(entry.payload, type);
+        } catch (Exception e) {
+            logger.warn("[CACHE] Error al parsear caché key={}: {}", key, e.getMessage());
+            return null;
+        }
     }
 }
