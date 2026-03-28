@@ -436,7 +436,7 @@ class PredictionService:
         """Crea una instancia del modelo especificado."""
         params = hyperparameters or {}
 
-        if model_type == 'linear':
+        if model_type in ('linear', 'linear_regression'):
             return TimeSeriesLinearRegression(
                 target_column='total',
                 date_column='fecha',
