@@ -11,6 +11,7 @@ import com.app.service.data.CleaningService;
 import com.app.service.data.DataApiService;
 import com.app.service.data.TransformService;
 import com.app.service.data.ValidationService;
+import com.app.service.reports.ReportGeneratorService;
 import javafx.animation.PauseTransition;
 import javafx.application.Platform;
 import javafx.beans.property.SimpleStringProperty;
@@ -151,6 +152,11 @@ public class DataController {
 
     /** Servicio para llamadas a la API de datos */
     private final DataApiService dataApiService = new DataApiService();
+
+    /** Última consulta de históricos (para exportar sin volver a la API) */
+    private List<HistoricoItemDTO> lastHistoricoItems = new ArrayList<>();
+    private String lastQueryDateRange = "\u2014";
+    private final ReportGeneratorService reportGenerator = new ReportGeneratorService();
 
     /** ID del upload actual en el backend (null = no subido) */
     private String currentUploadId = null;
@@ -711,14 +717,49 @@ public class DataController {
     }
 
     /**
-     * Abre la vista de datos cargados para el archivo indicado.
-     * TODO: implementar vista previa de datos (CU-01 paso 6: primeras 10 filas)
+     * Muestra las primeras 10 filas del archivo cargado en un diálogo con TableView.
      */
     private void onViewUploadedData(UploadedFileDTO upload) {
-        System.out.printf("[DATA] Ver datos de carga: id=%d, archivo=%s%n",
-                upload.id(), upload.fileName());
-        // TODO: dataPreviewService.showPreview(upload.id())
-        //       o navegar a históricos con filtro por esta carga
+        dataApiService.getPreview(String.valueOf(upload.id()), 10)
+                .thenAccept(preview -> Platform.runLater(() -> {
+                    if (preview == null) {
+                        showError("Sin vista previa", "No se pudo obtener la vista previa de los datos.");
+                        return;
+                    }
+
+                    Dialog<Void> dialog = new Dialog<>();
+                    dialog.setTitle("Vista previa \u2014 " + upload.fileName());
+                    dialog.setHeaderText(preview.getPreviewRows() + " filas de " + preview.getTotalRows() + " totales");
+                    dialog.getDialogPane().getButtonTypes().add(ButtonType.CLOSE);
+
+                    TableView<ObservableList<String>> table = new TableView<>();
+                    List<String> columns = preview.getColumns();
+                    for (int i = 0; i < columns.size(); i++) {
+                        final int idx = i;
+                        TableColumn<ObservableList<String>, String> col = new TableColumn<>(columns.get(i));
+                        col.setCellValueFactory(p ->
+                                new SimpleStringProperty(idx < p.getValue().size()
+                                        ? String.valueOf(p.getValue().get(idx)) : ""));
+                        table.getColumns().add(col);
+                    }
+
+                    List<ObservableList<String>> rows = new ArrayList<>();
+                    for (Map<String, Object> rowMap : preview.getData()) {
+                        ObservableList<String> row = FXCollections.observableArrayList();
+                        for (String col : columns) row.add(String.valueOf(rowMap.getOrDefault(col, "")));
+                        rows.add(row);
+                    }
+                    table.setItems(FXCollections.observableArrayList(rows));
+                    table.setPrefWidth(700);
+                    table.setPrefHeight(300);
+
+                    dialog.getDialogPane().setContent(table);
+                    dialog.showAndWait();
+                }))
+                .exceptionally(ex -> {
+                    Platform.runLater(() -> showError("Error", "No se pudo cargar la vista previa."));
+                    return null;
+                });
     }
 
     // ═════════════════════════════════════════════════════════════════════════
@@ -921,6 +962,12 @@ public class DataController {
                                 .collect(Collectors.toList());
                     }
 
+                    // Guardar para exportación posterior
+                    lastHistoricoItems = new ArrayList<>(items);
+                    String fromStr = dpHistoryFrom.getValue() != null ? dpHistoryFrom.getValue().toString() : "\u2014";
+                    String toStr   = dpHistoryTo.getValue()   != null ? dpHistoryTo.getValue().toString()   : "\u2014";
+                    lastQueryDateRange = fromStr + " \u2192 " + toStr;
+
                     List<ObservableList<String>> rows = new ArrayList<>();
                     for (HistoricoItemDTO item : items) {
                         rows.add(FXCollections.observableArrayList(
@@ -965,10 +1012,37 @@ public class DataController {
 
     @FXML
     private void onExportData() {
-        // TODO: dataService.export(currentQueryResult, formato)
-        System.out.println("[DATA] Exportar datos históricos filtrados");
-        showInfo("Exportar datos",
-                "La exportaci\u00F3n de datos estar\u00E1 disponible en la pr\u00F3xima versi\u00F3n.");
+        if (lastHistoricoItems.isEmpty()) {
+            showInfo("Sin datos", "Aplica los filtros primero para cargar datos hist\u00F3ricos.");
+            return;
+        }
+        ChoiceDialog<String> fmt = new ChoiceDialog<>("PDF", "PDF", "Excel");
+        fmt.setTitle("Formato de exportaci\u00F3n");
+        fmt.setHeaderText("Exportar datos hist\u00F3ricos");
+        fmt.setContentText("Selecciona el formato:");
+        Optional<String> result = fmt.showAndWait();
+        if (result.isEmpty()) return;
+        String format = result.get().equals("Excel") ? "Excel" : "PDF";
+
+        List<Map<String, Object>> rows = lastHistoricoItems.stream().map(item -> {
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put("fecha",    item.getFechaFormatted());
+            row.put("producto", item.getProducto());
+            row.put("precio",   item.getPrecioFormatted());
+            row.put("cantidad", item.getCantidadFormatted());
+            row.put("total",    item.getTotalFormatted());
+            row.put("tipo",     item.getTipo());
+            return row;
+        }).collect(Collectors.toList());
+
+        try {
+            ReportGeneratorService.GeneratedFile file =
+                    reportGenerator.generate(format, "Historicos", "historicos",
+                            lastQueryDateRange, rows);
+            showInfo("Exportaci\u00F3n completada", "Guardado en:\n" + file.path());
+        } catch (Exception e) {
+            showError("Error al exportar", e.getMessage());
+        }
     }
 
     // ═════════════════════════════════════════════════════════════════════════

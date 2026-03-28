@@ -15,6 +15,7 @@ import com.app.model.predictions.TrainModelResponseDTO;
 import com.app.model.predictions.UserModelDTO;
 import com.app.service.alerts.WarningService;
 import com.app.service.predictions.PredictionService;
+import com.app.service.reports.ReportGeneratorService;
 import com.app.ui.components.cards.ResultKpiCard;
 import com.app.ui.components.charts.BarChartCardController;
 import com.app.ui.components.charts.LineChartCardController;
@@ -136,6 +137,7 @@ public class PredictiveController {
     private RotateTransition loadingRotation;
 
     private final PredictionService predictionService = new PredictionService();
+    private final ReportGeneratorService reportGenerator = new ReportGeneratorService();
     private TrainModelResponseDTO lastTrainResponse;
     private ForecastResponseDTO lastForecastResponse;
     private PackTrainResponseDTO lastPackTrainResponse;
@@ -3118,8 +3120,9 @@ public class PredictiveController {
     }
 
     /**
-     * Carga chart de predicción vs real
+     * Carga chart de predicción vs real; usa datos reales del forecast si están disponibles.
      */
+    @SuppressWarnings("unchecked")
     private void loadPredictionChart() {
         try {
             FXMLLoader loader = new FXMLLoader(
@@ -3128,11 +3131,28 @@ public class PredictiveController {
             VBox chartNode = loader.load();
             LineChartCardController controller = loader.getController();
 
-            controller.setTitle("Predicción vs Datos Reales");
+            controller.setTitle("Predicci\u00F3n vs Datos Reales");
             controller.setSubtitle("Comparativa de resultados");
 
-            // TODO: Cargar datos reales desde el resultado del modelo
-            controller.loadData();
+            if (lastForecastResponse != null && lastForecastResponse.getPredictions() != null) {
+                List<String> dates  = (List<String>) lastForecastResponse.getPredictions().get("dates");
+                List<Number> values = (List<Number>) lastForecastResponse.getPredictions().get("values");
+                if (dates != null && values != null) {
+                    XYChart.Series<String, Number> series = new XYChart.Series<>();
+                    series.setName("Predicci\u00F3n");
+                    int step = Math.max(1, dates.size() / 30);
+                    for (int i = 0; i < dates.size(); i += step) {
+                        String label = dates.get(i).length() > 10
+                                ? dates.get(i).substring(5, 10) : dates.get(i);
+                        series.getData().add(new XYChart.Data<>(label, values.get(i)));
+                    }
+                    controller.loadCustomData(series);
+                } else {
+                    controller.loadData();
+                }
+            } else {
+                controller.loadData();
+            }
 
             resultsChartsContainer.getChildren().add(chartNode);
 
@@ -3265,9 +3285,32 @@ public class PredictiveController {
 
     @FXML
     private void onGenerateReport() {
-        System.out.println("Generando reporte...");
-        // TODO: Generar PDF/Excel con resultados
-        WarningService.show("Generando reporte...");
+        if (lastTrainResponse == null) {
+            WarningService.show("Entrena un modelo primero para generar el reporte.");
+            return;
+        }
+        List<Map<String, Object>> rows = buildPredictionRows();
+        if (rows.isEmpty()) {
+            WarningService.show("No hay datos de predicci\u00F3n disponibles. Genera un forecast primero.");
+            return;
+        }
+        ChoiceDialog<String> fmt = new ChoiceDialog<>("PDF", "PDF", "Excel");
+        fmt.setTitle("Formato de exportaci\u00F3n");
+        fmt.setHeaderText("Reporte de predicci\u00F3n \u2014 " + lastTrainResponse.getModelType());
+        fmt.setContentText("Selecciona el formato:");
+        Optional<String> result = fmt.showAndWait();
+        if (result.isEmpty()) return;
+        String format = result.get().equals("Excel") ? "Excel" : "PDF";
+        String dateRange = rows.get(0).get("fecha") + " \u2192 " + rows.get(rows.size() - 1).get("fecha");
+        try {
+            ReportGeneratorService.GeneratedFile file =
+                    reportGenerator.generate(format,
+                            "Prediccion_" + lastTrainResponse.getModelType(),
+                            "predicciones", dateRange, rows);
+            WarningService.show("Reporte guardado en: " + file.path().getFileName());
+        } catch (Exception e) {
+            WarningService.show("Error al generar reporte: " + e.getMessage());
+        }
     }
 
     @FXML
@@ -3286,9 +3329,53 @@ public class PredictiveController {
 
     @FXML
     private void onExportData() {
-        System.out.println("Exportando datos...");
-        // TODO: Exportar datos a CSV/Excel
-        WarningService.show("Exportando datos...");
+        List<Map<String, Object>> rows = buildPredictionRows();
+        if (rows.isEmpty()) {
+            WarningService.show("No hay datos de predicci\u00F3n para exportar.");
+            return;
+        }
+        ChoiceDialog<String> fmt = new ChoiceDialog<>("Excel", "Excel", "PDF");
+        fmt.setTitle("Exportar datos");
+        fmt.setHeaderText("Exportar datos de predicci\u00F3n");
+        fmt.setContentText("Selecciona el formato:");
+        Optional<String> result = fmt.showAndWait();
+        if (result.isEmpty()) return;
+        String format = result.get().equals("PDF") ? "PDF" : "Excel";
+        String dateRange = rows.get(0).get("fecha") + " \u2192 " + rows.get(rows.size() - 1).get("fecha");
+        try {
+            ReportGeneratorService.GeneratedFile file =
+                    reportGenerator.generate(format, "Datos_Prediccion",
+                            "predicciones", dateRange, rows);
+            WarningService.show("Datos exportados: " + file.path().getFileName());
+        } catch (Exception e) {
+            WarningService.show("Error al exportar: " + e.getMessage());
+        }
+    }
+
+    /** Convierte lastForecastResponse a filas para el generador de reportes. */
+    @SuppressWarnings("unchecked")
+    private List<Map<String, Object>> buildPredictionRows() {
+        if (lastForecastResponse == null || lastForecastResponse.getPredictions() == null)
+            return List.of();
+        List<String> dates   = (List<String>) lastForecastResponse.getPredictions().get("dates");
+        List<Number> values  = (List<Number>) lastForecastResponse.getPredictions().get("values");
+        List<Number> lowerCi = (List<Number>) lastForecastResponse.getPredictions().get("lower_ci");
+        List<Number> upperCi = (List<Number>) lastForecastResponse.getPredictions().get("upper_ci");
+        if (dates == null || values == null) return List.of();
+
+        List<Map<String, Object>> rows = new ArrayList<>();
+        for (int i = 0; i < dates.size(); i++) {
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put("fecha",       dates.get(i));
+            row.put("prediccion",  values.get(i) != null
+                    ? String.format("%.2f", values.get(i).doubleValue()) : "\u2014");
+            row.put("ic_inferior", lowerCi != null && i < lowerCi.size() && lowerCi.get(i) != null
+                    ? String.format("%.2f", lowerCi.get(i).doubleValue()) : "\u2014");
+            row.put("ic_superior", upperCi != null && i < upperCi.size() && upperCi.get(i) != null
+                    ? String.format("%.2f", upperCi.get(i).doubleValue()) : "\u2014");
+            rows.add(row);
+        }
+        return rows;
     }
 
     /**

@@ -126,6 +126,10 @@ public class ReportGeneratorService {
             case "rentabilidad_categoria"  -> new String[]{"Categoría", "Ingresos ($)", "Costos ($)", "Utilidad ($)", "Margen %"};
             case "rentabilidad_producto"   -> new String[]{"Producto", "Categoría", "Ingresos ($)", "Costos ($)", "Utilidad ($)", "Margen %"};
             case "productos"               -> new String[]{"Producto", "Categoría", "Cant. Vendida", "Ingresos Generados ($)"};
+            case "alertas"                 -> new String[]{"Fecha", "Tipo", "Severidad", "T\u00EDtulo", "M\u00E9trica",
+                                                           "Valor Actual", "Valor Esperado", "Desviaci\u00F3n %", "Estado"};
+            case "historicos"              -> new String[]{"Fecha", "Producto", "Precio ($)", "Cantidad", "Total ($)", "Tipo"};
+            case "predicciones"            -> new String[]{"Fecha", "Predicci\u00F3n", "IC Inferior", "IC Superior"};
             default                        -> new String[]{"Datos"};
         };
     }
@@ -138,6 +142,10 @@ public class ReportGeneratorService {
             case "rentabilidad_categoria"  -> new String[]{"categoria", "ingresos", "costos", "utilidad", "margen"};
             case "rentabilidad_producto"   -> new String[]{"nombre", "categoria", "ingresos", "costos", "utilidad", "margen"};
             case "productos"               -> new String[]{"nombre", "categoria", "cantidad_vendida", "ingresos_generados"};
+            case "alertas"                 -> new String[]{"fecha", "tipo", "severidad", "titulo", "metrica",
+                                                           "valor_actual", "valor_esperado", "desviacion", "estado"};
+            case "historicos"              -> new String[]{"fecha", "producto", "precio", "cantidad", "total", "tipo"};
+            case "predicciones"            -> new String[]{"fecha", "prediccion", "ic_inferior", "ic_superior"};
             default                        -> new String[]{"value"};
         };
     }

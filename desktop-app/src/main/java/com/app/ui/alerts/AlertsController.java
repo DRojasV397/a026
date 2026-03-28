@@ -1,8 +1,11 @@
 package com.app.ui.alerts;
 
+import com.app.core.navigation.SceneManager;
 import com.app.core.session.UserSession;
+import com.app.model.AppRoute;
 import com.app.model.alerts.AlertDTO;
 import com.app.service.alerts.AlertApiService;
+import com.app.service.reports.ReportGeneratorService;
 import com.app.ui.components.AnimatedToggleSwitch;
 import javafx.animation.PauseTransition;
 import javafx.application.Platform;
@@ -35,9 +38,11 @@ import javafx.stage.Stage;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import java.util.function.BiFunction;
 import java.util.stream.Collectors;
 
@@ -120,6 +125,7 @@ public class AlertsController {
     private boolean configInitialized  = false;
 
     private final AlertApiService alertApiService = new AlertApiService();
+    private final ReportGeneratorService reportGenerator = new ReportGeneratorService();
 
     private static final DateTimeFormatter FMT =
             DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm", new Locale("es", "MX"));
@@ -953,20 +959,67 @@ public class AlertsController {
 
     @FXML
     private void onExportActive() {
-        System.out.println("[ALERTS] Exportar alertas activas");
-        // TODO: exportService.export(filteredActive, formato)
+        exportAlerts(filteredActive != null ? new ArrayList<>(filteredActive) : List.of(),
+                "Exportar alertas activas");
     }
 
     @FXML
     private void onExportHistory() {
-        System.out.println("[ALERTS] Exportar hist\u00F3rico de alertas");
-        // TODO: exportService.export(filteredHistory, formato)
+        exportAlerts(filteredHistory != null ? new ArrayList<>(filteredHistory) : List.of(),
+                "Exportar historial de alertas");
+    }
+
+    // ── Helpers de exportación ────────────────────────────────────────────────
+
+    private List<Map<String, Object>> alertsToRows(List<AlertDTO> alerts) {
+        return alerts.stream().map(a -> {
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put("fecha",          a.createdAt()      != null ? a.createdAt().toString()      : "\u2014");
+            row.put("tipo",           a.type()            != null ? a.type()            : "\u2014");
+            row.put("severidad",      a.severity()        != null ? a.severity()        : "\u2014");
+            row.put("titulo",         a.title()           != null ? a.title()           : "\u2014");
+            row.put("metrica",        a.affectedMetric()  != null ? a.affectedMetric()  : "\u2014");
+            row.put("valor_actual",   String.valueOf(a.currentValue()));
+            row.put("valor_esperado", String.valueOf(a.expectedValue()));
+            row.put("desviacion",     String.format("%.1f%%", a.deviationPercent()));
+            row.put("estado",         a.status()          != null ? a.status()          : "\u2014");
+            return row;
+        }).collect(Collectors.toList());
+    }
+
+    private void exportAlerts(List<AlertDTO> alerts, String dialogTitle) {
+        if (alerts.isEmpty()) {
+            Alert info = new Alert(Alert.AlertType.INFORMATION);
+            info.setTitle("Sin datos"); info.setHeaderText(null);
+            info.setContentText("No hay alertas para exportar."); info.showAndWait();
+            return;
+        }
+        ChoiceDialog<String> fmt = new ChoiceDialog<>("PDF", "PDF", "Excel");
+        fmt.setTitle("Formato de exportaci\u00F3n");
+        fmt.setHeaderText(dialogTitle); fmt.setContentText("Selecciona el formato:");
+        Optional<String> result = fmt.showAndWait();
+        if (result.isEmpty()) return;
+        String format = result.get().equals("Excel") ? "Excel" : "PDF";
+        try {
+            ReportGeneratorService.GeneratedFile file =
+                    reportGenerator.generate(format, "Alertas", "alertas",
+                            LocalDateTime.now().toLocalDate().toString(),
+                            alertsToRows(alerts));
+            Alert ok = new Alert(Alert.AlertType.INFORMATION);
+            ok.setTitle("Exportaci\u00F3n completada"); ok.setHeaderText(null);
+            ok.setContentText("Guardado en:\n" + file.path()); ok.showAndWait();
+        } catch (Exception e) {
+            Alert err = new Alert(Alert.AlertType.ERROR);
+            err.setTitle("Error"); err.setHeaderText(null);
+            err.setContentText("No se pudo generar el archivo: " + e.getMessage()); err.showAndWait();
+        }
     }
 
     // ── Acciones rápidas ──────────────────────────────────────────────────────
     private void onQuickGenerateReport() {
-        System.out.println("[ALERTS] Acci\u00F3n r\u00E1pida: Generar reporte de alertas");
-        // TODO: navegar a módulo de reportes con filtro de alertas preseleccionado
+        SceneManager.setContent("/fxml/reports/ReportsView.fxml",
+                "Reportes", "Crea y descarga reportes personalizados del sistema",
+                AppRoute.REPORTS);
     }
     private void onQuickExport() {
         System.out.println("[ALERTS] Acci\u00F3n r\u00E1pida: Exportar todas las alertas activas");
