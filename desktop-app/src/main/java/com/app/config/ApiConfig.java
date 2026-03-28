@@ -2,7 +2,7 @@ package com.app.config;
 
 public class ApiConfig {
 
-    private static final String BASE_URL = "http://localhost:8000/api/v1";
+    private static final String BASE_URL = "http://163.192.134.120:8000/api/v1";
 
     private ApiConfig() {}
 
