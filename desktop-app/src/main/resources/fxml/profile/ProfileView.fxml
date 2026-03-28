@@ -192,14 +192,6 @@
 
                             <HBox alignment="CENTER_LEFT" spacing="15" styleClass="settings-row">
                                 <VBox HBox.hgrow="ALWAYS" spacing="3">
-                                    <Label text="Tema de colores" styleClass="settings-item-title"/>
-                                    <Label text="Aplica al dashboard principal" styleClass="settings-item-sub"/>
-                                </VBox>
-                                <ComboBox fx:id="cmbTheme" styleClass="form-input"/>
-                            </HBox>
-
-                            <HBox alignment="CENTER_LEFT" spacing="15" styleClass="settings-row">
-                                <VBox HBox.hgrow="ALWAYS" spacing="3">
                                     <Label text="Rango de fechas por defecto" styleClass="settings-item-title"/>
                                     <Label text="Período inicial al abrir reportes" styleClass="settings-item-sub"/>
                                 </VBox>

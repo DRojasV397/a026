@@ -2,7 +2,6 @@ package com.app.ui.profile;
 
 import com.app.core.navigation.SceneManager;
 import com.app.core.session.UserSession;
-import com.app.core.theme.ThemeManager;
 import com.app.model.UserDTO;
 import com.app.service.profile.ProfileApiService;
 import com.app.service.storage.AvatarStorageService;
@@ -63,7 +62,6 @@ public class ProfileController {
     @FXML private Label lblStatsReports;
 
     // ── Dashboard settings ────────────────────────────────────────────────────
-    @FXML private ComboBox<String> cmbTheme;
     @FXML private ComboBox<String> cmbDateRange;
 
     // ── Cabecera — meta ───────────────────────────────────────────────────────────
@@ -110,7 +108,7 @@ public class ProfileController {
 
     // Clave → nombre legible para el log / futura llamada a BD
     private enum ConfigKey {
-        THEME, DATE_RANGE, PREDICTIONS_PANEL,
+        DATE_RANGE, PREDICTIONS_PANEL,
         TWO_FACTOR, EMAIL_NOTIF, SYSTEM_NOTIF,
         NOTIF_PREDICTIONS, NOTIF_REPORTS, NOTIF_SECURITY
     }
@@ -336,18 +334,11 @@ public class ProfileController {
     }
 
     private void populateCombos() {
-        cmbTheme.getItems().addAll("Azul corporativo", "Oscuro", "Claro");
         cmbDateRange.getItems().addAll(
                 "Últimos 7 días", "Últimos 30 días",
                 "Último trimestre", "Este año"
         );
 
-        // ── Listeners de cambio (misma lógica que los toggles) ────────────────
-        cmbTheme.getSelectionModel().selectedItemProperty().addListener(
-                (obs, oldVal, newVal) -> {
-                    if (newVal != null) onConfigChangedString(ConfigKey.THEME, newVal);
-                }
-        );
         cmbDateRange.getSelectionModel().selectedItemProperty().addListener(
                 (obs, oldVal, newVal) -> {
                     if (newVal != null) onConfigChangedString(ConfigKey.DATE_RANGE, newVal);
@@ -361,9 +352,6 @@ public class ProfileController {
     private void onConfigChangedString(ConfigKey key, String value) {
         if (!configLoaded) return;
         System.out.printf("[CONFIG] %-22s → \"%s\"%n", key.name(), value);
-        if (key == ConfigKey.THEME) {
-            ThemeManager.apply(value);
-        }
         // TODO: configService.updateSetting(UserSession.getUserId(), key.name(), value);
     }
 
@@ -372,7 +360,6 @@ public class ProfileController {
      * Aquí se reemplazará getMockConfig() por service.getUserConfig(userId).
      */
     private void applyMockConfig(UserConfig config) {
-        cmbTheme.getSelectionModel().select(config.theme());
         cmbDateRange.getSelectionModel().select(config.dateRange());
         tglPredictionsPanel.setSelected(config.showPredictionsOnStart());
 
@@ -880,7 +867,6 @@ public class ProfileController {
      */
     private UserConfig getMockConfig() {
         return new UserConfig(
-                ThemeManager.getCurrent(),    // theme
                 "Últimos 30 días",    // dateRange
                 true,                 // showPredictionsOnStart
                 false,                // twoFactorEnabled
@@ -896,7 +882,6 @@ public class ProfileController {
     //  Record interno para la configuración de usuario
     // ─────────────────────────────────────────────────────────────────────────
     public record UserConfig(
-            String  theme,
             String  dateRange,
             boolean showPredictionsOnStart,
             boolean twoFactorEnabled,
