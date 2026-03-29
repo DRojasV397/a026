@@ -192,11 +192,22 @@ public class DataController {
     }
 
     private void applyOfflineRestrictions() {
-        tabUpload.setDisable(true);
+        // Tab 1: accesible para ver Cargas recientes (cach\u00E9 data_historial)
+        // Solo se deshabilitan los controles de carga/proceso
         btnProcess.setDisable(true);
         btnSelectFile.setDisable(true);
         dropZoneCard.setDisable(true);
         dropZoneCard.setOpacity(0.5);
+
+        // Tab 2: accesible desde cach\u00E9 (data_historicos)
+        // Se deshabilitan los filtros server-side; b\u00FAsqueda por texto queda activa (client-side)
+        cmbDataType.setDisable(true);
+        dpHistoryFrom.setDisable(true);
+        dpHistoryTo.setDisable(true);
+
+        // Tab 3: validaci\u00F3n y confirmaci\u00F3n requieren API
+        tabValidation.setDisable(true);
+        btnConfirmValidation.setDisable(true);
     }
 
     // ─────────────────────────────────────────────────────────────────────────

@@ -135,8 +135,14 @@ public class SidebarController {
         if (adminItem != null && adminItem.isVisible()) {
             adminItem.setDisable(true);
             adminItem.setOpacity(0.4);
-            adminItem.setTooltip(new Tooltip("No disponible sin conexión"));
+            adminItem.setTooltip(new Tooltip("No disponible sin conexi\u00F3n"));
         }
+        predictiveBtn.setDisable(true);
+        predictiveBtn.setOpacity(0.4);
+        predictiveBtn.setTooltip(new Tooltip("No disponible sin conexi\u00F3n"));
+        simulationBtn.setDisable(true);
+        simulationBtn.setOpacity(0.4);
+        simulationBtn.setTooltip(new Tooltip("No disponible sin conexi\u00F3n"));
     }
 
     public void goDashboard() {

@@ -376,6 +376,14 @@ public class DataApiService {
      * @param to    Fecha de fin del rango (null → sin límite)
      */
     public CompletableFuture<HistoricoListDTO> getHistoricos(String tipo, LocalDate from, LocalDate to) {
+        String userId   = String.valueOf(UserSession.getUserId());
+        String cacheKey = "data_historicos";
+
+        if (UserSession.isOfflineMode()) {
+            return CompletableFuture.completedFuture(
+                    loadFromCache(userId, cacheKey, HistoricoListDTO.class));
+        }
+
         StringBuilder url = new StringBuilder(ApiConfig.getDataHistoricosUrl());
         boolean first = true;
 
@@ -402,14 +410,15 @@ public class DataApiService {
                 .thenApply(response -> {
                     logger.info("Historicos response HTTP {}", response.statusCode());
                     if (response.statusCode() == 200) {
+                        CacheService.put(userId, cacheKey, response.body());
                         return gson.fromJson(response.body(), HistoricoListDTO.class);
                     }
                     logger.warn("Historicos failed - HTTP {}: {}", response.statusCode(), response.body());
                     return null;
                 })
                 .exceptionally(ex -> {
-                    logger.error("Error al obtener históricos: {}", ex.getMessage());
-                    return null;
+                    logger.error("Error al obtener hist\u00F3ricos: {}", ex.getMessage());
+                    return loadFromCache(userId, cacheKey, HistoricoListDTO.class);
                 });
     }
 
