@@ -4,7 +4,6 @@ Esquemas DTO (Pydantic) para el módulo de Productos y Categorías.
 
 from pydantic import BaseModel, Field, ConfigDict
 from typing import Optional
-from decimal import Decimal
 
 
 # Esquemas de Categoría
@@ -41,8 +40,8 @@ class ProductoBase(BaseModel):
     nombre: str = Field(..., description="Nombre del producto")
     descripcion: Optional[str] = None
     idCategoria: Optional[int] = None
-    precioUnitario: Optional[Decimal] = None
-    costo: Optional[Decimal] = None
+    precioUnitario: Optional[float] = None
+    costo: Optional[float] = None
     existencia: Optional[int] = 0
     activo: Optional[int] = 1
 
@@ -58,8 +57,8 @@ class ProductoUpdate(BaseModel):
     nombre: Optional[str] = None
     descripcion: Optional[str] = None
     idCategoria: Optional[int] = None
-    precioUnitario: Optional[Decimal] = None
-    costo: Optional[Decimal] = None
+    precioUnitario: Optional[float] = None
+    costo: Optional[float] = None
     existencia: Optional[int] = None
     activo: Optional[int] = None
 
@@ -67,7 +66,7 @@ class ProductoUpdate(BaseModel):
 class ProductoResponse(ProductoBase):
     """Esquema de respuesta de Producto."""
     idProducto: int
-    costoUnitario: Optional[Decimal] = None
+    costoUnitario: Optional[float] = None
     categoriaNombre: Optional[str] = None
     stock: Optional[int] = None
     stockMinimo: Optional[int] = None

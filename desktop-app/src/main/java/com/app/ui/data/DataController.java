@@ -185,7 +185,7 @@ public class DataController {
         Platform.runLater(() -> {
             buildHowToSteps();
             buildFormatFields();
-            loadRecentUploads(getMockRecentUploads());
+            loadRecentUploadsFromApi();
         });
 
         if (UserSession.isOfflineMode()) applyOfflineRestrictions();
@@ -651,6 +651,42 @@ public class DataController {
     // ═════════════════════════════════════════════════════════════════════════
     //  CARGAS RECIENTES
     // ═════════════════════════════════════════════════════════════════════════
+
+    private void loadRecentUploadsFromApi() {
+        dataApiService.getHistorial(null)
+                .thenAccept(response -> Platform.runLater(() -> {
+                    if (response == null) {
+                        loadRecentUploads(List.of());
+                        return;
+                    }
+                    List<UploadedFileDTO> uploads = response.getItems().stream()
+                            .map(item -> {
+                                LocalDateTime uploadedAt;
+                                try {
+                                    uploadedAt = LocalDateTime.parse(item.getCargadoEn());
+                                } catch (Exception e) {
+                                    uploadedAt = LocalDateTime.now();
+                                }
+                                return new UploadedFileDTO(
+                                        item.getIdHistorial(),
+                                        item.getNombreArchivo(),
+                                        item.getFileExtension(),
+                                        item.getTipoDatos().toUpperCase(),
+                                        uploadedAt,
+                                        item.getEstado(),
+                                        0L,
+                                        item.getRegistrosInsertados(),
+                                        ""
+                                );
+                            })
+                            .collect(Collectors.toList());
+                    loadRecentUploads(uploads);
+                }))
+                .exceptionally(ex -> {
+                    Platform.runLater(() -> loadRecentUploads(List.of()));
+                    return null;
+                });
+    }
 
     private void loadRecentUploads(List<UploadedFileDTO> uploads) {
         recentUploadsList.getChildren().clear();
@@ -1341,6 +1377,7 @@ public class DataController {
                         validationResult.setManaged(false);
                         buildValidationChecklist();
                         currentUploadId = null;
+                        loadRecentUploadsFromApi();
                     } else {
                         String msg = confirmResponse != null ? confirmResponse.getMessage() : "Error desconocido";
                         showError("Error al confirmar", msg);
