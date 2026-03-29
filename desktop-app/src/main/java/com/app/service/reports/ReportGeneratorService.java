@@ -116,6 +116,48 @@ public class ReportGeneratorService {
         return new GeneratedFile(filePath, Math.max(1, sizeKb));
     }
 
+    /**
+     * Genera un reporte simple guardando en la ruta indicada por el usuario.
+     */
+    public GeneratedFile generate(String format, String name, String tipo,
+                                   String dateRange, List<Map<String, Object>> rows,
+                                   Path targetPath) throws IOException {
+        Files.createDirectories(targetPath.getParent());
+
+        if (format.equalsIgnoreCase("PDF")) {
+            generatePdf(targetPath, name, tipo, dateRange, rows);
+        } else {
+            generateExcel(targetPath, name, tipo, dateRange, rows);
+        }
+
+        long sizeKb = Files.size(targetPath) / 1024;
+        logger.info("Reporte generado: {} ({} KB)", targetPath.getFileName(), sizeKb);
+        return new GeneratedFile(targetPath, Math.max(1, sizeKb));
+    }
+
+    /**
+     * Genera un informe de rentabilidad completo guardando en la ruta indicada por el usuario.
+     */
+    public GeneratedFile generateRentabilidadCompleto(
+            String format, String name, String dateRange,
+            List<Map<String, Object>> mensual,
+            List<Map<String, Object>> porCategoria,
+            List<Map<String, Object>> porProducto,
+            Path targetPath) throws IOException {
+
+        Files.createDirectories(targetPath.getParent());
+
+        if (format.equalsIgnoreCase("PDF")) {
+            generatePdfMultiSection(targetPath, name, dateRange, mensual, porCategoria, porProducto);
+        } else {
+            generateExcelMultiSheet(targetPath, name, dateRange, mensual, porCategoria, porProducto);
+        }
+
+        long sizeKb = Files.size(targetPath) / 1024;
+        logger.info("Informe completo generado: {} ({} KB)", targetPath.getFileName(), sizeKb);
+        return new GeneratedFile(targetPath, Math.max(1, sizeKb));
+    }
+
     // ── Column definitions per report type ───────────────────────────────────
 
     private String[] getHeaders(String tipo) {

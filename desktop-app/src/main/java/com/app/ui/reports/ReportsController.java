@@ -19,9 +19,11 @@ import javafx.scene.control.*;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 import javafx.scene.layout.*;
+import javafx.stage.FileChooser;
 
 import java.awt.Desktop;
 import java.io.File;
+import java.nio.file.Path;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -277,11 +279,36 @@ public class ReportsController {
             return;
         }
 
+        String name   = txtReportName.getText().trim();
+        String format = selectedFormat;
+        String ext    = format.equalsIgnoreCase("PDF") ? ".pdf" : ".xlsx";
+        String safeName   = name.replaceAll("[^a-zA-Z0-9_\\-]", "_");
+        String timestamp  = LocalDateTime.now()
+                .format(java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"));
+
+        // Diálogo para que el usuario elija dónde guardar el archivo
+        FileChooser fileChooser = new FileChooser();
+        fileChooser.setTitle("Guardar reporte");
+        fileChooser.setInitialFileName(safeName + "_" + timestamp + ext);
+        if (format.equalsIgnoreCase("PDF")) {
+            fileChooser.getExtensionFilters().add(
+                    new FileChooser.ExtensionFilter("PDF (*.pdf)", "*.pdf"));
+        } else {
+            fileChooser.getExtensionFilters().add(
+                    new FileChooser.ExtensionFilter("Excel (*.xlsx)", "*.xlsx"));
+        }
+        File defaultDir = generator.getReportsDir().toFile();
+        fileChooser.setInitialDirectory(defaultDir.exists() ? defaultDir
+                : new File(System.getProperty("user.home")));
+
+        File selectedFile = fileChooser.showSaveDialog(btnGenerate.getScene().getWindow());
+        if (selectedFile == null) return; // usuario canceló
+        final Path targetPath = selectedFile.toPath();
+
         btnGenerate.setDisable(true);
         showStatus("Generando reporte...", true);
 
         String tipo          = selectedReportType.id();
-        String name          = txtReportName.getText().trim();
         String subtype       = cmbSubType.getValue() != null ? cmbSubType.getValue() : "";
         String agruparPor    = subtypeToAgruparPor(subtype);
         int    topN          = subtypeToTopN(subtype);
@@ -290,14 +317,13 @@ public class ReportsController {
                 + " - " + dpTo.getValue().format(FMT_DATERANGE);
         LocalDate from       = dpFrom.getValue();
         LocalDate to         = dpTo.getValue();
-        String format        = selectedFormat;
 
         reportsService.fetchReportData(tipo, from, to, agruparPor, topN)
                 .thenAccept(data -> Platform.runLater(() -> {
                     btnGenerate.setDisable(false);
 
                     if (data.isEmpty()) {
-                        showStatus("\u2716 Error al obtener datos del servidor. Verifica la conexión.", false);
+                        showStatus("\u2716 Error al obtener datos del servidor. Verifica la conexi\u00F3n.", false);
                         return;
                     }
 
@@ -308,14 +334,15 @@ public class ReportsController {
                                     format, name, dateRange,
                                     extractRows(data, "rentabilidad"),
                                     extractRows(data, "rentabilidad_categoria"),
-                                    extractRows(data, "rentabilidad_producto"));
+                                    extractRows(data, "rentabilidad_producto"),
+                                    targetPath);
                         } else {
                             List<Map<String, Object>> rows = extractRows(data, effectiveTipo);
-                            file = generator.generate(format, name, effectiveTipo, dateRange, rows);
+                            file = generator.generate(format, name, effectiveTipo, dateRange, rows, targetPath);
                         }
 
                         String displayTypeName = selectedReportType.name()
-                                + (subtype.isEmpty() ? "" : " — " + subtype);
+                                + (subtype.isEmpty() ? "" : " \u2014 " + subtype);
                         ReportDTO report = new ReportDTO(
                                 System.currentTimeMillis(),
                                 name,
@@ -332,8 +359,7 @@ public class ReportsController {
                         allSavedReports.add(0, report);
                         renderSavedReports();
 
-                        String msg = "\u2714 Guardado en: " + file.path().getFileName();
-                        showStatus(msg, true);
+                        showStatus("\u2714 Guardado en: " + file.path().toAbsolutePath(), true);
 
                     } catch (Exception e) {
                         showStatus("\u2716 Error al generar el archivo: " + e.getMessage(), false);

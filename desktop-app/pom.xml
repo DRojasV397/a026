@@ -21,7 +21,7 @@
     </properties>
 
     <dependencies>
-        <!-- JavaFX Dependencies -->
+        <!-- JavaFX Dependencies (platform actual — auto-detectado) -->
         <dependency>
             <groupId>org.openjfx</groupId>
             <artifactId>javafx-controls</artifactId>
@@ -193,9 +193,19 @@
                             <goal>shade</goal>
                         </goals>
                         <configuration>
+                            <filters>
+                                <filter>
+                                    <artifact>*:*</artifact>
+                                    <excludes>
+                                        <exclude>META-INF/*.SF</exclude>
+                                        <exclude>META-INF/*.DSA</exclude>
+                                        <exclude>META-INF/*.RSA</exclude>
+                                    </excludes>
+                                </filter>
+                            </filters>
                             <transformers>
                                 <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
-                                    <mainClass>com.app.Main</mainClass>
+                                    <mainClass>com.app.Launcher</mainClass>
                                 </transformer>
                             </transformers>
                         </configuration>
@@ -204,4 +214,45 @@
             </plugin>
         </plugins>
     </build>
+
+    <!-- Perfil para generar el JAR multiplataforma (Windows + macOS Apple Silicon).
+         Uso: mvn package -DskipTests -P cross-platform
+         NO activar durante desarrollo: los JARs de mac rompen javafx:run en Windows. -->
+    <profiles>
+        <profile>
+            <id>cross-platform</id>
+            <dependencies>
+                <!-- JavaFX — nativas macOS Apple Silicon (M1/M2/M3) -->
+                <dependency>
+                    <groupId>org.openjfx</groupId>
+                    <artifactId>javafx-controls</artifactId>
+                    <version>${javafx.version}</version>
+                    <classifier>mac-aarch64</classifier>
+                    <scope>runtime</scope>
+                </dependency>
+                <dependency>
+                    <groupId>org.openjfx</groupId>
+                    <artifactId>javafx-fxml</artifactId>
+                    <version>${javafx.version}</version>
+                    <classifier>mac-aarch64</classifier>
+                    <scope>runtime</scope>
+                </dependency>
+                <dependency>
+                    <groupId>org.openjfx</groupId>
+                    <artifactId>javafx-graphics</artifactId>
+                    <version>${javafx.version}</version>
+                    <classifier>mac-aarch64</classifier>
+                    <scope>runtime</scope>
+                </dependency>
+                <dependency>
+                    <groupId>org.openjfx</groupId>
+                    <artifactId>javafx-base</artifactId>
+                    <version>${javafx.version}</version>
+                    <classifier>mac-aarch64</classifier>
+                    <scope>runtime</scope>
+                </dependency>
+            </dependencies>
+        </profile>
+    </profiles>
+
 </project>
