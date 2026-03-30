@@ -435,7 +435,7 @@ async def get_purchases_data(
         if agg == 'W':
             df = df.set_index('fecha').resample('W-SUN')['total'].sum().reset_index()
         elif agg == 'M':
-            df = df.set_index('fecha').resample('ME')['total'].sum().reset_index()
+            df = df.set_index('fecha').resample('M')['total'].sum().reset_index()
 
     data = df.to_dict(orient='records')
     for row in data:

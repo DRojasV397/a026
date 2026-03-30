@@ -673,6 +673,8 @@ public class SimulationController {
         txtScenarioName.clear(); txtScenarioDesc.clear();
         buildVariablesEditor(getSimulationVariables());
         clearProductOverrides();
+        // Recargar modelos para reflejar packs entrenados durante esta sesión
+        loadUserModels();
         logEvent(ActionType.SCENARIO_CREATE_STARTED, Map.of());
         if (resultsPanel.isVisible()) slideOut(resultsPanel, () -> slideIn(editionPanel));
         else slideIn(editionPanel);

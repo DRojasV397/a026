@@ -2043,8 +2043,10 @@ public class PredictiveController {
         validPhase2 = phase2Config.isValid();
         updateFooterState();
 
-        // Auto-cargar preview cuando las fechas sean válidas
-        if (phase2Config.isHasEnoughData() && previewTable != null) {
+        // Auto-cargar preview cuando ambas fechas estén seleccionadas y sean válidas
+        // (independiente de si hay "suficientes datos" para entrenar)
+        if (phase2Config.getStartDate() != null && phase2Config.getEndDate() != null
+                && phase2Config.isHasNoErrors() && previewTable != null) {
             String range = phase2Config.getStartDate() + "_" + phase2Config.getEndDate();
             if (!range.equals(lastPreviewDateRange)) {
                 lastPreviewDateRange = range;

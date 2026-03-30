@@ -178,7 +178,7 @@ class PredictionService:
         elif aggregation == 'W':
             df_agg = df.set_index('fecha').resample('W-SUN')['total'].sum().reset_index()
         elif aggregation == 'M':
-            df_agg = df.set_index('fecha').resample('ME')['total'].sum().reset_index()
+            df_agg = df.set_index('fecha').resample('M')['total'].sum().reset_index()
         else:
             df_agg = df.groupby('fecha')['total'].sum().reset_index()
 
