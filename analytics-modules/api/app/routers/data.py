@@ -218,7 +218,7 @@ async def get_historial_cargas(
     - **tipo**: Filtro opcional por tipo de datos (ventas, compras, productos)
     """
     service = DataService(db)
-    result = service.get_historial_cargas(current_user.idUsuario, tipo)
+    result = service.get_historial_cargas(None, tipo)
     return HistorialCargaResponse(items=result["items"], total=result["total"])
 
 
@@ -267,7 +267,6 @@ async def get_historicos(
                 db.query(Venta.fecha, Producto.nombre, DetalleVenta.precioUnitario, DetalleVenta.cantidad)
                 .join(Venta, DetalleVenta.idVenta == Venta.idVenta)
                 .join(Producto, DetalleVenta.idProducto == Producto.idProducto)
-                .filter(Venta.creadoPor == current_user.idUsuario)
             )
             if fecha_inicio:
                 q = q.filter(Venta.fecha >= fecha_inicio)
@@ -293,7 +292,6 @@ async def get_historicos(
                 db.query(Compra.fecha, Producto.nombre, DetalleCompra.costo, DetalleCompra.cantidad, DetalleCompra.subtotal)
                 .join(Compra, DetalleCompra.idCompra == Compra.idCompra)
                 .join(Producto, DetalleCompra.idProducto == Producto.idProducto)
-                .filter(Compra.creadoPor == current_user.idUsuario)
             )
             if fecha_inicio:
                 q = q.filter(Compra.fecha >= fecha_inicio)

@@ -380,7 +380,7 @@ async def get_sales_data(
         fecha_inicio=fecha_inicio,
         fecha_fin=fecha_fin,
         aggregation=request.aggregation,
-        user_id=current_user.idUsuario
+        user_id=None
     )
 
     # Convertir DataFrame a lista de diccionarios
@@ -425,7 +425,7 @@ async def get_purchases_data(
     df = service.get_compras_data(
         fecha_inicio=fecha_inicio,
         fecha_fin=fecha_fin,
-        user_id=current_user.idUsuario
+        user_id=None
     )
 
     # Aplicar agregacion igual que sales-data
@@ -474,7 +474,7 @@ async def validate_data(
         fecha_inicio=fecha_inicio,
         fecha_fin=fecha_fin,
         aggregation=request.aggregation,
-        user_id=current_user.idUsuario
+        user_id=None
     )
 
     valid, issues = service.validate_data_requirements(df)

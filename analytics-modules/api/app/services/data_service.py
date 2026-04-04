@@ -815,9 +815,9 @@ class DataService:
             Dict con items y total
         """
         try:
-            query = self.db.query(HistorialCarga).filter(
-                HistorialCarga.cargadoPor == user_id
-            )
+            query = self.db.query(HistorialCarga)
+            if user_id is not None:
+                query = query.filter(HistorialCarga.cargadoPor == user_id)
             if tipo_datos:
                 query = query.filter(HistorialCarga.tipoDatos == tipo_datos)
 

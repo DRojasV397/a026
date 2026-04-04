@@ -93,10 +93,10 @@ class ProductoService:
             categoria_id: Filtrar por categoría
         """
         if categoria_id:
-            return self.producto_repo.get_por_categoria_y_usuario(categoria_id, user_id)
+            return self.producto_repo.get_by_categoria(categoria_id)
         if activos_only:
-            return self.producto_repo.get_activos_por_usuario(user_id)
-        return self.producto_repo.get_por_usuario(user_id, skip=skip, limit=limit)
+            return self.producto_repo.get_activos()
+        return self.producto_repo.get_all(skip=skip, limit=limit)
 
     def update_producto(
         self, producto_id: int, producto_data: ProductoUpdate, user_id: int

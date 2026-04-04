@@ -345,7 +345,7 @@ class PredictionService:
         # Todos los modelos usan datos diarios. SARIMA captura el patrón DOW con s=7
         # y variables exógenas DOW. ARIMA lo captura parcialmente con el componente AR.
         # La agregación semanal para ARIMA daba solo ~37 muestras: insuficiente.
-        df = self.get_sales_data(fecha_inicio, fecha_fin, aggregation='D', user_id=user_id)
+        df = self.get_sales_data(fecha_inicio, fecha_fin, aggregation='D', user_id=None)
 
         # Validar requisitos con chequeos específicos del modelo
         valid, issues = self.validate_data_requirements(df, model_type=model_type)
@@ -360,9 +360,9 @@ class PredictionService:
         compras_df = None
         hp = hyperparameters or {}
         if model_type == 'multiple_regression' and hp.get('use_compras', True):
-            compras_df = self.get_compras_data(fecha_inicio, fecha_fin, user_id=user_id)
+            compras_df = self.get_compras_data(fecha_inicio, fecha_fin, user_id=None)
         elif model_type == 'ensemble':
-            compras_df = self.get_compras_data(fecha_inicio, fecha_fin, user_id=user_id)
+            compras_df = self.get_compras_data(fecha_inicio, fecha_fin, user_id=None)
 
         # Crear modelo segun tipo
         model = self._create_model(model_type, hyperparameters, compras_data=compras_df)
@@ -744,8 +744,8 @@ class PredictionService:
         """
         logger.info("Iniciando seleccion automatica de modelo...")
 
-        # Obtener datos del usuario
-        df = self.get_sales_data(fecha_inicio, fecha_fin, user_id=user_id)
+        # Obtener datos de la organización
+        df = self.get_sales_data(fecha_inicio, fecha_fin, user_id=None)
 
         valid, issues = self.validate_data_requirements(df)
         if not valid:
@@ -1111,8 +1111,8 @@ class PredictionService:
         hp = hyperparameters or {}
 
         # ── Obtener datos ──────────────────────────────────────────────────
-        ventas_df  = self.get_sales_data(fecha_inicio, fecha_fin, aggregation='D', user_id=user_id)
-        compras_df = self.get_compras_data(fecha_inicio, fecha_fin, user_id=user_id)
+        ventas_df  = self.get_sales_data(fecha_inicio, fecha_fin, aggregation='D', user_id=None)
+        compras_df = self.get_compras_data(fecha_inicio, fecha_fin, user_id=None)
 
         # Validar mínimo de días en ambas series
         valid_v, issues_v = self.validate_data_requirements(ventas_df)
