@@ -16,6 +16,10 @@
       styleClass="navbar"
       stylesheets="@/styles/navbar.css">
 
+    <padding>
+        <Insets top="15" right="20" bottom="15" left="20"/>
+    </padding>
+
 <!-- IZQUIERDA: TÍTULOS -->
 <VBox spacing="3"
       alignment="CENTER_LEFT"
