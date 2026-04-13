@@ -219,7 +219,11 @@ public class ProfitController {
         sub.getStyleClass().add("main-subtitle");
         sub.setWrapText(true);
 
-        HBox ratiosRow = new HBox(12);
+        FlowPane ratiosRow = new FlowPane();
+        ratiosRow.setHgap(12);
+        ratiosRow.setVgap(12);
+        ratiosRow.setPrefWrapLength(Double.MAX_VALUE); // usa todo el ancho disponible
+
         VBox r1 = buildRatioCard("Razón Bruta",
                 "Utilidad Bruta / Ingresos",
                 pct.format(ind.getMargenBruto()) + "%",
@@ -232,10 +236,20 @@ public class ProfitController {
                 "Utilidad Neta / Ingresos",
                 pct.format(ind.getMargenNeto()) + "%",
                 ind.getMargenNeto());
-        HBox.setHgrow(r1, Priority.ALWAYS);
-        HBox.setHgrow(r2, Priority.ALWAYS);
-        HBox.setHgrow(r3, Priority.ALWAYS);
+        // Ancho mínimo para que cada card ocupe espacio razonable antes de hacer wrap
+        r1.setMinWidth(160);
+        r2.setMinWidth(160);
+        r3.setMinWidth(160);
+
+        // maxWidth para que no crezcan desproporcionadamente cuando hay espacio
+        r1.setMaxWidth(Double.MAX_VALUE);
+        r2.setMaxWidth(Double.MAX_VALUE);
+        r3.setMaxWidth(Double.MAX_VALUE);
+
         ratiosRow.getChildren().addAll(r1, r2, r3);
+
+        // El FlowPane sí crece con el VBox padre
+        VBox.setVgrow(ratiosRow, Priority.ALWAYS);
 
         card.getChildren().addAll(title, sub, ratiosRow);
         return card;

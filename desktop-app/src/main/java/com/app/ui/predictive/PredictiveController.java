@@ -177,7 +177,7 @@ public class PredictiveController {
                         "Análisis de tendencia directa y relaciones proporcionales.",
                         List.of("Esencial", "Polinomial", "Ágil"),
                         "La opción más estable para proyecciones de crecimiento base.",
-                        "📉", "Alta", "Instantáneo",
+                        "lineal_model.png", "Alta", "Instantáneo",
                         List.of(
                                 new PredictiveModelDTO.ModelFeature("📐", "Complejidad", "Lineal / Polinomial", "#3498db"),
                                 new PredictiveModelDTO.ModelFeature("🛡", "Regularización", "Lasso / Ridge / ElasticNet", "#2ecc71"),
@@ -189,7 +189,7 @@ public class PredictiveController {
                         "Especializado en series de tiempo sin estacionalidad.",
                         List.of("Cronológico", "Autoregresivo", "Histórico"),
                         "Analiza el pasado inmediato para proyectar el futuro cercano.",
-                        "📈", "Muy Alta", "Rápido",
+                        "arima_model.png", "Muy Alta", "Rápido",
                         List.of(
                                 new PredictiveModelDTO.ModelFeature("🔢", "Componentes", "AR (Lags) + I (Diff) + MA", "#3498db"),
                                 new PredictiveModelDTO.ModelFeature("🤖", "Optimización", "Auto-order automático", "#9b59b6"),
@@ -201,7 +201,7 @@ public class PredictiveController {
                         "Potente para negocios con picos estacionales (ventas, feriados).",
                         List.of("Estacional", "Rítmico", "Recurrente"),
                         "Identifica ciclos anuales, mensuales o semanales con precisión.",
-                        "🗓", "Excelente", "Moderado",
+                        "sarima_model.png", "Excelente", "Moderado",
                         List.of(
                                 new PredictiveModelDTO.ModelFeature("🔄", "Ciclos", "Soporta periodos de 1-365 días", "#2ecc71"),
                                 new PredictiveModelDTO.ModelFeature("📊", "Criterios", "Selección vía AIC / BIC", "#3498db"),
@@ -213,7 +213,7 @@ public class PredictiveController {
                         "Sistema de múltiples árboles para decisiones multivariable.",
                         List.of("Jerárquico", "Robusto", "Multivariable"),
                         "Ideal cuando intervienen muchas variables (clima, precios, stock).",
-                        "🌳", "Superior", "Intensivo",
+                        "forest_model.png", "Superior", "Intensivo",
                         List.of(
                                 new PredictiveModelDTO.ModelFeature("🌲", "Bosque", "Ensamble de 10-1000 árboles", "#27ae60"),
                                 new PredictiveModelDTO.ModelFeature("🏗", "Muestreo", "Técnica Bootstrap (Bagging)", "#8e44ad"),
@@ -225,7 +225,7 @@ public class PredictiveController {
                         "Regresión enriquecida con compras, lags y variables exógenas.",
                         List.of("Exógeno", "Lags", "Configurable"),
                         "Supera a la regresión lineal al incorporar datos de compras como predictor y lags de autocorrelación.",
-                        "📐", "Alta", "Rápido",
+                        "multiple_model.png", "Alta", "Rápido",
                         List.of(
                                 new PredictiveModelDTO.ModelFeature("🛒", "Variable exógena", "Datos de compras como predictor", "#e67e22"),
                                 new PredictiveModelDTO.ModelFeature("🔁", "Autocorrelación", "Lags 1, 7, 14 y 30 días", "#3498db"),
@@ -237,7 +237,7 @@ public class PredictiveController {
                         "Combina múltiples modelos con un meta-learner que aprende los pesos óptimos.",
                         List.of("Stacking", "Meta-Learner", "Multi-Modelo"),
                         "Supera modelos individuales capturando patrones complementarios: tendencia, lags y no-linealidad en conjunto.",
-                        "🧩", "Superior", "Intensivo",
+                        "ensamble_model.png", "Superior", "Intensivo",
                         List.of(
                                 new PredictiveModelDTO.ModelFeature("🔗", "Técnica", "Stacking OOF temporal (sin data leakage)", "#9b59b6"),
                                 new PredictiveModelDTO.ModelFeature("🤖", "Meta-Learner", "Ridge aprende pesos óptimos por modelo base", "#3498db"),
@@ -249,7 +249,7 @@ public class PredictiveController {
                         "Gradient Boosting de alta precisión con regularización integrada para series de tiempo.",
                         List.of("Gradient Boosting", "Regularización", "Lags"),
                         "Combina boosting secuencial con regularización L1/L2 para capturar relaciones no lineales con lags automáticos.",
-                        "⚡", "Superior", "Moderado",
+                        "boost_model.png", "Superior", "Moderado",
                         List.of(
                                 new PredictiveModelDTO.ModelFeature("🚀", "Técnica", "Boosting secuencial de árboles", "#e67e22"),
                                 new PredictiveModelDTO.ModelFeature("🛡", "Regularización", "L1 (reg_alpha) y L2 (reg_lambda)", "#2ecc71"),
@@ -261,7 +261,7 @@ public class PredictiveController {
                         "Modelo de Facebook para series de tiempo de negocio con estacionalidad múltiple.",
                         List.of("Facebook", "Estacional", "Tendencia"),
                         "Detecta tendencia adaptativa y estacionalidades anuales y semanales de forma automática, robusto ante outliers.",
-                        "🔮", "Alta", "Moderado",
+                        "prophet_model.png", "Alta", "Moderado",
                         List.of(
                                 new PredictiveModelDTO.ModelFeature("📅", "Estacionalidad", "Anual + semanal automática", "#9b59b6"),
                                 new PredictiveModelDTO.ModelFeature("📈", "Tendencia", "Adaptativa con changepoints", "#3498db"),
@@ -498,8 +498,20 @@ public class PredictiveController {
         VBox card = new VBox(10);
         card.getStyleClass().add("model-card");
 
-        Label icon = new Label(model.icon());
-        icon.getStyleClass().add("model-icon");
+        ImageView icon = new ImageView();
+        icon.setFitWidth(48);
+        icon.setFitHeight(48);
+        icon.setPreserveRatio(true);
+        try {
+            icon.setImage(new Image(
+                    Objects.requireNonNull(
+                            getClass().getResourceAsStream("/images/models/" + model.icon())
+                    )
+            ));
+        } catch (Exception e) {
+            // Fallback silencioso si no existe la imagen
+            System.out.println("Icono no encontrado: " + model.icon());
+        }
 
         Label title = new Label(model.title());
         title.getStyleClass().add("model-title");
