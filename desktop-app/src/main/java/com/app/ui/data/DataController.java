@@ -467,16 +467,14 @@ public class DataController {
         ButtonType btnVentas    = new ButtonType("Ventas",     ButtonBar.ButtonData.LEFT);
         ButtonType btnCompras   = new ButtonType("Compras",    ButtonBar.ButtonData.RIGHT);
         ButtonType btnProductos = new ButtonType("Productos",  ButtonBar.ButtonData.LEFT);
-        ButtonType btnInventario= new ButtonType("Inventario", ButtonBar.ButtonData.RIGHT);
         ButtonType btnCancel    = new ButtonType("Cancelar",   ButtonBar.ButtonData.CANCEL_CLOSE);
         tipoDialog.getDialogPane().getButtonTypes().setAll(
-                btnVentas, btnCompras, btnProductos, btnInventario, btnCancel);
+                btnVentas, btnCompras, btnProductos, btnCancel);
 
         tipoDialog.setResultConverter(btn -> {
             if (btn == btnVentas)     return "ventas";
             if (btn == btnCompras)    return "compras";
             if (btn == btnProductos)  return "productos";
-            if (btn == btnInventario) return "inventario";
             return null;
         });
 
@@ -1361,13 +1359,6 @@ public class DataController {
                 columnMappings.put("categoria",  "categoria");
                 columnMappings.put("descripcion","descripcion");
                 columnMappings.put("costo",      "costo");
-            }
-            case "inventario" -> {
-                columnMappings.put("sku",       "sku");
-                columnMappings.put("cantidad",  "cantidad");
-                columnMappings.put("ubicacion", "ubicacion");
-                columnMappings.put("minimo",    "minimo");
-                columnMappings.put("maximo",    "maximo");
             }
             default -> {
                 // Fallback: enviar columnas vacías y dejar que el backend las detecte

@@ -13,7 +13,6 @@ class DataType(str, Enum):
     VENTAS = "ventas"
     COMPRAS = "compras"
     PRODUCTOS = "productos"
-    INVENTARIO = "inventario"
 
 
 class UploadStatus(str, Enum):
@@ -163,14 +162,12 @@ REQUIRED_COLUMNS = {
     DataType.VENTAS: ["fecha", "total"],
     DataType.COMPRAS: ["fecha", "total"],
     DataType.PRODUCTOS: ["sku", "nombre", "precio"],
-    DataType.INVENTARIO: ["sku", "cantidad"]
 }
 
 OPTIONAL_COLUMNS = {
     DataType.VENTAS: ["producto", "cantidad", "precio_unitario", "cliente"],
     DataType.COMPRAS: ["producto", "cantidad", "costo", "proveedor"],
     DataType.PRODUCTOS: ["categoria", "descripcion", "costo"],
-    DataType.INVENTARIO: ["ubicacion", "minimo", "maximo"]
 }
 
 

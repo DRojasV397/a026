@@ -45,17 +45,17 @@ class DatabaseManager:
     def _get_connection_string(self) -> str:
         """
         Construye la cadena de conexión para SQL Server.
+        Usa autenticación SQL Server (UID/PWD) para compatibilidad con Linux.
 
         Returns:
             str: Cadena de conexión URL-encoded para SQLAlchemy
         """
-        # Construcción de la cadena de conexión ODBC con autenticación de Windows
-        # No especificamos puerto para usar Named Pipes (más confiable en Windows)
         connection_params = (
             f"DRIVER={{{settings.DB_DRIVER}}};"
-            f"SERVER={settings.DB_SERVER};"
+            f"SERVER={settings.DB_SERVER},{settings.DB_PORT};"
             f"DATABASE={settings.DB_NAME};"
-            "Trusted_Connection=yes;"
+            f"UID={settings.DB_USER};"
+            f"PWD={settings.DB_PASSWORD};"
             "TrustServerCertificate=yes;"
         )
 

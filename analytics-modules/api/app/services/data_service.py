@@ -482,8 +482,6 @@ class DataService:
                 updated = 0
             elif data_type == DataType.PRODUCTOS:
                 inserted, updated = self._insert_productos(df, user_id)
-            elif data_type == DataType.INVENTARIO:
-                inserted, updated = self._insert_inventario(df, user_id)
             else:
                 return {"success": False, "message": f"Tipo de datos no soportado: {data_type.value}"}
 
@@ -705,71 +703,6 @@ class DataService:
                 continue
 
         return inserted, updated
-
-    def _insert_inventario(
-        self, df: pd.DataFrame, user_id: Optional[int] = None
-    ) -> tuple[int, int]:
-        """
-        Actualiza el stock de productos existentes por SKU.
-
-        - Si el SKU existe para el usuario: actualiza stock, stockMinimo,
-          stockMaximo y ubicacion.
-        - Si el SKU no existe: se omite (no se puede crear un producto
-          desde datos de inventario sin nombre ni categoría).
-
-        Returns:
-            Tuple (no_encontrados_omitidos, actualizados)
-        """
-        repo = ProductoRepository(self.db)
-        updated = 0
-        skipped = 0
-
-        for _, row in df.iterrows():
-            try:
-                sku = str(row.get('sku', '')).strip()
-                if not sku:
-                    skipped += 1
-                    continue
-
-                # Buscar producto del usuario por SKU (incluye legacy con creadoPor=NULL)
-                existing = None
-                if user_id:
-                    existing = repo.get_by_sku_y_usuario(sku, user_id)
-                if not existing:
-                    existing = repo.get_by_sku(sku)
-
-                if not existing:
-                    logger.warning(f"Inventario: SKU '{sku}' no encontrado, omitiendo")
-                    skipped += 1
-                    continue
-
-                updates: dict = {}
-
-                cantidad_raw = row.get('cantidad')
-                if cantidad_raw is not None and str(cantidad_raw).strip() != '':
-                    updates['stock'] = int(float(cantidad_raw))
-
-                minimo_raw = row.get('minimo')
-                if minimo_raw is not None and str(minimo_raw).strip() != '':
-                    updates['stockMinimo'] = int(float(minimo_raw))
-
-                maximo_raw = row.get('maximo')
-                if maximo_raw is not None and str(maximo_raw).strip() != '':
-                    updates['stockMaximo'] = int(float(maximo_raw))
-
-                ubicacion_raw = row.get('ubicacion')
-                if ubicacion_raw is not None and str(ubicacion_raw).strip() != '':
-                    updates['ubicacion'] = str(ubicacion_raw).strip()
-
-                if updates:
-                    repo.update(existing.idProducto, updates)
-                    updated += 1
-
-            except Exception as e:
-                logger.warning(f"Error al actualizar inventario SKU '{row.get('sku')}': {str(e)}")
-                continue
-
-        return skipped, updated
 
     def _save_historial(
         self,
