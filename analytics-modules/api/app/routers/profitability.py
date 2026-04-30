@@ -205,12 +205,9 @@ async def get_profitability_projection(
     service = ProfitabilityService(db)
     result = service.get_profitability_projection(current_user.idUsuario, periods)
 
-    if not result.get("success"):
-        raise HTTPException(
-            status_code=404,
-            detail=result.get("error", "Error al generar proyección")
-        )
-
+    # Retornar siempre 200 (success o no) para que el cliente Java
+    # pueda diferenciar entre "sin modelos entrenados" (success=False)
+    # y un error de conexión real (resp == null).
     return result
 
 
